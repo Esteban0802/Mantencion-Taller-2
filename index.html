@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>CRM Mantención</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<header>🔧 Sistema de Mantención</header>
+
+<button onclick="window.location.href='dashboard.html'">
+  ← Volver al Panel
+</button>
+
+<div class="container">
+
+  <!-- TABS -->
+  <div class="tabs">
+    <button class="tab active" data-tab="ingreso">Ingreso</button>
+    <button class="tab disabled" data-tab="evaluacion">Evaluación</button>
+    <button class="tab disabled" data-tab="overhaul">Overhaul</button>
+    <button class="tab disabled" data-tab="pruebas">Pruebas</button>
+    <button class="tab disabled" data-tab="despacho">Despacho</button>
+  </div>
+
+  <!-- INGRESO -->
+  <div id="ingreso" class="content active">
+    <div class="card">
+      <h2>Ingreso de Equipo</h2>
+
+      <input id="equipo" placeholder="Equipo">
+      <input id="serie" placeholder="Serie">
+      <input id="cliente" placeholder="Cliente">
+      <input id="os" placeholder="Orden Servicio">
+
+      <label>Checklist (Excel)</label>
+      <input type="file" id="excelIngreso">
+
+      <button class="btn-primary" onclick="crearOT()">Crear Orden de Trabajo</button>
+    </div>
+  </div>
+
+  <!-- EVALUACION -->
+  <div id="evaluacion" class="content">
+    <div class="card">
+      <h2>Evaluación</h2>
+
+      <div id="listaEvaluacion"></div>
+
+      <button class="btn-success" onclick="guardarEvaluacion()">Guardar</button>
+      <button class="btn-primary" id="btnAprobar" onclick="aprobarEvaluacion()">Aprobar</button>
+    </div>
+  </div>
+
+  <!-- OVERHAUL -->
+  <div id="overhaul" class="content">
+  <div class="card">
+    <h2>Overhaul</h2>
+
+    <input type="file" id="excelOverhaul">
+    <button class="btn-primary" onclick="cargarOverhaul()">Cargar Checklist</button>
+
+    <div id="listaOverhaul"></div>
+
+    <br>
+    <button class="btn-success" onclick="guardarOverhaul()">Guardar</button>
+    <button class="btn-primary" onclick="aprobarOverhaul()">Aprobar</button>
+  </div>
+</div>
+
+  <div id="pruebas" class="content">
+  <div class="card">
+    <h2>Pruebas Funcionales</h2>
+
+    <h3>Checklist Mecánico</h3>
+    <input type="file" id="excelMecanico">
+    <button class="btn-primary" onclick="cargarChecklist('mecanico')">Cargar Mecánico</button>
+    <div id="listaMecanico"></div>
+
+    <hr>
+
+    <h3>Checklist Eléctrico</h3>
+    <input type="file" id="excelElectrico">
+    <button class="btn-primary" onclick="cargarChecklist('electrico')">Cargar Eléctrico</button>
+    <div id="listaElectrico"></div>
+
+    <br>
+    <button class="btn-success" onclick="guardarPruebas()">Guardar</button>
+    <button class="btn-primary" onclick="aprobarPruebas()">Aprobar</button>
+  </div>
+</div>
+
+  <div id="despacho" class="content">
+  <div class="card">
+    <h2>Despacho</h2>
+
+    <h3>Preparación de Despacho</h3>
+    <input type="file" id="excelPrep">
+    <button class="btn-primary" onclick="cargarChecklistDespacho('preparacion')">Cargar</button>
+    <div id="listaPreparacion"></div>
+
+    <hr>
+
+    <h3>Despacho Final</h3>
+    <input type="file" id="excelFinal">
+    <button class="btn-primary" onclick="cargarChecklistDespacho('final')">Cargar</button>
+    <div id="listaFinal"></div>
+
+    <hr>
+
+    <h3>Documentos</h3>
+    <input type="file" multiple onchange="subirDocumentos(event)">
+    <div id="listaDocs"></div>
+
+    <br>
+    <button class="btn-success" onclick="guardarDespacho()">Guardar</button>
+    <button class="btn-primary" onclick="cerrarOT()">Cerrar OT</button>
+    <button class="btn-warning" onclick="generarPDF()">Generar PDF</button>
+  </div>
+</div>
+
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

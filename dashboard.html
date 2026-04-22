@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Panel de Órdenes</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<header>📊 Panel de Mantención</header>
+
+<div class="container">
+
+  <div class="main-container">
+
+    <div class="header-panel">
+      <h2>Órdenes de Trabajo</h2>
+      <button class="btn-green" onclick="nuevaOT()">+ Nueva Orden</button>
+    </div>
+
+    <table class="tabla-ot">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Equipo</th>
+          <th>Serie</th>
+          <th>Estado</th>
+          <th>Acción</th>
+        </tr>
+      </thead>
+      <tbody id="tablaOT"></tbody>
+    </table>
+
+  </div>
+
+</div>
+
+<script src="js/dashboard.js"></script>
+</body>
+</html>
