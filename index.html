@@ -5,13 +5,9 @@
   <title>CRM Mantención</title>
   <link rel="stylesheet" href="css/styles.css">
 </head>
-<body>
+<body class="ot-view">
 
 <header>🔧 Sistema de Mantención</header>
-
-<button onclick="window.location.href='dashboard.html'">
-  ← Volver al Panel
-</button>
 
 <div class="container">
 
@@ -96,21 +92,26 @@
     <h2>Despacho</h2>
 
     <h3>Preparación de Despacho</h3>
-    <input type="file" id="excelPrep">
+    <input type="file" id="excelPrep" accept=".xlsx,.xls">
     <button class="btn-primary" onclick="cargarChecklistDespacho('preparacion')">Cargar</button>
     <div id="listaPreparacion"></div>
 
     <hr>
 
     <h3>Despacho Final</h3>
-    <input type="file" id="excelFinal">
+    <input type="file" id="excelFinal" accept=".xlsx,.xls">
     <button class="btn-primary" onclick="cargarChecklistDespacho('final')">Cargar</button>
     <div id="listaFinal"></div>
 
     <hr>
 
     <h3>Documentos</h3>
-    <input type="file" multiple onchange="subirDocumentos(event)">
+
+    <!-- 🔥 IMPORTANTE: input separado y limpio -->
+    <input type="file" id="inputDocs" multiple>
+
+    <button class="btn-primary" onclick="subirDocumentos()">Subir Documentos</button>
+
     <div id="listaDocs"></div>
 
     <br>
@@ -119,6 +120,11 @@
     <button class="btn-warning" onclick="generarPDF()">Generar PDF</button>
   </div>
 </div>
+<br>
+<br>
+<button onclick="window.location.href='dashboard.html'">
+  ← Volver al Panel
+</button>
 
 </div>
 

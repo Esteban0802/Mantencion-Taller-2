@@ -7,31 +7,72 @@
 </head>
 <body>
 
-<header>📊 Panel de Mantención</header>
+<div class="app">
 
-<div class="container">
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <h2 class="logo">⚙️ Mantención</h2>
 
-  <div class="main-container">
+    <ul>
+      <li onclick="irDashboard()">📊 Dashboard</li>
+      <li onclick="nuevaOT()">➕ Nueva OT</li>
+      <li onclick="irDashboard()">📁 Órdenes</li>
+    </ul>
+  </aside>
 
-    <div class="header-panel">
+  <!-- CONTENIDO -->
+  <main class="main-content">
+
+    <div class="header">
       <h2>Órdenes de Trabajo</h2>
-      <button class="btn-green" onclick="nuevaOT()">+ Nueva Orden</button>
     </div>
 
-    <table class="tabla-ot">
-      <thead>
-        <tr>
-          <th>ID</th>
-          <th>Equipo</th>
-          <th>Serie</th>
-          <th>Estado</th>
-          <th>Acción</th>
-        </tr>
-      </thead>
-      <tbody id="tablaOT"></tbody>
-    </table>
+      <!-- 🔥 KPI AQUÍ -->
+ <div class="kpis">
 
+  <div class="kpi-card total">
+    <div class="kpi-icon">📊</div>
+    <div>
+      <span>Total OT</span>
+      <h3 id="kpiTotal">0</h3>
+    </div>
   </div>
+
+  <div class="kpi-card proceso">
+    <div class="kpi-icon">⚙️</div>
+    <div>
+      <span>En Proceso</span>
+      <h3 id="kpiProceso">0</h3>
+    </div>
+  </div>
+
+  <div class="kpi-card cerradas">
+    <div class="kpi-icon">✅</div>
+    <div>
+      <span>Cerradas</span>
+      <h3 id="kpiCerradas">0</h3>
+    </div>
+  </div>
+
+</div>
+    
+
+    <div class="card">
+      <table class="tabla-ot">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Equipo</th>
+            <th>Serie</th>
+            <th>Estado</th>
+            <th>Acción</th>
+          </tr>
+        </thead>
+        <tbody id="tablaOT"></tbody>
+      </table>
+    </div>
+
+  </main>
 
 </div>
 

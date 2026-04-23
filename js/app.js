@@ -264,31 +264,68 @@ window.onload = () => {
 
   listaOTs = JSON.parse(data);
 
-  // 👉 SI NO HAY OT → es nueva
+  // 👉 SI NO HAY OT ACTIVA → es nueva
   if (!id) return;
 
-  // 👉 BUSCAR OT
+  // 👉 BUSCAR OT ACTIVA
   ot = listaOTs.find(o => o.id == id);
 
   if (!ot) return;
 
-  // ===== RESTAURAR FLUJO =====
+  // =========================
+  // RESTAURAR FLUJO COMPLETO
+  // =========================
 
+  // 👉 EVALUACION
   habilitarTab("evaluacion");
   cargarEvaluacion();
 
-  if (ot.aprobada) habilitarTab("overhaul");
-
-  if (ot.overhaul?.length > 0) renderOverhaul();
-
-  if (ot.overhaulAprobado) habilitarTab("pruebas");
-
-  if (ot.pruebas) {
-    if (ot.pruebas.mecanico?.length > 0) renderChecklist("mecanico");
-    if (ot.pruebas.electrico?.length > 0) renderChecklist("electrico");
+  // 👉 OVERHAUL
+  if (ot.aprobada) {
+    habilitarTab("overhaul");
   }
 
-  if (ot.pruebasAprobado) habilitarTab("despacho");
+  if (ot.overhaul && ot.overhaul.length > 0) {
+    renderOverhaul();
+  }
+
+  // 👉 PRUEBAS
+  if (ot.overhaulAprobado) {
+    habilitarTab("pruebas");
+  }
+
+  if (ot.pruebas) {
+    if (ot.pruebas.mecanico?.length > 0) {
+      renderChecklist("mecanico");
+    }
+
+    if (ot.pruebas.electrico?.length > 0) {
+      renderChecklist("electrico");
+    }
+  }
+
+  // 👉 DESPACHO
+  if (ot.pruebasAprobado) {
+    habilitarTab("despacho");
+  }
+
+  // 👉 CHECKLIST DESPACHO (si existen)
+  if (ot.despacho) {
+
+    if (ot.despacho.preparacion?.length > 0) {
+      renderDespacho("preparacion");
+    }
+
+    if (ot.despacho.final?.length > 0) {
+      renderDespacho("final");
+    }
+
+    // 🔥 DOCUMENTOS (LO IMPORTANTE)
+    if (ot.despacho.documentos?.length > 0) {
+      mostrarDocs();
+    }
+  }
+
 };
 
 // =======================
@@ -519,11 +556,21 @@ function toggleDespacho(tipo, i) {
   guardarCambiosOT();
 }
 
-function subirDocumentos(e) {
-  const files = e.target.files;
+function subirDocumentos() {
+  const input = document.getElementById("inputDocs");
+  const files = input.files;
+
+  if (!files.length) {
+    alert("Selecciona archivos");
+    return;
+  }
 
   if (!ot.despacho) {
     ot.despacho = { preparacion: [], final: [], documentos: [] };
+  }
+
+  if (!ot.despacho.documentos) {
+    ot.despacho.documentos = [];
   }
 
   for (let file of files) {
@@ -532,26 +579,47 @@ function subirDocumentos(e) {
     reader.onload = function() {
       ot.despacho.documentos.push({
         nombre: file.name,
+        tipo: file.type,
         data: reader.result
       });
 
-      mostrarDocs();
       guardarCambiosOT();
+      mostrarDocs();
     };
 
-    reader.readAsDataURL(file);
+    reader.readAsDataURL(file); // 🔥 IMPORTANTE: NO XLSX
   }
+
+  // limpiar input
+  input.value = "";
 }
 
 function mostrarDocs() {
   const cont = document.getElementById("listaDocs");
   cont.innerHTML = "";
 
+  if (!ot.despacho || !ot.despacho.documentos) return;
+
   ot.despacho.documentos.forEach(doc => {
     const div = document.createElement("div");
-    div.textContent = doc.nombre;
+    div.className = "doc-item";
+
+    div.innerHTML = `
+      <span>${doc.nombre}</span>
+      <span>📄</span>
+    `;
+
+    div.onclick = () => abrirDocumento(doc);
+
     cont.appendChild(div);
   });
+}
+
+function abrirDocumento(doc) {
+  const win = window.open();
+  win.document.write(`
+    <iframe src="${doc.data}" style="width:100%; height:100%; border:none;"></iframe>
+  `);
 }
 
 function guardarDespacho() {
@@ -590,4 +658,20 @@ function guardarCambiosOT() {
     localStorage.setItem("ots", JSON.stringify(listaOTs));
   }
 }
+
+function obtenerEstadoOT(ot) {
+
+  if (ot.estado === "CERRADA") return "CERRADA";
+
+  if (!ot.aprobada) return "EVALUACION";
+
+  if (ot.aprobada && !ot.overhaulAprobado) return "OVERHAUL";
+
+  if (ot.overhaulAprobado && !ot.pruebasAprobado) return "PRUEBAS";
+
+  if (ot.pruebasAprobado) return "DESPACHO";
+
+  return "INGRESO";
+}
+
 
