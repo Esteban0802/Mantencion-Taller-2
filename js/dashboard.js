@@ -1,4 +1,5 @@
 let listaOTs = [];
+let listaFiltrada = [];
 
 // =======================
 // ESTADO AUTOMÁTICO
@@ -43,8 +44,10 @@ window.onload = () => {
     listaOTs = JSON.parse(data);
   }
 
-  renderTabla();
-  calcularKPIs();
+  listaFiltrada = [...listaOTs];
+
+  renderTabla(listaFiltrada);
+  calcularKPIs(listaFiltrada);
 
   // Sidebar activo
   document.querySelectorAll(".sidebar li").forEach(item => {
@@ -58,13 +61,13 @@ window.onload = () => {
 // =======================
 // RENDER TABLA
 // =======================
-function renderTabla() {
+function renderTabla(lista = listaOTs) {
   const tbody = document.getElementById("tablaOT");
   if (!tbody) return;
 
   tbody.innerHTML = "";
 
-  listaOTs.forEach((o, i) => {
+  lista.forEach((o, i) => {
 
     const estado = obtenerEstadoOT(o);
     const progreso = calcularProgreso(o);
@@ -72,11 +75,15 @@ function renderTabla() {
     const tr = document.createElement("tr");
 
     tr.innerHTML = `
-      <td>OT-${o.id}</td>
-      <td>${o.equipo}</td>
-      <td>${o.serie}</td>
+      <td>${o.os || "—"}</td>
+      <td>${o.equipo || "—"}</td>
+      <td>${o.serie || "—"}</td>
 
-      <td>${estado}</td>
+      <td>
+        <span class="estado ${estado.toLowerCase()}">
+          ${estado}
+        </span>
+      </td>
 
       <td>
         <div class="progress-bar">
@@ -86,7 +93,7 @@ function renderTabla() {
       </td>
 
       <td>
-        <button class="btn-icon" onclick="abrirOT(${i})">👁</button>
+        <button class="btn-icon" onclick="abrirOT(${listaOTs.indexOf(o)})">👁</button>
       </td>
     `;
 
@@ -97,12 +104,12 @@ function renderTabla() {
 // =======================
 // KPI
 // =======================
-function calcularKPIs() {
-  let total = listaOTs.length;
+function calcularKPIs(lista = listaOTs) {
+  let total = lista.length;
   let proceso = 0;
   let cerradas = 0;
 
-  listaOTs.forEach(ot => {
+  lista.forEach(ot => {
     const estado = obtenerEstadoOT(ot);
 
     if (estado === "CERRADA") {
@@ -112,13 +119,9 @@ function calcularKPIs() {
     }
   });
 
-  const kpiTotal = document.getElementById("kpiTotal");
-  const kpiProceso = document.getElementById("kpiProceso");
-  const kpiCerradas = document.getElementById("kpiCerradas");
-
-  if (kpiTotal) kpiTotal.textContent = total;
-  if (kpiProceso) kpiProceso.textContent = proceso;
-  if (kpiCerradas) kpiCerradas.textContent = cerradas;
+  document.getElementById("kpiTotal").textContent = total;
+  document.getElementById("kpiProceso").textContent = proceso;
+  document.getElementById("kpiCerradas").textContent = cerradas;
 }
 
 // =======================
@@ -145,4 +148,24 @@ function nuevaOT() {
 // =======================
 function irDashboard() {
   window.location.href = "dashboard.html";
+}
+
+function filtrarOTs() {
+  const texto = document.getElementById("inputBuscar").value.toLowerCase();
+
+  listaFiltrada = listaOTs.filter(ot => {
+
+    const os = (ot.os || "").toLowerCase();
+    const equipo = (ot.equipo || "").toLowerCase();
+    const serie = (ot.serie || "").toLowerCase();
+
+    return (
+      os.includes(texto) ||
+      equipo.includes(texto) ||
+      serie.includes(texto)
+    );
+  });
+
+  renderTabla(listaFiltrada);
+  calcularKPIs(listaFiltrada);
 }

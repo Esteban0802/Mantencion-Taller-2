@@ -27,6 +27,15 @@
       <h2>Órdenes de Trabajo</h2>
     </div>
 
+    <div class="buscador">
+  <input 
+    type="text" 
+    id="inputBuscar" 
+    placeholder="🔍 Buscar por OT, equipo o serie..."
+    onkeyup="filtrarOTs()"
+  >
+</div>
+
       <!-- 🔥 KPI AQUÍ -->
  <div class="kpis">
 
@@ -61,7 +70,7 @@
       <table class="tabla-ot">
         <thead>
           <tr>
-            <th>ID</th>
+            <th>Orden</th>
             <th>Equipo</th>
             <th>Serie</th>
             <th>Estado</th>

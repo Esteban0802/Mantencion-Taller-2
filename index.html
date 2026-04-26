@@ -13,27 +13,46 @@
 
   <!-- TABS -->
   <div class="tabs">
-    <button class="tab active" data-tab="ingreso">Ingreso</button>
+    <button class="tab active" data-tab="crear">Crear OS</button>
+    <button class="tab disabled" data-tab="ingreso">Ingreso</button>
     <button class="tab disabled" data-tab="evaluacion">Evaluación</button>
     <button class="tab disabled" data-tab="overhaul">Overhaul</button>
     <button class="tab disabled" data-tab="pruebas">Pruebas</button>
     <button class="tab disabled" data-tab="despacho">Despacho</button>
   </div>
 
-  <!-- INGRESO -->
-  <div id="ingreso" class="content active">
+  <!---CREAR OS-->
+  <div id="crear" class="content active">
     <div class="card">
-      <h2>Ingreso de Equipo</h2>
+      <h2>Crear Orden de Servicio</h2>
 
       <input id="equipo" placeholder="Equipo">
       <input id="serie" placeholder="Serie">
       <input id="cliente" placeholder="Cliente">
       <input id="os" placeholder="Orden Servicio">
 
-      <label>Checklist (Excel)</label>
-      <input type="file" id="excelIngreso">
+      <button class="btn-primary" onclick="guardarDatosOS()">
+        Continuar a Ingreso →
+      </button>
+    </div>
+  </div>
 
-      <button class="btn-primary" onclick="crearOT()">Crear Orden de Trabajo</button>
+  <!-- INGRESO -->
+  <div id="ingreso" class="content">
+    <div class="card">
+      <h3>Checklist Ingreso</h3>
+
+      <input type="file" id="excelIngreso">
+      <button class="btn-primary" onclick="cargarIngreso()">Cargar Checklist</button>
+
+      <div id="listaIngreso"></div>
+
+      <button class="btn-success" onclick="guardarIngreso()">
+        💾 Guardar Progreso
+      </button>
+      <button class="btn-primary" onclick="aprobarIngreso()">
+        Aprobar Ingreso
+      </button>
     </div>
   </div>
 
@@ -42,9 +61,15 @@
     <div class="card">
       <h2>Evaluación</h2>
 
+      <input type="file" id="excelEvaluacion">
+      <button class="btn-primary" onclick="cargarEvaluacion()">Cargar Checklist</button>
+
+
       <div id="listaEvaluacion"></div>
 
-      <button class="btn-success" onclick="guardarEvaluacion()">Guardar</button>
+      <button class="btn-success" onclick="guardarEvaluacion()">
+        💾 Guardar Evaluación
+      </button>
       <button class="btn-primary" id="btnAprobar" onclick="aprobarEvaluacion()">Aprobar</button>
     </div>
   </div>
@@ -60,11 +85,15 @@
     <div id="listaOverhaul"></div>
 
     <br>
-    <button class="btn-success" onclick="guardarOverhaul()">Guardar</button>
+    <button class="btn-success" onclick="guardarOverhaul()">
+        💾 Guardar Overhaul
+    </button>
     <button class="btn-primary" onclick="aprobarOverhaul()">Aprobar</button>
   </div>
 </div>
 
+
+<!--PRUEBAS-->
   <div id="pruebas" class="content">
   <div class="card">
     <h2>Pruebas Funcionales</h2>
@@ -82,40 +111,44 @@
     <div id="listaElectrico"></div>
 
     <br>
-    <button class="btn-success" onclick="guardarPruebas()">Guardar</button>
+    <button class="btn-success" onclick="guardarPruebas()">
+        💾 Guardar Progreso
+    </button>
     <button class="btn-primary" onclick="aprobarPruebas()">Aprobar</button>
   </div>
 </div>
 
+
+<!--DESPACHO-->
   <div id="despacho" class="content">
   <div class="card">
     <h2>Despacho</h2>
 
-    <h3>Preparación de Despacho</h3>
-    <input type="file" id="excelPrep" accept=".xlsx,.xls">
-    <button class="btn-primary" onclick="cargarChecklistDespacho('preparacion')">Cargar</button>
-    <div id="listaPreparacion"></div>
+<h3>Preparación de Despacho</h3>
+<input type="file" id="docsPrep" multiple>
+<button class="btn-primary" onclick="subirDocsSeccion('preparacion')">Subir</button>
+<div id="listaDocsPrep"></div>
 
-    <hr>
+<hr>
 
-    <h3>Despacho Final</h3>
-    <input type="file" id="excelFinal" accept=".xlsx,.xls">
-    <button class="btn-primary" onclick="cargarChecklistDespacho('final')">Cargar</button>
-    <div id="listaFinal"></div>
+<h3>Despacho Final</h3>
+<input type="file" id="docsFinal" multiple>
+<button class="btn-primary" onclick="subirDocsSeccion('final')">Subir</button>
+<div id="listaDocsFinal"></div>
 
-    <hr>
+<hr>
 
-    <h3>Documentos</h3>
+<h3>Documentos Generales</h3>
 
-    <!-- 🔥 IMPORTANTE: input separado y limpio -->
-    <input type="file" id="inputDocs" multiple>
+<input type="file" id="inputDocs" multiple>
+<button class="btn-primary" onclick="subirDocumentos()">Subir Documentos</button>
 
-    <button class="btn-primary" onclick="subirDocumentos()">Subir Documentos</button>
-
-    <div id="listaDocs"></div>
+<div id="listaDocs"></div>
 
     <br>
-    <button class="btn-success" onclick="guardarDespacho()">Guardar</button>
+    <button class="btn-success" onclick="guardarDespacho()">
+        💾 Guardar Despacho
+    </button>
     <button class="btn-primary" onclick="cerrarOT()">Cerrar OT</button>
     <button class="btn-warning" onclick="generarPDF()">Generar PDF</button>
   </div>
@@ -125,6 +158,17 @@
 <button onclick="window.location.href='dashboard.html'">
   ← Volver al Panel
 </button>
+
+<!-- 🔥 MODAL VISOR DOCUMENTOS -->
+<div id="modalDoc" class="modal-doc">
+  <div class="modal-content-doc">
+
+    <span class="close-doc" onclick="cerrarModal()">✖</span>
+
+    <iframe id="visorDoc"></iframe>
+
+  </div>
+</div>
 
 </div>
 
