@@ -562,6 +562,35 @@ function renderComentariosEvaluacion(i) {
   });
 }
 
+function validarEvaluacionCompleta() {
+
+  if (!ot.evaluacion || ot.evaluacion.length === 0) {
+    alert("Debes cargar checklist");
+    return false;
+  }
+
+  const checklist = ot.evaluacion.every(i => i.ok);
+  const fotos = ot.evaluacion.every(i => i.fotos && i.fotos.length > 0);
+  const comentarios = ot.evaluacion.every(i => i.comentarios && i.comentarios.length > 0);
+
+  if (!checklist) {
+    alert("Checklist incompleto");
+    return false;
+  }
+
+  if (!fotos) {
+    alert("Debes subir evidencia fotográfica en todos los ítems");
+    return false;
+  }
+
+  if (!comentarios) {
+    alert("Todos los ítems deben tener comentarios");
+    return false;
+  }
+
+  return true;
+}
+
 function eliminarComentarioEvaluacion(i, index) {
 
   if (!confirm("¿Eliminar comentario?")) return;
@@ -572,27 +601,24 @@ function eliminarComentarioEvaluacion(i, index) {
   renderComentariosEvaluacion(i);
 }
 
+
 function aprobarEvaluacion() {
+
   if (usuario.rol !== "admin") {
     alert("Solo admin puede aprobar");
     return;
   }
 
-  const completo = ot.evaluacion.every(i => i.ok);
+  // 🔥 VALIDACIÓN COMPLETA
+  if (!validarEvaluacionCompleta()) return;
 
-  if (!completo) {
-    alert("Debes completar todo el checklist");
-    return;
-  }
-
-  // 🔥 IMPORTANTE
   ot.evaluacionAprobada = true;
 
   guardarCambiosOT();
 
   habilitarTab("overhaul");
 
-  alert("Evaluación aprobada");
+  alert("Evaluación aprobada correctamente ✅");
 }
 // =======================
 // GUARDAR EVALUACIÓN
@@ -692,6 +718,47 @@ window.onload = () => {
     }
   }
 
+  // 🔥 FORZAR FLUJO VISUAL
+if (ot) {
+
+  // 👉 SI NO HA EMPEZADO INGRESO
+  if (!ot.ingreso || ot.ingreso.length === 0) {
+    habilitarTab("ingreso");
+    cambiarTab("ingreso");
+  }
+
+  // 👉 SI YA ESTÁ EN INGRESO
+  else if (ot.ingreso && !ot.ingresoAprobado) {
+    habilitarTab("ingreso");
+    cambiarTab("ingreso");
+  }
+
+  // 👉 SI INGRESO APROBADO → EVALUACION
+  else if (ot.ingresoAprobado && !ot.evaluacionAprobada) {
+    habilitarTab("evaluacion");
+    cambiarTab("evaluacion");
+  }
+
+  // 👉 SI EVALUACION APROBADA → OVERHAUL
+  else if (ot.evaluacionAprobada && !ot.overhaulAprobado) {
+    habilitarTab("overhaul");
+    cambiarTab("overhaul");
+  }
+
+  // 👉 SI OVERHAUL APROBADO → PRUEBAS
+  else if (ot.overhaulAprobado && !ot.pruebasAprobado) {
+    habilitarTab("pruebas");
+    cambiarTab("pruebas");
+  }
+
+  // 👉 SI PRUEBAS APROBADAS → DESPACHO
+  else if (ot.pruebasAprobado) {
+    habilitarTab("despacho");
+    cambiarTab("despacho");
+  }
+
+}
+
 };
 
 function cambiarTab(nombre) {
@@ -710,6 +777,53 @@ function irACrearOS() {
 
   cambiarTab("crear");
 
+}
+
+function validarOverhaulCompleto() {
+
+  if (!ot.overhaul || ot.overhaul.length === 0) {
+    alert("Debes cargar checklist");
+    return false;
+  }
+
+  const checklist = ot.overhaul.every(i => i.ok);
+  const fotos = ot.overhaul.every(i => i.fotos && i.fotos.length > 0);
+  const comentarios = ot.overhaul.every(i => i.comentarios && i.comentarios.length > 0);
+
+  if (!checklist) {
+    alert("Checklist incompleto");
+    return false;
+  }
+
+  if (!fotos) {
+    alert("Faltan evidencias fotográficas");
+    return false;
+  }
+
+  if (!comentarios) {
+    alert("Faltan comentarios");
+    return false;
+  }
+
+  return true;
+}
+
+function aprobarOverhaul() {
+
+  if (usuario.rol !== "admin") {
+    alert("Solo admin puede aprobar");
+    return;
+  }
+
+  if (!validarOverhaulCompleto()) return;
+
+  ot.overhaulAprobado = true;
+
+  guardarCambiosOT();
+
+  habilitarTab("pruebas");
+
+  alert("Overhaul aprobado correctamente");
 }
 
 // =======================
@@ -1299,6 +1413,66 @@ function aprobarPruebas() {
   alert("PRUEBAS aprobadas, se habilita DESPACHO");
 }
 
+function validarPruebasCompleto() {
+
+  if (!ot.pruebas) {
+    alert("Debes cargar los checklist de pruebas");
+    return false;
+  }
+
+  const tipos = ["mecanico", "electrico"];
+
+  for (let tipo of tipos) {
+
+    const lista = ot.pruebas[tipo];
+
+    if (!lista || lista.length === 0) {
+      alert(`Falta checklist ${tipo}`);
+      return false;
+    }
+
+    const checklist = lista.every(i => i.ok);
+    const fotos = lista.every(i => i.fotos && i.fotos.length > 0);
+    const comentarios = lista.every(i => i.comentarios && i.comentarios.length > 0);
+
+    if (!checklist) {
+      alert(`Checklist ${tipo} incompleto`);
+      return false;
+    }
+
+    if (!fotos) {
+      alert(`Faltan evidencias en ${tipo}`);
+      return false;
+    }
+
+    if (!comentarios) {
+      alert(`Faltan comentarios en ${tipo}`);
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function aprobarPruebas() {
+
+  if (usuario.rol !== "admin") {
+    alert("Solo admin puede aprobar");
+    return;
+  }
+
+  // 🔥 VALIDACIÓN CENTRALIZADA
+  if (!validarPruebasCompleto()) return;
+
+  ot.pruebasAprobado = true;
+
+  guardarCambiosOT();
+
+  habilitarTab("despacho");
+
+  alert("PRUEBAS aprobadas correctamente");
+}
+
 // =======================
 // SUBIR DOCUMENTOS POR SECCIÓN
 // =======================
@@ -1391,15 +1565,6 @@ function eliminarDocSeccion(e, tipo, index) {
   renderDocsSeccion(tipo);
 }
 
-function validarDespachoCompleto() {
-
-  if (!ot.despacho) return false;
-
-  const prep = ot.despacho.preparacion?.length > 0;
-  const final = ot.despacho.final?.length > 0;
-
-  return prep && final;
-}
 
 // =======================
 // ABRIR DOCUMENTO (MODAL)
@@ -1456,14 +1621,27 @@ function guardarDespacho() {
 
 function validarDespachoCompleto() {
 
-  if (!ot.despacho) return false;
+  if (!ot.despacho) {
+    alert("Falta información de despacho");
+    return false;
+  }
 
   const prep = ot.despacho.preparacion?.length > 0;
   const final = ot.despacho.final?.length > 0;
   const docs = ot.despacho.documentos?.length > 0;
 
-  if (!prep || !final || !docs) {
-    alert("Faltan documentos en despacho");
+  if (!prep) {
+    alert("Faltan documentos de preparación");
+    return false;
+  }
+
+  if (!final) {
+    alert("Faltan documentos de despacho final");
+    return false;
+  }
+
+  if (!docs) {
+    alert("Faltan documentos generales");
     return false;
   }
 

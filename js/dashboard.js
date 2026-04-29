@@ -1,3 +1,4 @@
+
 let listaOTs = [];
 let listaFiltrada = [];
 
@@ -131,7 +132,6 @@ function abrirOT(index) {
   const ot = listaOTs[index];
 
   localStorage.setItem("otActiva", ot.id);
-
   window.location.href = "index.html";
 }
 

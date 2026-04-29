@@ -702,3 +702,89 @@ textarea {
   margin-top: 5px;
   color: #64748b;
 }
+
+.estado {
+  padding: 5px 10px;
+  border-radius: 8px;
+  font-weight: bold;
+  color: white;
+  font-size: 12px;
+}
+
+/* ESTADOS */
+.estado.crear {
+  background: #64748b; /* gris */
+}
+
+.estado.ingreso {
+  background: #f59e0b; /* amarillo */
+}
+
+.estado.evaluacion {
+  background: #3b82f6; /* azul */
+}
+
+.estado.overhaul {
+  background: #8b5cf6; /* morado */
+}
+
+.estado.pruebas {
+  background: #06b6d4; /* celeste 🔥 */
+}
+
+.estado.despacho {
+  background: #0ea5e9; /* azul fuerte */
+}
+
+.estado.cerrada {
+  background: #10b981; /* verde */
+}
+
+.estado {
+  padding: 5px 10px;
+  border-radius: 6px;
+  color: white;
+  font-weight: bold;
+  font-size: 12px;
+}
+
+/* COLORES */
+.estado-ingreso {
+  background: #f59e0b; /* amarillo */
+}
+
+.estado-evaluacion {
+  background: #3b82f6; /* azul */
+}
+
+.estado-overhaul {
+  background: #8b5cf6; /* morado */
+}
+
+.estado-pruebas {
+  background: #06b6d4; /* celeste */
+}
+
+.estado-despacho {
+  background: #6366f1; /* azul oscuro */
+}
+
+.estado-cerrada {
+  background: #10b981; /* verde */
+}
+
+
+
+
+.estado {
+  margin-left: 5px;
+  font-size: 14px;
+}
+
+.tab.completo {
+  background: #d4edda;
+}
+
+.tab.proceso {
+  background: #fff3cd;
+}
