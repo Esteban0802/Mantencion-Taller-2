@@ -3,7 +3,11 @@
 // =======================
 let ot = null;
 let listaOTs = [];
-let usuario = { rol: "admin" };
+let usuario = {
+  nombre: "Esteban",
+  rol: "admin",
+  sucursal: "Antofagasta"
+};
 
 // =======================
 // TABS
@@ -194,19 +198,18 @@ function mostrarFotosIngreso(i) {
   ot.ingreso[i].fotos.forEach((foto, index) => {
 
     const cont = document.createElement("div");
-    cont.style.position = "relative";
-    cont.style.display = "inline-block";
+    cont.className = "foto-box";
 
     const img = document.createElement("img");
     img.src = foto;
+    img.style.cursor = "pointer";
+    img.onclick = () => verImagenModal(foto);
     img.width = 100;
 
     const btn = document.createElement("button");
-    btn.innerText = "❌";
+    btn.innerHTML = "&times;";
 
-    btn.style.position = "absolute";
-    btn.style.top = "0";
-    btn.style.right = "0";
+    btn.className = "btn-delete-img";
 
     btn.onclick = () => eliminarFotoIngreso(i, index);
 
@@ -268,12 +271,17 @@ function renderComentariosItem(i) {
   ot.ingreso[i].comentarios.forEach((c, index) => {
 
     const div = document.createElement("div");
-    div.className = "item";
+    div.className = "comentario-card";
 
     div.innerHTML = `
-      <strong>${c.nombre}</strong> - <small>${c.fecha}</small>
+      <strong>👨‍🔧${c.nombre}</strong>
+      <p class="comentario-fecha">${c.fecha}</p>
       <p>${c.texto}</p>
-      <button onclick="eliminarComentarioIngreso(${i}, ${index})">🗑</button>
+      <button 
+        class="btn-delete-comment"
+        onclick="eliminarComentarioIngreso(${i}, ${index})">
+        🗑
+      </button>
     `;
 
     cont.appendChild(div);
@@ -317,6 +325,8 @@ function aprobarIngreso() {
 
   ot.ingresoAprobado = true;
 
+  ot.estado = obtenerEstadoOT(ot);
+
   guardarCambiosOT();
 
   habilitarTab("evaluacion");
@@ -349,10 +359,34 @@ function guardarCambiosOT() {
   const index = lista.findIndex(o => o.id === ot.id);
 
   if (index !== -1) {
+
+    // 🔥 ACTUALIZAR ESTADO ANTES DE GUARDAR
+    ot.estado = obtenerEstadoOT(ot);
+
     lista[index] = ot;
   }
 
   localStorage.setItem("ots", JSON.stringify(lista));
+
+    // 🔥 ACTUALIZAR UI EN TIEMPO REAL
+  actualizarPipeline();
+
+  // 🔥 FORZAR REFRESH VISUAL
+window.dispatchEvent(new Event("storage"));
+}
+
+function obtenerEstadoOT(ot) {
+
+  if (!ot) return "INGRESO";
+
+  if (!ot.ingresoAprobado) return "INGRESO";
+  if (!ot.evaluacionAprobada) return "EVALUACION";
+  if (!ot.overhaulAprobado) return "OVERHAUL";
+  if (!ot.pruebasAprobado) return "PRUEBAS";
+
+  if (!ot.despacho) return "DESPACHO";
+
+  return "CERRADA";
 }
 
 function cargarEvaluacion() {
@@ -482,19 +516,18 @@ function mostrarFotosEvaluacion(i) {
   ot.evaluacion[i].fotos.forEach((foto, index) => {
 
     const cont = document.createElement("div");
-    cont.style.position = "relative";
-    cont.style.display = "inline-block";
+    cont.className = "foto-box";
 
     const img = document.createElement("img");
     img.src = foto;
+    img.style.cursor = "pointer";
+    img.onclick = () => verImagenModal(foto);
     img.width = 100;
 
     const btn = document.createElement("button");
-    btn.innerText = "❌";
+    btn.innerHTML = "&times;";
 
-    btn.style.position = "absolute";
-    btn.style.top = "0";
-    btn.style.right = "0";
+    btn.className = "btn-delete-img";
 
     btn.onclick = () => eliminarFotoEvaluacion(i, index);
 
@@ -550,12 +583,17 @@ function renderComentariosEvaluacion(i) {
   comentarios.forEach((c, index) => {
 
     const div = document.createElement("div");
-    div.className = "item";
+    div.className = "comentario-card";
 
     div.innerHTML = `
-      <strong>${c.nombre}</strong> - <small>${c.fecha}</small>
+      <strong>👨‍🔧${c.nombre}</strong>
+      <p class="comentario-fecha">${c.fecha}</p>
       <p>${c.texto}</p>
-      <button onclick="eliminarComentarioEvaluacion(${i}, ${index})">🗑</button>
+      <button 
+        class="btn-delete-comment"
+        onclick="eliminarComentarioEvaluacion(${i}, ${index})">
+        🗑
+      </button>
     `;
 
     cont.appendChild(div);
@@ -613,6 +651,8 @@ function aprobarEvaluacion() {
   if (!validarEvaluacionCompleta()) return;
 
   ot.evaluacionAprobada = true;
+
+  ot.estado = obtenerEstadoOT(ot);
 
   guardarCambiosOT();
 
@@ -759,6 +799,8 @@ if (ot) {
 
 }
 
+actualizarPipeline();
+
 };
 
 function cambiarTab(nombre) {
@@ -806,24 +848,6 @@ function validarOverhaulCompleto() {
   }
 
   return true;
-}
-
-function aprobarOverhaul() {
-
-  if (usuario.rol !== "admin") {
-    alert("Solo admin puede aprobar");
-    return;
-  }
-
-  if (!validarOverhaulCompleto()) return;
-
-  ot.overhaulAprobado = true;
-
-  guardarCambiosOT();
-
-  habilitarTab("pruebas");
-
-  alert("Overhaul aprobado correctamente");
 }
 
 // =======================
@@ -930,33 +954,51 @@ function subirFotoOverhaul(e, i) {
 }
 
 function mostrarFotosOverhaul(i) {
+
   const div = document.getElementById(`fotos-overhaul-${i}`);
   if (!div) return;
 
   div.innerHTML = "";
 
-  (ot.overhaul[i].fotos || []).forEach((f, index) => {
+  (ot.overhaul[i].fotos || []).forEach((foto, index) => {
 
     const container = document.createElement("div");
+    container.className = "foto-box";
 
     const img = document.createElement("img");
-    img.src = f;
+    img.src = foto; // ✅ CORRECTO
+    img.width = 100;
+    img.style.cursor = "pointer";
+    img.onclick = () => verImagenModal(foto);
     img.width = 100;
 
-    const btn = document.createElement("button");
-    btn.innerText = "❌";
 
-    btn.onclick = () => {
-      ot.overhaul[i].fotos.splice(index, 1);
-      guardarCambiosOT();
-      mostrarFotosOverhaul(i);
-    };
+    const btn = document.createElement("button");
+    btn.innerHTML = "&times;";
+
+    btn.className = "btn-delete-img";
+
+    btn.onclick = () => eliminarFotoOverhaul(i, index);
 
     container.appendChild(img);
     container.appendChild(btn);
 
     div.appendChild(container);
   });
+}
+
+function eliminarFotoOverhaul(i, index) {
+
+  const confirmar = confirm("¿Eliminar foto?");
+  if (!confirmar) return;
+
+  if (!ot.overhaul[i].fotos) return;
+
+  ot.overhaul[i].fotos.splice(index, 1);
+
+  guardarCambiosOT();
+
+  mostrarFotosOverhaul(i);
 }
 
 function agregarComentarioOverhaul(i) {
@@ -997,12 +1039,17 @@ function renderComentariosOverhaul(i) {
   (ot.overhaul[i].comentarios || []).forEach((c, index) => {
 
     const div = document.createElement("div");
-    div.className = "item";
+    div.className = "comentario-card";
 
     div.innerHTML = `
-      <strong>${c.nombre}</strong> - <small>${c.fecha}</small>
+      <strong>👨‍🔧${c.nombre}</strong>
+      <p class="comentario-fecha">${c.fecha}</p>
       <p>${c.texto}</p>
-      <button onclick="eliminarComentarioOverhaul(${i}, ${index})">🗑</button>
+      <button 
+        class="btn-delete-comment"
+        onclick="eliminarComentarioOverhaul(${i}, ${index})">
+        🗑
+      </button>
     `;
 
     cont.appendChild(div);
@@ -1077,6 +1124,8 @@ function aprobarOverhaul() {
 
   // ✅ aprobar
   ot.overhaulAprobado = true;
+
+  ot.estado = obtenerEstadoOT(ot);
 
   guardarCambiosOT();
 
@@ -1174,8 +1223,6 @@ function renderChecklist(tipo) {
       <button onclick="agregarComentarioPrueba('${tipo}', ${i})">Agregar</button>
 
       <div id="comentarios-${tipo}-${i}"></div>
-
-      <small>📅 ${fechaTexto}</small>
     `;
 
     cont.appendChild(div);
@@ -1211,7 +1258,9 @@ function mostrarFotosPrueba(tipo, i) {
 
   ot.pruebas[tipo][i].fotos.forEach(f => {
     const img = document.createElement("img");
-    img.src = f;
+    img.src = foto;
+    img.style.cursor = "pointer";
+    img.onclick = () => verImagenModal(foto);
     img.width = 100;
     div.appendChild(img);
   });
@@ -1265,20 +1314,17 @@ function renderComentariosPrueba(tipo, i) {
   comentarios.forEach((c, index) => {
 
     const div = document.createElement("div");
-    div.className = "item";
+    div.className = "comentario-card";
 
     div.innerHTML = `
-      <div style="display:flex; justify-content:space-between;">
-        <div>
-          <strong>${c.nombre}</strong> - <small>${c.fecha}</small>
-          <p>${c.texto}</p>
-        </div>
-
-        <button onclick="eliminarComentarioPrueba('${tipo}', ${i}, ${index})"
-          style="background:red; color:white; border:none; border-radius:5px;">
-          🗑
-        </button>
-      </div>
+      <strong>👨‍🔧${c.nombre}</strong>
+      <p class="comentario-fecha">${c.fecha}</p>
+      <p>${c.texto}</p>
+      <button 
+        class="btn-delete-comment"
+        onclick="eliminarComentarioPrueba('${tipo}', ${i}, ${index})">
+        🗑
+      </button>
     `;
 
     cont.appendChild(div);
@@ -1307,22 +1353,18 @@ function mostrarFotosPrueba(tipo, i) {
   ot.pruebas[tipo][i].fotos.forEach((foto, index) => {
 
     const container = document.createElement("div");
-    container.style.position = "relative";
-    container.style.display = "inline-block";
-    container.style.margin = "5px";
+    container.className = "foto-box";
 
     const img = document.createElement("img");
     img.src = foto;
+    img.style.cursor = "pointer";
+    img.onclick = () => verImagenModal(foto);
     img.width = 100;
 
     const btn = document.createElement("button");
-    btn.innerText = "❌";
+    btn.innerHTML = "&times;";
 
-    btn.style.position = "absolute";
-    btn.style.top = "0";
-    btn.style.right = "0";
-    btn.style.background = "red";
-    btn.style.color = "white";
+    btn.className = "btn-delete-img";
 
     btn.onclick = () => eliminarFotoPrueba(tipo, i, index);
 
@@ -1406,6 +1448,8 @@ function aprobarPruebas() {
   // ✅ aprobar
   ot.pruebasAprobado = true;
 
+  ot.estado = obtenerEstadoOT(ot);
+
   guardarCambiosOT();
 
   habilitarTab("despacho");
@@ -1454,24 +1498,6 @@ function validarPruebasCompleto() {
   return true;
 }
 
-function aprobarPruebas() {
-
-  if (usuario.rol !== "admin") {
-    alert("Solo admin puede aprobar");
-    return;
-  }
-
-  // 🔥 VALIDACIÓN CENTRALIZADA
-  if (!validarPruebasCompleto()) return;
-
-  ot.pruebasAprobado = true;
-
-  guardarCambiosOT();
-
-  habilitarTab("despacho");
-
-  alert("PRUEBAS aprobadas correctamente");
-}
 
 // =======================
 // SUBIR DOCUMENTOS POR SECCIÓN
@@ -1536,9 +1562,12 @@ function renderDocsSeccion(tipo) {
     div.className = "doc-item";
 
     div.innerHTML = `
-      <span>${doc.nombre}</span>
+      <div class="doc-left">
+        <span class="doc-icon">📄</span>
+        <span class="doc-name">${doc.nombre}</span>
+      </div>
 
-      <div>
+      <div class="doc-actions">
         <button onclick="abrirDocSeccion(event, '${tipo}', ${index})">👁</button>
         <button onclick="eliminarDocSeccion(event, '${tipo}', ${index})">🗑</button>
       </div>
@@ -1823,6 +1852,22 @@ function abrirDocumentoDesdeLista(e, index) {
   abrirDocumento(ot.despacho.documentos[index]);
 }
 
+function eliminarDocumento(e, index) {
+
+  e.stopPropagation();
+
+  const confirmar = confirm("¿Eliminar documento?");
+  if (!confirmar) return;
+
+  if (!ot?.despacho?.documentos) return;
+
+  ot.despacho.documentos.splice(index, 1);
+
+  guardarCambiosOT();
+
+  mostrarDocs();
+}
+
 function mostrarDocs() {
 
   const cont = document.getElementById("listaDocs");
@@ -1867,210 +1912,570 @@ function generarPDF() {
   }
 
   const { jsPDF } = window.jspdf;
-  const doc = new jsPDF();
 
-  const logo = "./img/LOGO COLOR pn.png";
+  const doc = new jsPDF("p", "mm", "a4");
+
+  // =========================
+  // CONFIG
+  // =========================
+  const logo = "./img/pdf/logo.png";
+  const portada = "./img/pdf/portada.jpg";
+
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
 
   let y = 20;
 
-  // =======================
-  // 🔷 HEADER
-  // =======================
+  // =========================
+  // PORTADA
+  // =========================
+function crearPortada() {
+
+  // Fondo blanco
+  doc.setFillColor(255,255,255);
+  doc.rect(0,0,pageWidth,pageHeight,"F");
+
+  // =========================
+  // LOGO SUPERIOR
+  // =========================
+  doc.addImage(logo, "PNG", 20, 15, 35, 12);
+
+  // =========================
+  // TEXTO SUPERIOR DERECHO
+  // =========================
+  doc.setFontSize(8);
+  doc.setTextColor(100);
+
+  doc.text(
+    `Informe final ${ot.equipo || ""}`,
+    185,
+    18,
+    { align:"right" }
+  );
+
+  doc.text(
+    new Date().toLocaleDateString("es-CL"),
+    185,
+    23,
+    { align:"right" }
+  );
+
+  // =========================
+  // TÍTULO EMPRESA
+  // =========================
+  doc.setFont("helvetica","bold");
+  doc.setFontSize(18);
+  doc.setTextColor(20);
+
+  doc.text(
+    "ATLAS COPCO CHILE S.P.A",
+    pageWidth/2,
+    55,
+    { align:"center" }
+  );
+
+  // =========================
+  // LÍNEA SUPERIOR IMAGEN
+  // =========================
+  doc.setDrawColor(0,140,190);
+  doc.setLineWidth(2);
+
+  doc.line(30, 75, 180, 75);
+
+  // =========================
+  // IMAGEN CENTRAL
+  // =========================
+  doc.addImage(
+    portada,
+    "JPEG",
+    30,
+    78,
+    150,
+    70
+  );
+
+  // =========================
+  // LÍNEA INFERIOR IMAGEN
+  // =========================
+  doc.line(30, 155, 180, 155);
+
+  // =========================
+  // TITULO CENTRAL
+  // =========================
+  doc.setFontSize(20);
+  doc.setFont("helvetica","bold");
+
+  doc.text(
+    "INFORME FINAL",
+    pageWidth/2,
+    185,
+    { align:"center" }
+  );
+
+  // EQUIPO
+  doc.setFontSize(16);
+
+  doc.text(
+    `${ot.equipo || ""}`,
+    pageWidth/2,
+    197,
+    { align:"center" }
+  );
+
+  // CLIENTE
+  doc.text(
+    `${ot.cliente || ""}`,
+    pageWidth/2,
+    209,
+    { align:"center" }
+  );
+
+  // =========================
+  // DATOS EXTRA
+  // =========================
+  doc.setFontSize(11);
+  doc.setFont("helvetica","normal");
+
+  doc.text(
+    `OS: ${ot.os || "-"}`,
+    pageWidth/2,
+    225,
+    { align:"center" }
+  );
+
+  doc.text(
+    `SERIE: ${ot.serie || "-"}`,
+    pageWidth/2,
+    233,
+    { align:"center" }
+  );
+
+  // =========================
+  // FOOTER
+  // =========================
+  doc.setFontSize(8);
+  doc.setTextColor(120);
+
+  doc.text(
+    "Sistema de Gestión de Mantención",
+    pageWidth/2,
+    285,
+    { align:"center" }
+  );
+}
+
+  crearPortada();
+
+  // =========================
+  // NUEVA PÁGINA
+  // =========================
+  doc.addPage();
+
+  // =========================
+  // HEADER
+  // =========================
   function header() {
 
     // Logo
-    doc.addImage(logo, "PNG", 10, 8, 40, 15);
+    doc.addImage(logo, "PNG", 10, 8, 40, 12);
 
-    // Título
-    doc.setFontSize(16);
-    doc.setFont("helvetica", "bold");
-    doc.text("ORDEN DE SERVICIO", 105, 15, { align: "center" });
+    // Línea superior
+    doc.setDrawColor(200);
+    doc.line(10, 24, 200, 24);
 
-    // Línea
-    doc.setDrawColor(0);
-    doc.line(10, 25, 200, 25);
-
-    y = 30;
-  }
-
-  header();
-
-  // =======================
-  // 🔷 DATOS GENERALES
-  // =======================
-  function seccionTitulo(texto) {
-    doc.setFontSize(12);
-    doc.setFont("helvetica", "bold");
-    doc.text(texto, 10, y);
-    y += 6;
-  }
-
-  function textoNormal(txt) {
+    // Texto derecha
     doc.setFontSize(9);
-    doc.setFont("helvetica", "normal");
-    doc.text(txt, 10, y);
-    y += 5;
+    doc.setTextColor(90);
+
+    doc.text(
+      `Informe OT ${ot.os || "-"}`,
+      200,
+      12,
+      { align:"right" }
+    );
+
+    doc.text(
+      `${ot.cliente || "-"}`,
+      200,
+      17,
+      { align:"right" }
+    );
+
+    doc.text(
+      new Date().toLocaleDateString("es-CL"),
+      200,
+      22,
+      { align:"right" }
+    );
+
+    y = 35;
   }
 
-  function saltoPagina() {
-    if (y > 270) {
+  // =========================
+  // FOOTER
+  // =========================
+  function footer(page) {
+
+    doc.setDrawColor(220);
+    doc.line(10, 285, 200, 285);
+
+    doc.setFontSize(8);
+    doc.setTextColor(100);
+
+    doc.text(
+      "Sistema de Gestión de Mantención",
+      10,
+      290
+    );
+
+    doc.text(
+      `Página ${page}`,
+      200,
+      290,
+      { align:"right" }
+    );
+  }
+
+  // =========================
+  // CONTROL PÁGINAS
+  // =========================
+  function checkPage() {
+
+    if (y > 260) {
+
+      footer(doc.getNumberOfPages());
+
       doc.addPage();
+
       header();
     }
   }
 
-  seccionTitulo("DATOS GENERALES");
+  // =========================
+  // TITULOS
+  // =========================
+  function titulo(txt) {
 
-  textoNormal(`Equipo: ${ot.equipo}`);
-  textoNormal(`Serie: ${ot.serie}`);
-  textoNormal(`Cliente: ${ot.cliente}`);
-  textoNormal(`OS: ${ot.os}`);
-  textoNormal(`Estado: ${ot.estado}`);
-  textoNormal(`Fecha: ${new Date().toLocaleString()}`);
+    checkPage();
 
-  y += 5;
+    doc.setFontSize(16);
+    doc.setTextColor(20,20,20);
+    doc.setFont("helvetica","bold");
 
-  // =======================
-  // 🔷 FUNCIÓN IMÁGENES
-  // =======================
-  function agregarImagen(img) {
-    try {
-      saltoPagina();
-      doc.addImage(img, "JPEG", 10, y, 60, 40);
-      y += 45;
-    } catch (e) {
-      console.warn("Error imagen", e);
-    }
+    doc.text(txt, 10, y);
+
+    y += 10;
   }
 
-  // =======================
-  // 🔹 SECCIÓN GENÉRICA
-  // =======================
-  function renderSeccion(nombre, data) {
+  // =========================
+  // TEXTO
+  // =========================
+  function parrafo(txt) {
 
-    if (!data || data.length === 0) return;
+    checkPage();
 
-    saltoPagina();
-    y += 5;
+    doc.setFontSize(10);
+    doc.setFont("helvetica","normal");
 
-    seccionTitulo(nombre);
+    const split = doc.splitTextToSize(txt, 180);
 
-    data.forEach(item => {
+    doc.text(split, 10, y);
 
-      saltoPagina();
-
-      doc.setFont("helvetica", "bold");
-      doc.text(`✔ ${item.item}`, 10, y);
-      y += 5;
-
-      doc.setFont("helvetica", "normal");
-
-      // comentarios
-      if (item.comentarios) {
-        item.comentarios.forEach(c => {
-          doc.text(`- ${c.nombre}: ${c.texto}`, 12, y);
-          y += 5;
-        });
-      }
-
-      // fotos
-      if (item.fotos) {
-        item.fotos.forEach(f => agregarImagen(f));
-      }
-
-      y += 3;
-    });
+    y += split.length * 5 + 5;
   }
 
-  // =======================
-  // 🔷 SECCIONES
-  // =======================
-  renderSeccion("INGRESO", ot.ingreso);
-  renderSeccion("EVALUACIÓN", ot.evaluacion);
-  renderSeccion("OVERHAUL", ot.overhaul);
+  // =========================
+  // DATOS GENERALES
+  // =========================
+  header();
 
-  // =======================
-  // 🔷 PRUEBAS
-  // =======================
-  if (ot.pruebas) {
+  titulo("1. DATOS GENERALES");
 
-    saltoPagina();
-    seccionTitulo("PRUEBAS");
+  doc.autoTable({
+    startY: y,
+    theme: "grid",
+    styles: {
+      fontSize: 10
+    },
+    headStyles: {
+      fillColor: [40,40,40]
+    },
+    body: [
+      ["Equipo", ot.equipo || "-"],
+      ["Serie", ot.serie || "-"],
+      ["Cliente", ot.cliente || "-"],
+      ["OS", ot.os || "-"],
+      ["Estado", ot.estado || "-"]
+    ]
+  });
 
-    ["mecanico", "electrico"].forEach(tipo => {
+  y = doc.lastAutoTable.finalY + 15;
 
-      const lista = ot.pruebas[tipo];
-      if (!lista) return;
+  // =========================
+  // RESUMEN
+  // =========================
+  titulo("2. RESUMEN DEL SERVICIO");
 
+  parrafo(
+  `Adjuntamos informe final correspondiente a mantenimiento Overhaul realizado a equipo compresor de aire Atlas Copco ${ot.equipo || "-"}, serie ${ot.serie || "-"}, perteneciente a ${ot.cliente || "-"}.`
+  );
+  parrafo(
+    "Daremos paso al detalle de las condiciones observadas en vuestro equipo."
+  );
+  parrafo(
+  `Servicio realizado por Post Venta Compressor Technique Service, Sucursal Atlas Copco ${usuario.sucursal || "-"}.`
+);
+
+  // =========================
+// BLOQUE SERVICIO
+// =========================
+function renderBloqueServicio(tituloSeccion, lista) {
+
+  if (!lista || lista.length === 0) return;
+
+  titulo(tituloSeccion);
+
+  lista.forEach((item, index) => {
+
+    checkPage();
+
+    // =========================
+    // ITEM
+    // =========================
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+
+    doc.text(`${index + 1}. ${item.item}`, 10, y);
+
+    y += 8;
+
+    // =========================
+    // COMENTARIOS
+    // =========================
+    if (item.comentarios?.length > 0) {
+
+      doc.setFontSize(10);
       doc.setFont("helvetica", "bold");
-      doc.text(tipo.toUpperCase(), 10, y);
-      y += 5;
 
-      lista.forEach(item => {
+      doc.text("Trabajos realizados:", 15, y);
 
-        saltoPagina();
+      y += 6;
+
+      item.comentarios.forEach(c => {
 
         doc.setFont("helvetica", "normal");
-        doc.text(`✔ ${item.item}`, 12, y);
-        y += 5;
 
-        if (item.fotos) {
-          item.fotos.forEach(f => agregarImagen(f));
+        const texto =
+          `• ${c.nombre}: ${c.texto}`;
+
+        const split = doc.splitTextToSize(texto, 170);
+
+        doc.text(split, 20, y);
+
+        y += split.length * 5 + 3;
+
+      });
+    }
+
+    // =========================
+    // FOTOS
+    // =========================
+    if (item.fotos?.length > 0) {
+
+      y += 5;
+
+      doc.setFont("helvetica", "bold");
+
+      doc.text("Evidencias fotográficas:", 15, y);
+
+      y += 10;
+
+      let x = 15;
+      let col = 0;
+
+      item.fotos.forEach(foto => {
+
+        checkPage();
+
+        try {
+
+          // Marco
+          doc.setDrawColor(180);
+          doc.rect(x - 1, y - 1, 57, 42);
+
+          // Imagen
+          doc.addImage(
+            foto,
+            "JPEG",
+            x,
+            y,
+            55,
+            40
+          );
+
+        } catch(e) {
+          console.warn(e);
         }
 
-        y += 3;
+        col++;
+
+        if (col === 3) {
+
+          col = 0;
+          x = 15;
+          y += 50;
+
+        } else {
+
+          x += 60;
+        }
+
       });
 
-    });
-  }
+      y += 55;
+    }
 
-  // =======================
-  // 🔷 DESPACHO
-  // =======================
-  if (ot.despacho?.documentos) {
+    y += 10;
 
-    saltoPagina();
-    seccionTitulo("DOCUMENTOS");
+  });
 
-    ot.despacho.documentos.forEach(d => {
-      textoNormal(`📄 ${d.nombre}`);
-    });
-  }
+}
 
-  // =======================
-  // 🔷 FIRMA
-  // =======================
-  saltoPagina();
+// =========================
+// INGRESO
+// =========================
+renderBloqueServicio(
+  "3. INGRESO",
+  ot.ingreso
+);
 
-  y += 10;
+// =========================
+// EVALUACIÓN
+// =========================
+renderBloqueServicio(
+  "4. EVALUACIÓN",
+  ot.evaluacion
+);
 
-  doc.line(20, y, 90, y);
-  doc.line(110, y, 180, y);
+// =========================
+// OVERHAUL
+// =========================
+renderBloqueServicio(
+  "5. OVERHAUL",
+  ot.overhaul
+);
 
-  y += 5;
+// =========================
+// PRUEBAS MECÁNICAS
+// =========================
+if (ot.pruebas?.mecanico) {
 
-  doc.text("Técnico", 40, y);
-  doc.text("Cliente", 140, y);
+  renderBloqueServicio(
+    "6. PRUEBAS MECÁNICAS",
+    ot.pruebas.mecanico
+  );
 
-  // =======================
-  // 🔷 FOOTER
-  // =======================
+}
+
+// =========================
+// PRUEBAS ELÉCTRICAS
+// =========================
+if (ot.pruebas?.electrico) {
+
+  renderBloqueServicio(
+    "7. PRUEBAS ELÉCTRICAS",
+    ot.pruebas.electrico
+  );
+
+}
+
+  // =========================
+  // RESUMEN FINAL
+  // =========================
+  titulo("9. CONCLUSIONES");
+
+  parrafo(
+  "El equipo queda operativo posterior a las actividades de mantenimiento realizadas por personal técnico especializado de Atlas Copco Compressor Technique Service."
+);
+
+parrafo(
+  "Todas las actividades fueron ejecutadas según procedimiento técnico y registradas en el presente informe."
+);
+
+parrafo(
+  "Se recomienda continuar con el plan de mantenimiento preventivo del equipo para asegurar continuidad operacional y confiabilidad."
+);
+
+
+  // =========================
+  // FOOTERS FINALES
+  // =========================
   const totalPages = doc.getNumberOfPages();
 
-  for (let i = 1; i <= totalPages; i++) {
+  for (let i = 2; i <= totalPages; i++) {
+
     doc.setPage(i);
 
-    doc.setFontSize(8);
-    doc.text(
-      `Página ${i} de ${totalPages}`,
-      200,
-      290,
-      { align: "right" }
-    );
+    footer(i);
   }
 
-  // =======================
-  // 🔚 EXPORTAR
-  // =======================
-  doc.save(`OT_${ot.os}.pdf`);
+  // =========================
+  // EXPORTAR
+  // =========================
+  doc.save(`Informe_${ot.os}.pdf`);
+}
+
+function actualizarPipeline() {
+
+  const estado = obtenerEstadoOT(ot);
+
+  const orden = [
+    "INGRESO",
+    "EVALUACION",
+    "OVERHAUL",
+    "PRUEBAS",
+    "DESPACHO",
+    "CERRADA"
+  ];
+
+  orden.forEach((step, i) => {
+
+    const el = document.getElementById("step-" + step.toLowerCase());
+    if (!el) return;
+
+    el.classList.remove("active", "done");
+
+    const indexEstado = orden.indexOf(estado);
+
+    if (i < indexEstado) {
+      el.classList.add("done");
+    } else if (i === indexEstado) {
+      el.classList.add("active");
+    }
+
+  });
+}
+
+function mostrarAlerta(msg, tipo = "error") {
+
+  const div = document.createElement("div");
+
+  div.className = "alerta " + tipo;
+  div.innerText = msg;
+
+  document.body.appendChild(div);
+
+  setTimeout(() => div.remove(), 3000);
+}
+
+function verImagenModal(src) {
+  const modal = document.getElementById("modalImagen");
+  const img = document.getElementById("imgExpandida");
+
+  img.src = src;
+  modal.style.display = "block";
+}
+
+function cerrarImagen() {
+  document.getElementById("modalImagen").style.display = "none";
 }

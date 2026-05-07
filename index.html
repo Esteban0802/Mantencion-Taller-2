@@ -7,6 +7,17 @@
 </head>
 <body class="ot-view">
 
+  <div class="pipeline">
+
+  <div class="step" id="step-ingreso">Ingreso</div>
+  <div class="step" id="step-evaluacion">Evaluación</div>
+  <div class="step" id="step-overhaul">Overhaul</div>
+  <div class="step" id="step-pruebas">Pruebas</div>
+  <div class="step" id="step-despacho">Despacho</div>
+  <div class="step" id="step-cerrada">Cerrada</div>
+
+</div>
+
 <header>🔧 Sistema de Mantención</header>
 
 <div class="container">
@@ -169,10 +180,17 @@
   </div>
 </div>
 
+<!-- 🔥 VISOR DE IMÁGENES PRO -->
+<div id="modalImagen" class="modal-img">
+  <span class="cerrar-img" onclick="cerrarImagen()">×</span>
+  <img class="contenido-img" id="imgExpandida">
+</div>
+
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

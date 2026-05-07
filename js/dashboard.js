@@ -6,17 +6,16 @@ let listaFiltrada = [];
 // ESTADO AUTOMÁTICO
 // =======================
 function obtenerEstadoOT(ot) {
-  if (ot.estado === "CERRADA") return "CERRADA";
+  if (!ot) return "INGRESO";
 
-  if (!ot.aprobada) return "EVALUACION";
+  if (!ot.ingresoAprobado) return "INGRESO";
+  if (!ot.evaluacionAprobada) return "EVALUACION";
+  if (!ot.overhaulAprobado) return "OVERHAUL";
+  if (!ot.pruebasAprobado) return "PRUEBAS";
 
-  if (ot.aprobada && !ot.overhaulAprobado) return "OVERHAUL";
+  if (!ot.despacho) return "DESPACHO";
 
-  if (ot.overhaulAprobado && !ot.pruebasAprobado) return "PRUEBAS";
-
-  if (ot.pruebasAprobado) return "DESPACHO";
-
-  return "INGRESO";
+  return "CERRADA";
 }
 
 // =======================
@@ -57,6 +56,8 @@ window.onload = () => {
       this.classList.add("active");
     });
   });
+
+  renderGraficos(listaFiltrada);
 };
 
 // =======================
@@ -80,11 +81,7 @@ function renderTabla(lista = listaOTs) {
       <td>${o.equipo || "—"}</td>
       <td>${o.serie || "—"}</td>
 
-      <td>
-        <span class="estado ${estado.toLowerCase()}">
-          ${estado}
-        </span>
-      </td>
+      <td class="estado ${estado.toLowerCase()}">${estado}</td>
 
       <td>
         <div class="progress-bar">
@@ -100,6 +97,33 @@ function renderTabla(lista = listaOTs) {
 
     tbody.appendChild(tr);
   });
+}
+
+function pintarEstado(ot) {
+
+  const estado = obtenerEstadoOT(ot);
+
+  const colores = {
+    INGRESO: "#6c757d",
+    EVALUACION: "#ffc107",
+    OVERHAUL: "#0d6efd",
+    PRUEBAS: "#6f42c1",
+    DESPACHO: "#20c997",
+    CERRADA: "#198754"
+  };
+
+  return `
+    <span style="
+      background:${colores[estado]};
+      color:white;
+      padding:5px 10px;
+      border-radius:12px;
+      font-size:12px;
+      font-weight:bold;
+    ">
+      ${estado}
+    </span>
+  `;
 }
 
 // =======================
@@ -169,3 +193,96 @@ function filtrarOTs() {
   renderTabla(listaFiltrada);
   calcularKPIs(listaFiltrada);
 }
+
+let chartEstados = null;
+let chartProgreso = null;
+
+function renderGraficos(lista = listaOTs) {
+
+  const estadosCount = {
+    INGRESO: 0,
+    EVALUACION: 0,
+    OVERHAUL: 0,
+    PRUEBAS: 0,
+    DESPACHO: 0,
+    CERRADA: 0
+  };
+
+  let progresoTotal = 0;
+
+  lista.forEach(ot => {
+
+    const estado = obtenerEstadoOT(ot);
+    estadosCount[estado]++;
+
+    progresoTotal += calcularProgreso(ot);
+  });
+
+  const promedio = lista.length ? (progresoTotal / lista.length) : 0;
+
+  // 🔥 DESTRUIR GRÁFICOS ANTES (IMPORTANTE)
+  if (chartEstados) chartEstados.destroy();
+  if (chartProgreso) chartProgreso.destroy();
+
+  // 📊 GRAFICO ESTADOS
+chartEstados = new Chart(document.getElementById("graficoEstados"), {
+  type: "doughnut",
+  data: {
+    labels: Object.keys(estadosCount),
+    datasets: [{
+      data: Object.values(estadosCount),
+      backgroundColor: [
+        "#6c757d",  // gris ingreso
+        "#f39c12",  // evaluacion
+        "#007bff",  // overhaul
+        "#8e44ad",  // pruebas
+        "#16a085",  // despacho
+        "#2ecc71"   // cerrada
+      ],
+      borderColor: "#ffffff", // 🔥 bordes blancos
+      borderWidth: 2
+    }]
+  },
+  options: {
+    plugins: {
+      legend: {
+        labels: {
+          color: "#ffffff" // 🔥 texto blanco
+        }
+      }
+    }
+  }
+});
+
+  // 📊 GRAFICO PROGRESO
+  chartProgreso = new Chart(document.getElementById("graficoProgreso"), {
+    type: "bar",
+    data: {
+      labels: ["Progreso Promedio"],
+      datasets: [{
+        data: [promedio],
+        backgroundColor: ["#00c853"]
+      }]
+    },
+    options: {
+      scales: {
+        y: {
+          beginAtZero: true,
+          max: 100
+        }
+      }
+    }
+  });
+}
+
+window.addEventListener("storage", () => {
+  const data = localStorage.getItem("ots");
+  if (data) {
+    listaOTs = JSON.parse(data);
+    listaFiltrada = [...listaOTs];
+
+    renderTabla(listaFiltrada);
+    calcularKPIs(listaFiltrada);
+    renderGraficos(listaFiltrada);
+  }
+});
