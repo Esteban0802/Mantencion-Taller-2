@@ -30,6 +30,57 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 // =======================
+// COMPRESIÓN DE IMÁGENES
+// =======================
+function comprimirImagen(file, calidad = 0.7, maxWidth = 1600) {
+
+  return new Promise((resolve) => {
+
+    const reader = new FileReader();
+
+    reader.readAsDataURL(file);
+
+    reader.onload = (event) => {
+
+      const img = new Image();
+
+      img.src = event.target.result;
+
+      img.onload = () => {
+
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d");
+
+        let width = img.width;
+        let height = img.height;
+
+        // 🔥 REDIMENSIONAR
+        if (width > maxWidth) {
+
+          height *= maxWidth / width;
+          width = maxWidth;
+
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+
+        ctx.drawImage(img, 0, 0, width, height);
+
+        // 🔥 COMPRESIÓN JPEG
+        const compressedBase64 =
+          canvas.toDataURL("image/jpeg", calidad);
+
+        resolve(compressedBase64);
+
+      };
+
+    };
+
+  });
+}
+
+// =======================
 // CREAR OS
 // =======================
 function guardarDatosOS() {
@@ -143,7 +194,12 @@ function renderIngreso() {
         ${item.item}
       </label>
 
-      <input type="file" onchange="subirFotoIngreso(event, ${i})">
+      <input 
+        type="file"
+        accept="image/*"
+        capture="environment"
+        onchange="subirFotoIngreso(event, ${i})"
+>
       <div id="fotos-ingreso-${i}"></div>
 
       <hr>
@@ -174,18 +230,21 @@ function toggleIngreso(i) {
 // =======================
 // FOTOS
 // =======================
-function subirFotoIngreso(e, i) {
+async function subirFotoIngreso(e, i) {
 
   const file = e.target.files[0];
-  const reader = new FileReader();
 
-  reader.onload = function() {
-    ot.ingreso[i].fotos.push(reader.result);
-    guardarCambiosOT();
-    mostrarFotosIngreso(i);
-  };
+  if (!file) return;
 
-  reader.readAsDataURL(file);
+  // 🔥 COMPRESIÓN
+  const imagenComprimida =
+    await comprimirImagen(file);
+
+  ot.ingreso[i].fotos.push(imagenComprimida);
+
+  guardarCambiosOT();
+
+  mostrarFotosIngreso(i);
 }
 
 function mostrarFotosIngreso(i) {
@@ -428,19 +487,20 @@ function cargarEvaluacion() {
   reader.readAsArrayBuffer(file);
 }
 
-function subirFotoEvaluacion(e, i) {
+async function subirFotoEvaluacion(e, i) {
+
   const file = e.target.files[0];
-  const reader = new FileReader();
 
-  reader.onload = function() {
-    ot.evaluacion[i].fotos.push(reader.result);
+  if (!file) return;
 
-    guardarCambiosOT(); // 🔥 CLAVE
+  const imagenComprimida =
+    await comprimirImagen(file);
 
-    mostrarFotosEvaluacion(i);
-  };
+  ot.overhaul[i].fotos.push(imagenComprimida);
 
-  reader.readAsDataURL(file);
+  guardarCambiosOT();
+
+  mostrarFotosEvaluacion(i);
 }
 
 function renderEvaluacion() {
@@ -467,7 +527,13 @@ function renderEvaluacion() {
         ${item.item}
       </label>
 
-      <input type="file" onchange="subirFotoEvaluacion(event, ${i})">
+      <input 
+        type="file"
+        accept="image/*"
+        capture="environment"
+        onchange="subirFotoEvaluacion(event, ${i})"
+      >
+
       <div id="fotos-evaluacion-${i}"></div>
 
       <hr>
@@ -914,7 +980,13 @@ function renderOverhaul() {
         ${item.item}
       </label>
 
-      <input type="file" onchange="subirFotoOverhaul(event, ${i})">
+      <input 
+        type="file"
+        accept="image/*"
+        capture="environment"
+        onchange="subirFotoOverhaul(event, ${i})"
+      >
+
 
       <div id="fotos-overhaul-${i}"></div>
 
@@ -940,17 +1012,20 @@ function toggleOverhaul(i) {
   guardarCambiosOT();
 }
 
-function subirFotoOverhaul(e, i) {
+async function subirFotoOverhaul(e, i) {
+
   const file = e.target.files[0];
-  const reader = new FileReader();
 
-  reader.onload = function() {
-    ot.overhaul[i].fotos.push(reader.result);
-    guardarCambiosOT();
-    mostrarFotosOverhaul(i);
-  };
+  if (!file) return;
 
-  reader.readAsDataURL(file);
+  const imagenComprimida =
+    await comprimirImagen(file);
+
+  ot.overhaul[i].fotos.push(imagenComprimida);
+
+  guardarCambiosOT();
+
+  mostrarFotosOverhaul(i);
 }
 
 function mostrarFotosOverhaul(i) {
@@ -1211,7 +1286,13 @@ function renderChecklist(tipo) {
         ${item.item}
       </label>
 
-      <input type="file" onchange="subirFotoPrueba(event, '${tipo}', ${i})">
+
+      <input 
+        type="file"
+        accept="image/*"
+        capture="environment"
+        onchange="subirFotoPrueba(event, '${tipo}', ${i})"
+      >
 
       <div id="fotos-${tipo}-${i}"></div>
 
@@ -1237,17 +1318,20 @@ function togglePrueba(tipo, i) {
   guardarCambiosOT();
 }
 
-function subirFotoPrueba(e, tipo, i) {
+async function subirFotoPrueba(e, i) {
+
   const file = e.target.files[0];
-  const reader = new FileReader();
 
-  reader.onload = function() {
-    ot.pruebas[tipo][i].fotos.push(reader.result);
-    mostrarFotosPrueba(tipo, i);
-    guardarCambiosOT();
-  };
+  if (!file) return;
 
-  reader.readAsDataURL(file);
+  const imagenComprimida =
+    await comprimirImagen(file);
+
+  ot.overhaul[i].fotos.push(imagenComprimida);
+
+  guardarCambiosOT();
+
+  mostrarFotosPrueba(i);
 }
 
 function mostrarFotosPrueba(tipo, i) {
@@ -2172,17 +2256,66 @@ function crearPortada() {
   // =========================
   function parrafo(txt) {
 
-    checkPage();
+  checkPage();
 
-    doc.setFontSize(10);
-    doc.setFont("helvetica","normal");
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "normal");
 
-    const split = doc.splitTextToSize(txt, 180);
+  const maxWidth = 180;
 
-    doc.text(split, 10, y);
+  const lineas = doc.splitTextToSize(txt, maxWidth);
 
-    y += split.length * 5 + 5;
+  lineas.forEach((linea, index) => {
+
+    // última línea NO justificar
+    if (index === lineas.length - 1) {
+
+      doc.text(linea, 10, y);
+
+    } else {
+
+      justificarTexto(linea, 10, y, maxWidth);
+
+    }
+
+    y += 5;
+  });
+
+  y += 5;
+}
+
+function justificarTexto(texto, x, y, ancho) {
+
+  const palabras = texto.split(" ");
+
+  if (palabras.length < 2) {
+    doc.text(texto, x, y);
+    return;
   }
+
+  const textoSinEspacios = palabras.join("");
+
+  const anchoTexto =
+    doc.getTextWidth(textoSinEspacios);
+
+  const espacioTotal =
+    ancho - anchoTexto;
+
+  const espacioEntrePalabras =
+    espacioTotal / (palabras.length - 1);
+
+  let offsetX = x;
+
+  palabras.forEach((palabra, i) => {
+
+    doc.text(palabra, offsetX, y);
+
+    offsetX +=
+      doc.getTextWidth(palabra) +
+      espacioEntrePalabras;
+
+  });
+}
 
   // =========================
   // DATOS GENERALES
@@ -2323,11 +2456,11 @@ function renderBloqueServicio(tituloSeccion, lista) {
 
           col = 0;
           x = 15;
-          y += 50;
+          y += 48;
 
         } else {
 
-          x += 60;
+          x += 58;
         }
 
       });
