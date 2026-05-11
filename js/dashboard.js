@@ -56,6 +56,7 @@ function calcularProgreso(ot) {
 // CARGAR TODAS LAS OT
 // =======================
 window.onload = () => {
+  renderUsuarioActivo();
 
   escucharOTsTiempoReal();
 
@@ -338,21 +339,32 @@ window.addEventListener("storage", () => {
 });
 
 function renderUsuarioActivo() {
-  const usuario = JSON.parse(localStorage.getItem("usuarioActivo"));
+  const usuarioActivo = JSON.parse(localStorage.getItem("usuarioActivo"));
 
-  if (!usuario) return;
+  if (!usuarioActivo) return;
 
   const nombre = document.getElementById("usuarioNombre");
   const rol = document.getElementById("usuarioRol");
 
-  if (nombre) nombre.textContent = usuario.nombre || "Usuario";
-  if (rol) rol.textContent = usuario.rol || "Sin rol";
+  if (nombre) {
+    nombre.textContent = usuarioActivo.nombre || "Usuario";
+  }
+
+  if (rol) {
+    if (usuarioActivo.rol === "jefe_taller") {
+      rol.textContent = "Jefe Taller";
+    } else if (usuarioActivo.rol === "usuario_taller") {
+      rol.textContent = "Usuario Taller";
+    } else {
+      rol.textContent = usuarioActivo.rol || "Sin rol";
+    }
+  }
 }
 
 function cerrarSesion() {
   localStorage.removeItem("usuarioActivo");
   localStorage.removeItem("otActiva");
-  window.location.href = "login.html";
+  window.location.href = "index.html";
 }
 
 window.cerrarSesion = cerrarSesion;
