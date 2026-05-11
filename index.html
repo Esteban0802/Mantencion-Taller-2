@@ -2,242 +2,42 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Flujo de Trabajo - OverTrack</title>
+  <title>OverTrack | Login</title>
   <link rel="icon" type="image/png" href="img/logo_overtrack - pestaña.png">
   <link rel="stylesheet" href="css/styles.css">
 </head>
-<body class="ot-view">
+<body class="login-overtrack">
 
-<header class="topbar-overtrack">
-  <div class="brand-overtrack">
-    <img src="img/logo_overtrack - pestaña.png" alt="OverTrack">
-  </div>
+  <div class="login-bg-grid"></div>
 
-  <div class="user-box">
-    <span id="usuarioNombre">Usuario</span>
-    <small id="usuarioRol">Rol</small>
-    <button
-      onclick="cerrarSesion()"
-      class="btn-logout permitido-bloqueo"
-    >
-      Salir
-    </button>
-  </div>
-</header>
+  <main class="login-wrapper">
 
-<div class="container">
-
-  <!-- TABS -->
-  <div class="tabs">
-    <button class="tab active" data-tab="crear">Crear OS</button>
-    <button class="tab disabled" data-tab="ingreso">Ingreso</button>
-    <button class="tab disabled" data-tab="evaluacion">Evaluación</button>
-    <button class="tab disabled" data-tab="overhaul">Overhaul</button>
-    <button class="tab disabled" data-tab="pruebas">Pruebas</button>
-    <button class="tab disabled" data-tab="despacho">Despacho</button>
-  </div>
-
-  <!---CREAR OS-->
-  <div id="crear" class="content active">
-    <div class="card">
-      <h2>Crear Orden de Servicio</h2>
-
-      <input id="equipo" placeholder="Equipo">
-      <input id="serie" placeholder="Serie">
-      <input id="cliente" placeholder="Cliente">
-      <input id="os" placeholder="Orden Servicio">
-
-      <button class="btn-primary" onclick="guardarDatosOS()">
-        Continuar a Ingreso →
-      </button>
-    </div>
-  </div>
-
-  <!-- INGRESO -->
-  <div id="ingreso" class="content">
-    <div class="card">
-      <h3>Checklist Ingreso</h3>
-
-      <input type="file" id="excelIngreso">
-      <button class="btn-primary" onclick="cargarIngreso()">Cargar Checklist</button>
-
-      <div id="listaIngreso"></div>
-
-      <button class="btn-success" onclick="guardarIngreso()">
-        💾 Guardar Progreso
-      </button>
-      <button class="btn-primary" onclick="aprobarIngreso()">
-        Siguiente
-      </button>
-    </div>
-  </div>
-
-  <!-- EVALUACION -->
-  <div id="evaluacion" class="content">
-    <div class="card">
-      <h2>Evaluación</h2>
-
-      <input type="file" id="excelEvaluacion">
-      <button class="btn-primary" onclick="cargarEvaluacion()">Cargar Checklist</button>
-
-
-      <div id="listaEvaluacion"></div>
-
-      <button class="btn-success" onclick="guardarEvaluacion()">
-        💾 Guardar Evaluación
-      </button>
-
-      <!-- DECISIÓN JEFE DE TALLER -->
-      <div class="decision-box solo-jefe">
-
-        <h3>Decisión Jefe de Taller</h3>
-        <p class="decision-text">
-          Para aprobar o rechazar el Overhaul, debes ingresar comentario y evidencia.
-        </p>
-
-        <textarea
-          id="comentarioDecisionEvaluacion"
-          placeholder="Comentario de aprobación o rechazo"
-        ></textarea>
-
-        <input
-          type="file"
-          id="docsDecisionEvaluacion"
-          multiple
-          onchange="renderDocsDecisionEvaluacionPreview()"
-        >
-
-        <div class="decision-actions">
-          <button
-            class="btn-success"
-            onclick="aprobarOverhaulDesdeEvaluacion()"
-          >
-            ✅ Aprobar Overhaul
-          </button>
-
-          <button
-            class="btn-danger"
-            onclick="rechazarOverhaulDesdeEvaluacion()"
-          >
-            ❌ Rechazar y pasar a Despacho
-          </button>
+    <section class="login-brand">
+      <div class="brand-logo">
+        <img src=".img/logo_overtrack.png" alt="OverTrack">
         </div>
+      <p>Gestión, trazabilidad y control operacional de taller.</p>
+    </section>
 
-        <div id="listaDocsDecisionEvaluacion"></div>
+    <section class="login-panel">
+      <h2>Acceso al sistema</h2>
+      <p class="login-subtitle">Ingresa con tu cuenta de taller</p>
 
-      </div>
-    </div>
-  </div>
+      <label>Correo</label>
+      <input type="email" id="email" placeholder="usuario@empresa.cl">
 
-  <!-- OVERHAUL -->
-  <div id="overhaul" class="content">
-  <div class="card">
-    <h2>Overhaul</h2>
+      <label>Contraseña</label>
+      <input type="password" id="password" placeholder="••••••••">
 
-    <input type="file" id="excelOverhaul">
-    <button class="btn-primary" onclick="cargarOverhaul()">Cargar Checklist</button>
-
-    <div id="listaOverhaul"></div>
-
-    <br>
-    <button class="btn-success" onclick="guardarOverhaul()">
-        💾 Guardar Overhaul
-    </button>
-    <button class="btn-primary" onclick="aprobarOverhaul()">SIguiente</button>
-  </div>
-</div>
-
-
-<!--PRUEBAS-->
-  <div id="pruebas" class="content">
-  <div class="card">
-    <h2>Pruebas Funcionales</h2>
-
-    <h3>Checklist Mecánico</h3>
-    <input type="file" id="excelMecanico">
-    <button class="btn-primary" onclick="cargarChecklist('mecanico')">Cargar Mecánico</button>
-    <div id="listaMecanico"></div>
-
-    <hr>
-
-    <h3>Checklist Eléctrico</h3>
-    <input type="file" id="excelElectrico">
-    <button class="btn-primary" onclick="cargarChecklist('electrico')">Cargar Eléctrico</button>
-    <div id="listaElectrico"></div>
-
-    <br>
-    <button class="btn-success" onclick="guardarPruebas()">
-        💾 Guardar Progreso
-    </button>
-    <button class="btn-primary solo-jefe" onclick="aprobarPruebas()">Aprobar</button>
-  </div>
-</div>
-
-
-<!--DESPACHO-->
-  <div id="despacho" class="content">
-  <div class="card">
-    <h2>Despacho</h2>
-
-<h3>Preparación de Despacho</h3>
-<input type="file" id="docsPrep" multiple>
-<button class="btn-primary" onclick="subirDocsSeccion('preparacion')">Subir</button>
-<div id="listaDocsPrep"></div>
-
-<hr>
-
-<h3>Despacho Final</h3>
-<input type="file" id="docsFinal" multiple>
-<button class="btn-primary" onclick="subirDocsSeccion('final')">Subir</button>
-<div id="listaDocsFinal"></div>
-
-<hr>
-
-    <br>
-    <button class="btn-success" onclick="guardarDespacho()">
-        💾 Guardar Despacho
-    </button>
-    <button class="btn-primary solo-jefe" onclick="cerrarOT()">Cerrar OT</button>
-    <button
-        onclick="generarPDF()"
-        class="permitido-bloqueo btn-warning"
-      >
-        Generar PDF
+      <button id="btnLogin" class="btn-login">
+        Iniciar sesión →
       </button>
-  </div>
-</div>
-<br>
-<br>
 
-<button
-  onclick="window.location.href='dashboard.html'"
-  class="permitido-bloqueo"
->
-  ← Volver al Panel
-</button>
+      <p id="loginError" class="login-error"></p>
+    </section>
 
-<!-- 🔥 MODAL VISOR DOCUMENTOS -->
-<div id="modalDoc" class="modal-doc">
-  <div class="modal-content-doc">
+  </main>
 
-    <span class="close-doc" onclick="cerrarModal()">✖</span>
-
-    <iframe id="visorDoc"></iframe>
-
-  </div>
-</div>
-
-<!-- 🔥 VISOR DE IMÁGENES PRO -->
-<div id="modalImagen" class="modal-img">
-  <span class="cerrar-img" onclick="cerrarImagen()">×</span>
-  <img class="contenido-img" id="imgExpandida">
-</div>
-
-</div>
-
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
-<script type="module" src="js/app.js"></script>
+  <script type="module" src="js/login.js"></script>
 </body>
 </html>

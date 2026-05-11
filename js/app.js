@@ -3161,7 +3161,7 @@ function renderUsuarioActivo() {
 function cerrarSesion() {
   localStorage.removeItem("usuarioActivo");
   localStorage.removeItem("otActiva");
-  window.location.href = "login.html";
+  window.location.href = "index.html";
 }
 
 window.cerrarSesion = cerrarSesion;

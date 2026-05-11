@@ -197,7 +197,7 @@ function abrirOT(index) {
   }
 
   localStorage.setItem("otActiva", ot.id);
-  window.location.href = "index.html";
+  window.location.href = "flujo.html";
 }
 
 window.abrirOT = abrirOT;
@@ -208,7 +208,7 @@ window.abrirOT = abrirOT;
 // =======================
 function nuevaOT() {
   localStorage.removeItem("otActiva");
-  window.location.href = "index.html";
+  window.location.href = "flujo.html";
 }
 
 window.nuevaOT = nuevaOT;
