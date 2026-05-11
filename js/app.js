@@ -1,13 +1,62 @@
+import { db, auth, storage } from "./firebase-config.js";
+
+import {
+  collection,
+  addDoc,
+  doc,
+  getDoc,
+  updateDoc,
+  serverTimestamp
+} from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+import {
+  ref,
+  uploadBytes,
+  getDownloadURL
+} from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
+
+console.log("🔥 Firebase conectado correctamente");
+console.log(db);
+console.log(auth);
+console.log(storage);
+
 // =======================
 // VARIABLES GLOBALES
 // =======================
 let ot = null;
 let listaOTs = [];
-let usuario = {
-  nombre: "Esteban",
-  rol: "admin",
-  sucursal: "Antofagasta"
-};
+let usuario = JSON.parse(
+  localStorage.getItem("usuarioActivo")
+) || null;
+
+// =======================
+// VALIDAR ROLES
+// =======================
+function esJefeTaller() {
+  return usuario && usuario.rol === "jefe_taller";
+}
+
+function esUsuarioTaller() {
+  return usuario && usuario.rol === "usuario_taller";
+}
+
+// =======================
+// APLICAR PERMISOS VISUALES
+// =======================
+function aplicarPermisosRol() {
+
+  if (!usuario) return;
+
+  // 🔒 Usuario Taller
+  if (esUsuarioTaller()) {
+
+    document
+      .querySelectorAll(".solo-jefe")
+      .forEach(el => {
+        el.style.display = "none";
+      });
+  }
+}
 
 // =======================
 // TABS
@@ -83,42 +132,64 @@ function comprimirImagen(file, calidad = 0.7, maxWidth = 1600) {
 // =======================
 // CREAR OS
 // =======================
-function guardarDatosOS() {
+async function guardarDatosOS() {
 
-  const equipo = document.getElementById("equipo").value;
-  const serie = document.getElementById("serie").value;
-  const cliente = document.getElementById("cliente").value;
-  const os = document.getElementById("os").value;
+  const equipo = document.getElementById("equipo").value.trim();
+  const serie = document.getElementById("serie").value.trim();
+  const cliente = document.getElementById("cliente").value.trim();
+  const os = document.getElementById("os").value.trim();
 
   if (!equipo || !serie || !cliente || !os) {
     alert("Completa todos los campos");
     return;
   }
 
-  let listaOTs = JSON.parse(localStorage.getItem("ots")) || [];
+  try {
 
-  const nueva = {
-    id: Date.now(),
-    equipo,
-    serie,
-    cliente,
-    os,
-    estado: "INGRESO",
-    ingreso: [],
-    evaluacion: [],
-    overhaul: [],
-    pruebas: null,
-    despacho: null
-  };
+    const nuevaOT = {
+      equipo,
+      serie,
+      cliente,
+      os,
 
-  listaOTs.push(nueva);
+      estado: "INGRESO",
 
-  localStorage.setItem("ots", JSON.stringify(listaOTs));
-  localStorage.setItem("otActiva", nueva.id);
+      empresaId: "empresa_demo",
+      sucursalId: "sucursal_demo",
 
-  // 🔥 REDIRECCIÓN
-  window.location.href = "index.html";
+      ingreso: [],
+      evaluacion: [],
+      overhaul: [],
+      pruebas: null,
+      despacho: null,
+
+      ingresoAprobado: false,
+      evaluacionAprobada: false,
+      overhaulAprobado: false,
+      pruebasAprobado: false,
+
+      cerrada: false,
+
+      creadoPor: "usuario_taller",
+      fechaCreacion: serverTimestamp(),
+      fechaActualizacion: serverTimestamp()
+    };
+
+    const docRef = await addDoc(collection(db, "ots"), nuevaOT);
+
+    localStorage.setItem("otActiva", docRef.id);
+
+    alert("OS creada correctamente ✅");
+
+    window.location.href = "index.html";
+
+  } catch (error) {
+    console.error("Error creando OS:", error);
+    alert("Error al crear la OS en Firebase");
+  }
 }
+
+window.guardarDatosOS = guardarDatosOS;
 
 function habilitarTab(nombre) {
   const tab = document.querySelector(`[data-tab="${nombre}"]`);
@@ -223,6 +294,7 @@ function renderIngreso() {
 // CHECK
 // =======================
 function toggleIngreso(i) {
+  if (OTBloqueada()) return;
   ot.ingreso[i].ok = !ot.ingreso[i].ok;
   guardarCambiosOT();
 }
@@ -232,19 +304,46 @@ function toggleIngreso(i) {
 // =======================
 async function subirFotoIngreso(e, i) {
 
+  if (OTBloqueada()) return;
+
   const file = e.target.files[0];
 
   if (!file) return;
 
-  // 🔥 COMPRESIÓN
-  const imagenComprimida =
-    await comprimirImagen(file);
+  try {
 
-  ot.ingreso[i].fotos.push(imagenComprimida);
+    if (!ot.ingreso[i].fotos) {
+      ot.ingreso[i].fotos = [];
+    }
 
-  guardarCambiosOT();
+    // Comprimir imagen
+    const imagenBlob = await comprimirImagenBlob(file);
 
-  mostrarFotosIngreso(i);
+    // Crear archivo comprimido
+    const imagenComprimida = new File(
+      [imagenBlob],
+      `ingreso_${Date.now()}.jpg`,
+      { type: "image/jpeg" }
+    );
+
+    // Subir a Firebase Storage
+    const urlFoto = await subirArchivoStorage(
+      imagenComprimida,
+      "ingreso",
+      i
+    );
+
+    // Guardar SOLO URL en Firestore
+    ot.ingreso[i].fotos.push(urlFoto);
+
+    await guardarCambiosOT();
+
+    mostrarFotosIngreso(i);
+
+  } catch (error) {
+    console.error("Error subiendo foto ingreso:", error);
+    alert("Error al subir la imagen");
+  }
 }
 
 function mostrarFotosIngreso(i) {
@@ -281,6 +380,8 @@ function mostrarFotosIngreso(i) {
 
 function eliminarFotoIngreso(i, index) {
 
+  if (OTBloqueada()) return;
+
   if (!confirm("¿Eliminar foto?")) return;
 
   ot.ingreso[i].fotos.splice(index, 1);
@@ -293,6 +394,8 @@ function eliminarFotoIngreso(i, index) {
 // COMENTARIOS
 // =======================
 function agregarComentarioItem(i) {
+
+  if (OTBloqueada()) return;
 
   const nombre = document.getElementById(`tecnico-${i}`).value;
   const texto = document.getElementById(`comentario-${i}`).value;
@@ -348,6 +451,8 @@ function renderComentariosItem(i) {
 }
 
 function eliminarComentarioIngreso(i, index) {
+
+  if (OTBloqueada()) return;
 
   if (!confirm("¿Eliminar comentario?")) return;
 
@@ -411,41 +516,98 @@ function guardarIngreso() {
 // =======================
 // GUARDAR
 // =======================
-function guardarCambiosOT() {
+async function guardarCambiosOT() {
 
-  const lista = JSON.parse(localStorage.getItem("ots")) || [];
+  if (!ot) return;
 
-  const index = lista.findIndex(o => o.id === ot.id);
+  const id = localStorage.getItem("otActiva");
 
-  if (index !== -1) {
-
-    // 🔥 ACTUALIZAR ESTADO ANTES DE GUARDAR
-    ot.estado = obtenerEstadoOT(ot);
-
-    lista[index] = ot;
+  if (!id) {
+    alert("No hay OT activa");
+    return;
   }
 
-  localStorage.setItem("ots", JSON.stringify(lista));
+  try {
 
-    // 🔥 ACTUALIZAR UI EN TIEMPO REAL
-  actualizarPipeline();
+    ot.estado = obtenerEstadoOT(ot);
 
-  // 🔥 FORZAR REFRESH VISUAL
-window.dispatchEvent(new Event("storage"));
+    await updateDoc(doc(db, "ots", id), {
+      ...ot,
+      estado: ot.estado,
+      fechaActualizacion: serverTimestamp()
+    });
+
+    console.log("OT actualizada en Firebase ✅");
+
+  } catch (error) {
+    console.error("Error guardando OT:", error);
+    alert("Error al guardar cambios en Firebase");
+  }
 }
 
 function obtenerEstadoOT(ot) {
 
   if (!ot) return "INGRESO";
 
+  if (ot.estado === "CERRADA" || ot.cerrada === true) {
+    return "CERRADA";
+  }
+
   if (!ot.ingresoAprobado) return "INGRESO";
+
+  // Evaluación todavía no tiene decisión del jefe
   if (!ot.evaluacionAprobada) return "EVALUACION";
-  if (!ot.overhaulAprobado) return "OVERHAUL";
+
+  // Si evaluación fue rechazada, saltar directo a despacho
+  if (ot.overhaulRequerido === false) return "DESPACHO";
+
+  // Si evaluación fue aprobada, sigue overhaul normal
+  if (ot.overhaulRequerido === true && !ot.overhaulAprobado) {
+    return "OVERHAUL";
+  }
+
   if (!ot.pruebasAprobado) return "PRUEBAS";
 
-  if (!ot.despacho) return "DESPACHO";
+  return "DESPACHO";
+}
 
-  return "CERRADA";
+// =======================
+// BLOQUEO OT CERRADA
+// =======================
+function OTBloqueada() {
+  return ot && (ot.estado === "CERRADA" || ot.cerrada === true);
+}
+
+// =======================
+// APLICAR MODO SOLO LECTURA
+// =======================
+function aplicarModoSoloLectura() {
+
+  if (!OTBloqueada()) return;
+
+  document
+    .querySelectorAll("input, textarea, select, button")
+    .forEach(el => {
+
+      if (
+        el.classList.contains("tab") ||
+        el.classList.contains("permitido-bloqueo")
+      ) return;
+
+      el.disabled = true;
+      el.style.opacity = "0.45";
+      el.style.cursor = "not-allowed";
+    });
+
+  document
+    .querySelectorAll('input[type="file"]')
+    .forEach(file => {
+      file.disabled = true;
+      file.style.pointerEvents = "none";
+      file.style.opacity = "0.45";
+    });
+
+  console.log("🔒 OT cerrada: modo solo lectura aplicado");
 }
 
 function cargarEvaluacion() {
@@ -489,18 +651,42 @@ function cargarEvaluacion() {
 
 async function subirFotoEvaluacion(e, i) {
 
+  if (OTBloqueada()) return;
+
   const file = e.target.files[0];
 
   if (!file) return;
 
-  const imagenComprimida =
-    await comprimirImagen(file);
+  try {
 
-  ot.overhaul[i].fotos.push(imagenComprimida);
+    if (!ot.evaluacion[i].fotos) {
+      ot.evaluacion[i].fotos = [];
+    }
 
-  guardarCambiosOT();
+    const imagenBlob = await comprimirImagenBlob(file);
 
-  mostrarFotosEvaluacion(i);
+    const imagenComprimida = new File(
+      [imagenBlob],
+      `evaluacion_${Date.now()}.jpg`,
+      { type: "image/jpeg" }
+    );
+
+    const urlFoto = await subirArchivoStorage(
+      imagenComprimida,
+      "evaluacion",
+      i
+    );
+
+    ot.evaluacion[i].fotos.push(urlFoto);
+
+    await guardarCambiosOT();
+
+    mostrarFotosEvaluacion(i);
+
+  } catch (error) {
+    console.error("Error subiendo foto evaluación:", error);
+    alert("Error al subir la imagen de evaluación");
+  }
 }
 
 function renderEvaluacion() {
@@ -554,23 +740,11 @@ function renderEvaluacion() {
 }
 
 function toggleEvaluacion(i) {
+  if (OTBloqueada()) return;
   ot.evaluacion[i].ok = !ot.evaluacion[i].ok;
   guardarCambiosOT();
 }
 
-function subirFotoEvaluacion(e, i) {
-
-  const file = e.target.files[0];
-  const reader = new FileReader();
-
-  reader.onload = function() {
-    ot.evaluacion[i].fotos.push(reader.result);
-    guardarCambiosOT();
-    mostrarFotosEvaluacion(i);
-  };
-
-  reader.readAsDataURL(file);
-}
 
 function mostrarFotosEvaluacion(i) {
 
@@ -606,6 +780,8 @@ function mostrarFotosEvaluacion(i) {
 
 function eliminarFotoEvaluacion(i, index) {
 
+  if (OTBloqueada()) return;
+
   if (!confirm("¿Eliminar foto?")) return;
 
   ot.evaluacion[i].fotos.splice(index, 1);
@@ -615,6 +791,8 @@ function eliminarFotoEvaluacion(i, index) {
 }
 
 function agregarComentarioEvaluacion(i) {
+
+  if (OTBloqueada()) return;
 
   const nombre = document.getElementById(`tecnico-eval-${i}`).value;
   const texto = document.getElementById(`comentario-eval-${i}`).value;
@@ -697,6 +875,8 @@ function validarEvaluacionCompleta() {
 
 function eliminarComentarioEvaluacion(i, index) {
 
+  if (OTBloqueada()) return;
+
   if (!confirm("¿Eliminar comentario?")) return;
 
   ot.evaluacion[i].comentarios.splice(index, 1);
@@ -708,10 +888,10 @@ function eliminarComentarioEvaluacion(i, index) {
 
 function aprobarEvaluacion() {
 
-  if (usuario.rol !== "admin") {
-    alert("Solo admin puede aprobar");
-    return;
-  }
+  if (!esJefeTaller()) {
+  alert("Solo Jefe de Taller puede aprobar");
+  return;
+}
 
   // 🔥 VALIDACIÓN COMPLETA
   if (!validarEvaluacionCompleta()) return;
@@ -725,6 +905,259 @@ function aprobarEvaluacion() {
   habilitarTab("overhaul");
 
   alert("Evaluación aprobada correctamente ✅");
+}
+
+// =======================
+// DECISIÓN JEFE TALLER - EVALUACIÓN
+// =======================
+async function subirDocumentoDecisionEvaluacion(file, resultado) {
+
+  const urlArchivo = await subirArchivoStorage(
+    file,
+    `decision_evaluacion_${resultado.toLowerCase()}`,
+    "documentos"
+  );
+
+  return {
+    nombre: file.name,
+    tipo: file.type,
+    url: urlArchivo,
+    fecha: new Date().toLocaleString()
+  };
+}
+
+async function aprobarOverhaulDesdeEvaluacion() {
+
+  if (OTBloqueada()) return;
+
+  if (!esJefeTaller()) {
+    alert("Solo Jefe de Taller puede aprobar Overhaul desde Evaluación");
+    return;
+  }
+
+  if (!validarEvaluacionCompleta()) return;
+
+  const comentario = document
+    .getElementById("comentarioDecisionEvaluacion")
+    .value
+    .trim();
+
+  const inputDocs = document.getElementById("docsDecisionEvaluacion");
+  const files = inputDocs.files;
+
+  if (!comentario) {
+    alert("Debes ingresar comentario de aprobación");
+    return;
+  }
+
+  if (!files.length) {
+    alert("Debes cargar al menos un documento de evidencia");
+    return;
+  }
+
+  try {
+
+    const documentos = [];
+
+    for (let file of files) {
+      const docSubido = await subirDocumentoDecisionEvaluacion(
+        file,
+        "APROBADO"
+      );
+
+      documentos.push(docSubido);
+    }
+
+    ot.decisionEvaluacion = {
+      resultado: "APROBADO",
+      comentario,
+      documentos,
+      usuario: usuario?.nombre || "Jefe Taller",
+      rol: usuario?.rol || "jefe_taller",
+      fecha: new Date().toLocaleString()
+    };
+
+    ot.evaluacionAprobada = true;
+    ot.overhaulRequerido = true;
+
+    ot.estado = obtenerEstadoOT(ot);
+
+    await guardarCambiosOT();
+
+    habilitarTab("overhaul");
+    cambiarTab("overhaul");
+
+    alert("Overhaul aprobado. Se habilita etapa OVERHAUL ✅");
+
+  } catch (error) {
+    console.error("Error aprobando Overhaul:", error);
+    alert("Error al guardar decisión de evaluación");
+  }
+}
+
+async function rechazarOverhaulDesdeEvaluacion() {
+
+  if (OTBloqueada()) return;
+
+  if (!esJefeTaller()) {
+    alert("Solo Jefe de Taller puede rechazar Overhaul desde Evaluación");
+    return;
+  }
+
+  if (!validarEvaluacionCompleta()) return;
+
+  const comentario = document
+    .getElementById("comentarioDecisionEvaluacion")
+    .value
+    .trim();
+
+  const inputDocs = document.getElementById("docsDecisionEvaluacion");
+  const files = inputDocs.files;
+
+  if (!comentario) {
+    alert("Debes ingresar comentario de rechazo");
+    return;
+  }
+
+  if (!files.length) {
+    alert("Debes cargar al menos un documento de evidencia");
+    return;
+  }
+
+  try {
+
+    const documentos = [];
+
+    for (let file of files) {
+      const docSubido = await subirDocumentoDecisionEvaluacion(
+        file,
+        "RECHAZADO"
+      );
+
+      documentos.push(docSubido);
+    }
+
+    ot.decisionEvaluacion = {
+      resultado: "RECHAZADO",
+      comentario,
+      documentos,
+      usuario: usuario?.nombre || "Jefe Taller",
+      rol: usuario?.rol || "jefe_taller",
+      fecha: new Date().toLocaleString()
+    };
+
+    ot.evaluacionAprobada = true;
+    ot.overhaulRequerido = false;
+
+    // Saltamos etapas que no aplican
+    ot.overhaulAprobado = true;
+    ot.pruebasAprobado = true;
+
+    if (!ot.despacho) {
+      ot.despacho = {
+        preparacion: [],
+        final: []
+      };
+    }
+
+    ot.estado = obtenerEstadoOT(ot);
+
+    await guardarCambiosOT();
+
+    habilitarTab("despacho");
+    cambiarTab("despacho");
+
+    alert("Overhaul rechazado. La OS pasa a DESPACHO ✅");
+
+  } catch (error) {
+    console.error("Error rechazando Overhaul:", error);
+    alert("Error al guardar decisión de evaluación");
+  }
+}
+
+function renderDocsDecisionEvaluacionPreview() {
+  const cont = document.getElementById("listaDocsDecisionEvaluacion");
+  const input = document.getElementById("docsDecisionEvaluacion");
+
+  if (!cont) return;
+
+  cont.innerHTML = "";
+
+  // 1) Mostrar documentos ya guardados en Firebase
+  const docsGuardados = ot?.decisionEvaluacion?.documentos || [];
+
+  docsGuardados.forEach((doc, index) => {
+    const div = document.createElement("div");
+    div.className = "doc-item";
+
+    div.innerHTML = `
+      <div class="doc-left">
+        <span class="doc-icon">📄</span>
+        <span class="doc-name">${doc.nombre}</span>
+      </div>
+
+      <div class="doc-actions">
+        <button
+          type="button"
+          class="permitido-bloqueo"
+          onclick="abrirDocumentoDecisionEvaluacion(${index})">
+          👁
+        </button>
+      </div>
+    `;
+
+    cont.appendChild(div);
+  });
+
+  // 2) Mostrar archivos nuevos seleccionados, antes de aprobar/rechazar
+  if (!input || !input.files.length) return;
+
+  Array.from(input.files).forEach((file) => {
+    const div = document.createElement("div");
+    div.className = "doc-item";
+
+    const urlTemp = URL.createObjectURL(file);
+
+    div.innerHTML = `
+      <div class="doc-left">
+        <span class="doc-icon">📄</span>
+        <span class="doc-name">${file.name}</span>
+      </div>
+
+      <div class="doc-actions">
+        <button
+          type="button"
+          class="permitido-bloqueo"
+          onclick="abrirArchivoTemporal('${urlTemp}')">
+          👁
+        </button>
+      </div>
+    `;
+
+    cont.appendChild(div);
+  });
+}
+
+function abrirDocumentoDecisionEvaluacion(index) {
+  const doc = ot?.decisionEvaluacion?.documentos?.[index];
+
+  if (!doc) return;
+
+  abrirDocumento({
+    nombre: doc.nombre,
+    tipo: doc.tipo,
+    url: doc.url
+  });
+}
+
+function abrirArchivoTemporal(url) {
+  const modal = document.getElementById("modalDoc");
+  const visor = document.getElementById("visorDoc");
+
+  if (!modal || !visor) return;
+
+  visor.src = url;
+  modal.style.display = "block";
 }
 // =======================
 // GUARDAR EVALUACIÓN
@@ -744,27 +1177,46 @@ function guardarEvaluacion() {
 // =======================
 // INIT
 // =======================
-window.onload = () => {
+window.onload = async () => {
 
   const id = localStorage.getItem("otActiva");
-  const data = localStorage.getItem("ots");
 
-  if (!data) return;
+  if (!id) {
+    cambiarTab("crear");
+    renderUsuarioActivo();
+    aplicarPermisosRol();
+    return;
+  }
 
-  listaOTs = JSON.parse(data);
+  try {
+    const otRef = doc(db, "ots", id);
+    const otSnap = await getDoc(otRef);
 
-  if (!id) return;
+    if (!otSnap.exists()) {
+      alert("La OT no existe en Firebase");
+      localStorage.removeItem("otActiva");
+      cambiarTab("crear");
+      return;
+    }
 
-  ot = listaOTs.find(o => o.id == id);
+    ot = {
+      id: otSnap.id,
+      ...otSnap.data()
+    };
 
-  if (!ot) return;
+    console.log("OT cargada desde Firebase:", ot);
+
+  } catch (error) {
+    console.error("Error cargando OT:", error);
+    alert("Error al cargar la OT desde Firebase");
+    return;
+  }
 
   // =========================
-  // RESTAURAR FLUJO CORRECTO
+  // RESTAURAR SECCIONES
   // =========================
 
-  // 👉 INGRESO
-  if (ot.ingreso && ot.ingreso.length > 0) {
+  if (ot.ingreso?.length > 0) {
     renderIngreso();
     habilitarTab("ingreso");
   }
@@ -773,28 +1225,32 @@ window.onload = () => {
     habilitarTab("evaluacion");
   }
 
-  // 👉 EVALUACIÓN
-  if (ot.evaluacion && ot.evaluacion.length > 0) {
+  if (ot.evaluacion?.length > 0) {
     renderEvaluacion();
     habilitarTab("evaluacion");
+    renderDocsDecisionEvaluacionPreview();
   }
 
-  if (ot.evaluacionAprobada) {
+  // ✅ SI EVALUACIÓN FUE APROBADA PARA OVERHAUL
+  if (ot.evaluacionAprobada && ot.overhaulRequerido === true) {
     habilitarTab("overhaul");
   }
 
-  // 👉 OVERHAUL
-  if (ot.overhaul && ot.overhaul.length > 0) {
+  // ✅ SI EVALUACIÓN FUE RECHAZADA → DIRECTO A DESPACHO
+  if (ot.evaluacionAprobada && ot.overhaulRequerido === false) {
+    habilitarTab("despacho");
+  }
+
+  if (ot.overhaul?.length > 0 && ot.overhaulRequerido === true) {
     renderOverhaul();
     habilitarTab("overhaul");
   }
 
-  if (ot.overhaulAprobado) {
+  if (ot.overhaulRequerido === true && ot.overhaulAprobado) {
     habilitarTab("pruebas");
   }
 
-  // 👉 PRUEBAS
-  if (ot.pruebas) {
+  if (ot.pruebas && ot.overhaulRequerido === true) {
     if (ot.pruebas.mecanico?.length > 0) {
       renderChecklist("mecanico");
     }
@@ -804,13 +1260,14 @@ window.onload = () => {
     }
   }
 
-  if (ot.pruebasAprobado) {
+  if (
+    ot.pruebasAprobado ||
+    ot.overhaulRequerido === false
+  ) {
     habilitarTab("despacho");
   }
 
-  // 👉 DESPACHO
   if (ot.despacho) {
-
     if (ot.despacho.preparacion?.length > 0) {
       renderDocsSeccion("preparacion");
     }
@@ -818,55 +1275,63 @@ window.onload = () => {
     if (ot.despacho.final?.length > 0) {
       renderDocsSeccion("final");
     }
-
-    if (ot.despacho.documentos?.length > 0) {
-      mostrarDocs();
-    }
   }
 
-  // 🔥 FORZAR FLUJO VISUAL
-if (ot) {
+  // =========================
+  // FORZAR TAB ACTIVO CORRECTO
+  // =========================
 
-  // 👉 SI NO HA EMPEZADO INGRESO
   if (!ot.ingreso || ot.ingreso.length === 0) {
     habilitarTab("ingreso");
     cambiarTab("ingreso");
   }
 
-  // 👉 SI YA ESTÁ EN INGRESO
-  else if (ot.ingreso && !ot.ingresoAprobado) {
+  else if (!ot.ingresoAprobado) {
     habilitarTab("ingreso");
     cambiarTab("ingreso");
   }
 
-  // 👉 SI INGRESO APROBADO → EVALUACION
   else if (ot.ingresoAprobado && !ot.evaluacionAprobada) {
     habilitarTab("evaluacion");
     cambiarTab("evaluacion");
   }
 
-  // 👉 SI EVALUACION APROBADA → OVERHAUL
-  else if (ot.evaluacionAprobada && !ot.overhaulAprobado) {
-    habilitarTab("overhaul");
-    cambiarTab("overhaul");
-  }
-
-  // 👉 SI OVERHAUL APROBADO → PRUEBAS
-  else if (ot.overhaulAprobado && !ot.pruebasAprobado) {
-    habilitarTab("pruebas");
-    cambiarTab("pruebas");
-  }
-
-  // 👉 SI PRUEBAS APROBADAS → DESPACHO
-  else if (ot.pruebasAprobado) {
+  // ✅ RECHAZO DE OVERHAUL → DESPACHO
+  else if (ot.evaluacionAprobada && ot.overhaulRequerido === false) {
     habilitarTab("despacho");
     cambiarTab("despacho");
   }
 
-}
+  // ✅ APROBADO PARA OVERHAUL
+  else if (
+    ot.evaluacionAprobada &&
+    ot.overhaulRequerido === true &&
+    !ot.overhaulAprobado
+  ) {
+    habilitarTab("overhaul");
+    cambiarTab("overhaul");
+  }
 
-actualizarPipeline();
+  else if (
+    ot.overhaulRequerido === true &&
+    ot.overhaulAprobado &&
+    !ot.pruebasAprobado
+  ) {
+    habilitarTab("pruebas");
+    cambiarTab("pruebas");
+  }
 
+  else if (
+    ot.pruebasAprobado ||
+    ot.overhaulRequerido === false
+  ) {
+    habilitarTab("despacho");
+    cambiarTab("despacho");
+  }
+
+  aplicarModoSoloLectura();
+  aplicarPermisosRol();
+  renderUsuarioActivo();
 };
 
 function cambiarTab(nombre) {
@@ -1008,24 +1473,49 @@ function renderOverhaul() {
 }
 
 function toggleOverhaul(i) {
+  if (OTBloqueada()) return;
   ot.overhaul[i].ok = !ot.overhaul[i].ok;
   guardarCambiosOT();
 }
 
 async function subirFotoOverhaul(e, i) {
 
+  if (OTBloqueada()) return;
+
   const file = e.target.files[0];
 
   if (!file) return;
 
-  const imagenComprimida =
-    await comprimirImagen(file);
+  try {
 
-  ot.overhaul[i].fotos.push(imagenComprimida);
+    if (!ot.overhaul[i].fotos) {
+      ot.overhaul[i].fotos = [];
+    }
 
-  guardarCambiosOT();
+    const imagenBlob = await comprimirImagenBlob(file);
 
-  mostrarFotosOverhaul(i);
+    const imagenComprimida = new File(
+      [imagenBlob],
+      `overhaul_${Date.now()}.jpg`,
+      { type: "image/jpeg" }
+    );
+
+    const urlFoto = await subirArchivoStorage(
+      imagenComprimida,
+      "overhaul",
+      i
+    );
+
+    ot.overhaul[i].fotos.push(urlFoto);
+
+    await guardarCambiosOT();
+
+    mostrarFotosOverhaul(i);
+
+  } catch (error) {
+    console.error("Error subiendo foto overhaul:", error);
+    alert("Error al subir la imagen de Overhaul");
+  }
 }
 
 function mostrarFotosOverhaul(i) {
@@ -1064,6 +1554,8 @@ function mostrarFotosOverhaul(i) {
 
 function eliminarFotoOverhaul(i, index) {
 
+  if (OTBloqueada()) return;
+
   const confirmar = confirm("¿Eliminar foto?");
   if (!confirmar) return;
 
@@ -1077,6 +1569,8 @@ function eliminarFotoOverhaul(i, index) {
 }
 
 function agregarComentarioOverhaul(i) {
+
+  if (OTBloqueada()) return;
 
   const nombre = document.getElementById(`tec-overhaul-${i}`).value;
   const texto = document.getElementById(`com-overhaul-${i}`).value;
@@ -1133,6 +1627,8 @@ function renderComentariosOverhaul(i) {
 
 function eliminarComentarioOverhaul(i, index) {
 
+  if (OTBloqueada()) return;
+
   if (!confirm("¿Eliminar registro?")) return;
 
   ot.overhaul[i].comentarios.splice(index, 1);
@@ -1161,10 +1657,6 @@ function guardarOverhaul() {
 // =======================
 function aprobarOverhaul() {
 
-  if (usuario.rol !== "admin") {
-    alert("Solo admin puede aprobar");
-    return;
-  }
 
   if (!ot.overhaul || ot.overhaul.length === 0) {
     alert("Debes cargar el checklist primero");
@@ -1314,43 +1806,58 @@ function renderChecklist(tipo) {
 }
 
 function togglePrueba(tipo, i) {
+  if (OTBloqueada()) return;
   ot.pruebas[tipo][i].ok = !ot.pruebas[tipo][i].ok;
   guardarCambiosOT();
 }
 
-async function subirFotoPrueba(e, i) {
+async function subirFotoPrueba(e, tipo, i) {
+
+  if (OTBloqueada()) return;
 
   const file = e.target.files[0];
 
   if (!file) return;
 
-  const imagenComprimida =
-    await comprimirImagen(file);
+  try {
 
-  ot.overhaul[i].fotos.push(imagenComprimida);
+    if (!ot.pruebas) {
+      ot.pruebas = { mecanico: [], electrico: [] };
+    }
 
-  guardarCambiosOT();
+    if (!ot.pruebas[tipo][i].fotos) {
+      ot.pruebas[tipo][i].fotos = [];
+    }
 
-  mostrarFotosPrueba(i);
-}
+    const imagenBlob = await comprimirImagenBlob(file);
 
-function mostrarFotosPrueba(tipo, i) {
-  const div = document.getElementById(`fotos-${tipo}-${i}`);
-  if (!div) return;
+    const imagenComprimida = new File(
+      [imagenBlob],
+      `pruebas_${tipo}_${Date.now()}.jpg`,
+      { type: "image/jpeg" }
+    );
 
-  div.innerHTML = "";
+    const urlFoto = await subirArchivoStorage(
+      imagenComprimida,
+      `pruebas_${tipo}`,
+      i
+    );
 
-  ot.pruebas[tipo][i].fotos.forEach(f => {
-    const img = document.createElement("img");
-    img.src = foto;
-    img.style.cursor = "pointer";
-    img.onclick = () => verImagenModal(foto);
-    img.width = 100;
-    div.appendChild(img);
-  });
+    ot.pruebas[tipo][i].fotos.push(urlFoto);
+
+    await guardarCambiosOT();
+
+    mostrarFotosPrueba(tipo, i);
+
+  } catch (error) {
+    console.error("Error subiendo foto prueba:", error);
+    alert("Error al subir la imagen de pruebas");
+  }
 }
 
 function agregarComentarioPrueba(tipo, i) {
+
+  if (OTBloqueada()) return;
 
   const nombre = document.getElementById(`tecnico-${tipo}-${i}`).value;
   const texto = document.getElementById(`comentario-${tipo}-${i}`).value;
@@ -1417,6 +1924,8 @@ function renderComentariosPrueba(tipo, i) {
 
 function eliminarComentarioPrueba(tipo, i, index) {
 
+  if (OTBloqueada()) return;
+
   const confirmar = confirm("¿Eliminar este registro?");
   if (!confirmar) return;
 
@@ -1461,6 +1970,8 @@ function mostrarFotosPrueba(tipo, i) {
 
 function eliminarFotoPrueba(tipo, i, index) {
 
+  if (OTBloqueada()) return;
+
   const confirmar = confirm("¿Eliminar esta evidencia?");
   if (!confirmar) return;
 
@@ -1491,10 +2002,10 @@ function guardarPruebas() {
 // =======================
 function aprobarPruebas() {
 
-  if (usuario.rol !== "admin") {
-    alert("Solo admin puede aprobar");
-    return;
-  }
+  if (!esJefeTaller()) {
+  alert("Solo Jefe de Taller puede aprobar pruebas");
+  return;
+}
 
   if (!ot.pruebas) {
     alert("Debes cargar los checklist");
@@ -1586,44 +2097,59 @@ function validarPruebasCompleto() {
 // =======================
 // SUBIR DOCUMENTOS POR SECCIÓN
 // =======================
-function subirDocsSeccion(tipo) {
+async function subirDocsSeccion(tipo) {
+
+  if (OTBloqueada()) return;
 
   const inputId = tipo === "preparacion" ? "docsPrep" : "docsFinal";
   const input = document.getElementById(inputId);
-  const files = input.files;
 
-  if (!files.length) {
+  if (!input || !input.files.length) {
     alert("Selecciona archivos");
     return;
   }
 
   if (!ot.despacho) {
-    ot.despacho = { preparacion: [], final: [] };
+    ot.despacho = {
+      preparacion: [],
+      final: []
+    };
   }
 
-  if (!ot.despacho[tipo]) {
-    ot.despacho[tipo] = [];
-  }
+  if (!ot.despacho.preparacion) ot.despacho.preparacion = [];
+  if (!ot.despacho.final) ot.despacho.final = [];
 
-  for (let file of files) {
-    const reader = new FileReader();
+  try {
 
-    reader.onload = function() {
+    for (let file of input.files) {
 
-      ot.despacho[tipo].push({
+      const urlArchivo = await subirArchivoStorage(
+        file,
+        tipo === "preparacion" ? "despacho_preparacion" : "despacho_final",
+        "documentos"
+      );
+
+      const nuevoDoc = {
         nombre: file.name,
         tipo: file.type,
-        data: reader.result
-      });
+        url: urlArchivo,
+        fecha: new Date().toLocaleString()
+      };
 
-      guardarCambiosOT();
-      renderDocsSeccion(tipo);
-    };
+      ot.despacho[tipo].push(nuevoDoc);
+    }
 
-    reader.readAsDataURL(file);
+    await guardarCambiosOT();
+
+    renderDocsSeccion("preparacion");
+    renderDocsSeccion("final");
+
+    input.value = "";
+
+  } catch (error) {
+    console.error("Error subiendo documento despacho:", error);
+    alert("Error al subir documento");
   }
-
-  input.value = "";
 }
 
 // =======================
@@ -1631,7 +2157,10 @@ function subirDocsSeccion(tipo) {
 // =======================
 function renderDocsSeccion(tipo) {
 
-  const contId = tipo === "preparacion" ? "listaDocsPrep" : "listaDocsFinal";
+  const contId = tipo === "preparacion"
+    ? "listaDocsPrep"
+    : "listaDocsFinal";
+
   const cont = document.getElementById(contId);
 
   if (!cont) return;
@@ -1652,7 +2181,11 @@ function renderDocsSeccion(tipo) {
       </div>
 
       <div class="doc-actions">
-        <button onclick="abrirDocSeccion(event, '${tipo}', ${index})">👁</button>
+        <button 
+          class="permitido-bloqueo"
+          onclick="abrirDocSeccion(event, '${tipo}', ${index})">
+          👁
+        </button>
         <button onclick="eliminarDocSeccion(event, '${tipo}', ${index})">🗑</button>
       </div>
     `;
@@ -1692,7 +2225,7 @@ function abrirDocumento(doc) {
     return;
   }
 
-  visor.src = doc.data;
+  visor.src = doc.url || doc.data;
   modal.style.display = "block";
 }
 
@@ -1741,7 +2274,6 @@ function validarDespachoCompleto() {
 
   const prep = ot.despacho.preparacion?.length > 0;
   const final = ot.despacho.final?.length > 0;
-  const docs = ot.despacho.documentos?.length > 0;
 
   if (!prep) {
     alert("Faltan documentos de preparación");
@@ -1753,10 +2285,6 @@ function validarDespachoCompleto() {
     return false;
   }
 
-  if (!docs) {
-    alert("Faltan documentos generales");
-    return false;
-  }
 
   return true;
 }
@@ -1771,16 +2299,23 @@ function cerrarOT() {
     return;
   }
 
+  if (!esJefeTaller()) {
+    alert("Solo Jefe de Taller puede cerrar la OS");
+    return;
+  }
+
   const confirmar = confirm("¿Seguro que deseas cerrar la OT?");
   if (!confirmar) return;
 
-  // 🔥 VALIDACIÓN TOTAL
   if (!validarOTCompleta()) return;
 
   ot.estado = "CERRADA";
+  ot.cerrada = true;
   ot.fechaCierre = new Date().toLocaleString();
 
   guardarCambiosOT();
+
+  aplicarModoSoloLectura();
 
   alert("OT FINALIZADA COMPLETAMENTE ✅");
 
@@ -1871,9 +2406,8 @@ function validarOTCompleta() {
 
   const prep = ot.despacho.preparacion?.length > 0;
   const final = ot.despacho.final?.length > 0;
-  const docs = ot.despacho.documentos?.length > 0;
 
-  if (!prep || !final || !docs) {
+  if (!prep || !final) {
     alert("DESPACHO incompleto");
     return false;
   }
@@ -1881,106 +2415,8 @@ function validarOTCompleta() {
   return true;
 }
 
-// =======================
-// SUBIR DOCUMENTOS GENERALES
-// =======================
-function subirDocumentos() {
 
-  const input = document.getElementById("inputDocs");
-  const files = input.files;
 
-  if (!files.length) {
-    alert("Selecciona archivos");
-    return;
-  }
-
-  if (!ot) {
-    alert("No hay OT cargada");
-    return;
-  }
-
-  // 🔥 asegurar estructura
-  if (!ot.despacho) {
-    ot.despacho = { preparacion: [], final: [], documentos: [] };
-  }
-
-  if (!ot.despacho.documentos) {
-    ot.despacho.documentos = [];
-  }
-
-  for (let file of files) {
-
-    const reader = new FileReader();
-
-    reader.onload = function() {
-
-      ot.despacho.documentos.push({
-        nombre: file.name,
-        tipo: file.type,
-        data: reader.result
-      });
-
-      guardarCambiosOT();
-      mostrarDocs();
-    };
-
-    reader.readAsDataURL(file);
-  }
-
-  // limpiar input
-  input.value = "";
-}
-
-function abrirDocumentoDesdeLista(e, index) {
-  e.stopPropagation();
-  abrirDocumento(ot.despacho.documentos[index]);
-}
-
-function eliminarDocumento(e, index) {
-
-  e.stopPropagation();
-
-  const confirmar = confirm("¿Eliminar documento?");
-  if (!confirmar) return;
-
-  if (!ot?.despacho?.documentos) return;
-
-  ot.despacho.documentos.splice(index, 1);
-
-  guardarCambiosOT();
-
-  mostrarDocs();
-}
-
-function mostrarDocs() {
-
-  const cont = document.getElementById("listaDocs");
-  if (!cont) return;
-
-  cont.innerHTML = "";
-
-  if (!ot?.despacho?.documentos) return;
-
-  ot.despacho.documentos.forEach((doc, index) => {
-
-    const div = document.createElement("div");
-    div.className = "doc-item";
-
-    div.innerHTML = `
-      <div class="doc-left">
-        <span class="doc-icon">📄</span>
-        <span class="doc-name">${doc.nombre}</span>
-      </div>
-
-      <div class="doc-actions">
-        <button onclick="abrirDocumentoDesdeLista(event, ${index})">👁</button>
-        <button onclick="eliminarDocumento(event, ${index})">🗑</button>
-      </div>
-    `;
-
-    cont.appendChild(div);
-  });
-}
 
 // =======================
 // GENERAR PDF
@@ -2378,7 +2814,11 @@ function renderBloqueServicio(tituloSeccion, lista) {
     doc.setFontSize(12);
     doc.setFont("helvetica", "bold");
 
-    doc.text(`${index + 1}. ${item.item}`, 10, y);
+    doc.text(
+      `${index + 1}. ${item.item}`,
+      10,
+      y
+    );
 
     y += 8;
 
@@ -2390,7 +2830,11 @@ function renderBloqueServicio(tituloSeccion, lista) {
       doc.setFontSize(10);
       doc.setFont("helvetica", "bold");
 
-      doc.text("Trabajos realizados:", 15, y);
+      doc.text(
+        "Trabajos realizados:",
+        15,
+        y
+      );
 
       y += 6;
 
@@ -2401,17 +2845,19 @@ function renderBloqueServicio(tituloSeccion, lista) {
         const texto =
           `• ${c.nombre}: ${c.texto}`;
 
-        const split = doc.splitTextToSize(texto, 170);
+        const split =
+          doc.splitTextToSize(texto, 170);
 
         doc.text(split, 20, y);
 
         y += split.length * 5 + 3;
 
       });
+
     }
 
     // =========================
-    // FOTOS
+    // GALERÍA PROFESIONAL
     // =========================
     if (item.fotos?.length > 0) {
 
@@ -2419,56 +2865,107 @@ function renderBloqueServicio(tituloSeccion, lista) {
 
       doc.setFont("helvetica", "bold");
 
-      doc.text("Evidencias fotográficas:", 15, y);
+      doc.text(
+        "Evidencias fotográficas:",
+        15,
+        y
+      );
 
       y += 10;
 
-      let x = 15;
-      let col = 0;
+      // =========================
+// CONFIGURACIÓN GALERÍA
+// =========================
+const espacioX = 8;
 
-      item.fotos.forEach(foto => {
+const anchoImg = 55;
+const altoImg = 40;
 
-        checkPage();
+const columnas = 3;
+
+// 🔥 CALCULAR ANCHO TOTAL GRID
+const anchoTotal =
+  (columnas * anchoImg) +
+  ((columnas - 1) * espacioX);
+
+// 🔥 CENTRAR AUTOMÁTICAMENTE
+const margenX =
+  (pageWidth - anchoTotal) / 2;
+      item.fotos.forEach((foto, fotoIndex) => {
+
+        const fila =
+          Math.floor(fotoIndex / columnas);
+
+        const columna =
+          fotoIndex % columnas;
+
+        const posX =
+          margenX +
+          (columna * (anchoImg + espacioX));
+
+        const posY =
+          y +
+          (fila * (altoImg + 12));
+
+        // =========================
+        // NUEVA PÁGINA
+        // =========================
+        if (posY + altoImg > 250) {
+
+          footer(doc.getNumberOfPages());
+
+          doc.addPage();
+
+          header();
+
+          y = 40;
+
+        }
 
         try {
 
-          // Marco
+          // MARCO
           doc.setDrawColor(180);
-          doc.rect(x - 1, y - 1, 57, 42);
 
-          // Imagen
+          doc.roundedRect(
+            posX - 1,
+            posY - 1,
+            anchoImg + 2,
+            altoImg + 2,
+            2,
+            2
+          );
+
+          // IMAGEN
           doc.addImage(
             foto,
             "JPEG",
-            x,
-            y,
-            55,
-            40
+            posX,
+            posY,
+            anchoImg,
+            altoImg
           );
 
         } catch(e) {
+
           console.warn(e);
-        }
 
-        col++;
-
-        if (col === 3) {
-
-          col = 0;
-          x = 15;
-          y += 48;
-
-        } else {
-
-          x += 58;
         }
 
       });
 
-      y += 55;
+      // =========================
+      // AJUSTAR ALTURA FINAL
+      // =========================
+      const filasTotales =
+        Math.ceil(item.fotos.length / columnas);
+
+      y += filasTotales * (altoImg + 12);
+
+      y += 10;
     }
 
-    y += 10;
+    y += 15;
 
   });
 
@@ -2558,36 +3055,6 @@ parrafo(
   doc.save(`Informe_${ot.os}.pdf`);
 }
 
-function actualizarPipeline() {
-
-  const estado = obtenerEstadoOT(ot);
-
-  const orden = [
-    "INGRESO",
-    "EVALUACION",
-    "OVERHAUL",
-    "PRUEBAS",
-    "DESPACHO",
-    "CERRADA"
-  ];
-
-  orden.forEach((step, i) => {
-
-    const el = document.getElementById("step-" + step.toLowerCase());
-    if (!el) return;
-
-    el.classList.remove("active", "done");
-
-    const indexEstado = orden.indexOf(estado);
-
-    if (i < indexEstado) {
-      el.classList.add("done");
-    } else if (i === indexEstado) {
-      el.classList.add("active");
-    }
-
-  });
-}
 
 function mostrarAlerta(msg, tipo = "error") {
 
@@ -2612,3 +3079,157 @@ function verImagenModal(src) {
 function cerrarImagen() {
   document.getElementById("modalImagen").style.display = "none";
 }
+
+// =======================
+// COMPRIMIR IMAGEN COMO BLOB
+// =======================
+function comprimirImagenBlob(file, calidad = 0.7, maxWidth = 1600) {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+
+    reader.onload = (event) => {
+      const img = new Image();
+
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d");
+
+        let width = img.width;
+        let height = img.height;
+
+        if (width > maxWidth) {
+          height *= maxWidth / width;
+          width = maxWidth;
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+
+        ctx.drawImage(img, 0, 0, width, height);
+
+        canvas.toBlob(
+          (blob) => resolve(blob),
+          "image/jpeg",
+          calidad
+        );
+      };
+
+      img.src = event.target.result;
+    };
+
+    reader.readAsDataURL(file);
+  });
+}
+
+// =======================
+// SUBIR ARCHIVO A STORAGE
+// =======================
+async function subirArchivoStorage(file, etapa, itemIndex) {
+
+  const otId = localStorage.getItem("otActiva");
+
+  if (!otId) {
+    alert("No hay OT activa");
+    return null;
+  }
+
+  const nombreArchivo = `${Date.now()}_${file.name}`;
+
+  const ruta = `ots/${otId}/${etapa}/item_${itemIndex}/${nombreArchivo}`;
+
+  const archivoRef = ref(storage, ruta);
+
+  await uploadBytes(archivoRef, file);
+
+  const url = await getDownloadURL(archivoRef);
+
+  return url;
+}
+
+function renderUsuarioActivo() {
+  const usuario = JSON.parse(localStorage.getItem("usuarioActivo"));
+
+  if (!usuario) return;
+
+  const nombre = document.getElementById("usuarioNombre");
+  const rol = document.getElementById("usuarioRol");
+
+  if (nombre) nombre.textContent = usuario.nombre || "Usuario";
+  if (rol) rol.textContent = usuario.rol || "Sin rol";
+}
+
+function cerrarSesion() {
+  localStorage.removeItem("usuarioActivo");
+  localStorage.removeItem("otActiva");
+  window.location.href = "login.html";
+}
+
+window.cerrarSesion = cerrarSesion;
+
+
+// =======================
+// FUNCIONES GLOBALES PARA HTML
+// =======================
+window.guardarDatosOS = guardarDatosOS;
+
+window.cargarIngreso = cargarIngreso;
+window.guardarIngreso = guardarIngreso;
+window.aprobarIngreso = aprobarIngreso;
+
+window.cargarEvaluacion = cargarEvaluacion;
+window.guardarEvaluacion = guardarEvaluacion;
+window.aprobarEvaluacion = aprobarEvaluacion;
+
+window.cargarOverhaul = cargarOverhaul;
+window.guardarOverhaul = guardarOverhaul;
+window.aprobarOverhaul = aprobarOverhaul;
+
+window.cargarChecklist = cargarChecklist;
+window.guardarPruebas = guardarPruebas;
+window.aprobarPruebas = aprobarPruebas;
+
+window.subirDocsSeccion = subirDocsSeccion;
+window.guardarDespacho = guardarDespacho;
+window.cerrarOT = cerrarOT;
+
+window.generarPDF = generarPDF;
+
+window.cerrarModal = cerrarModal;
+window.cerrarImagen = cerrarImagen;
+
+
+window.toggleIngreso = toggleIngreso;
+window.subirFotoIngreso = subirFotoIngreso;
+window.eliminarFotoIngreso = eliminarFotoIngreso;
+window.agregarComentarioItem = agregarComentarioItem;
+window.eliminarComentarioIngreso = eliminarComentarioIngreso;
+
+window.toggleEvaluacion = toggleEvaluacion;
+window.subirFotoEvaluacion = subirFotoEvaluacion;
+window.eliminarFotoEvaluacion = eliminarFotoEvaluacion;
+window.agregarComentarioEvaluacion = agregarComentarioEvaluacion;
+window.eliminarComentarioEvaluacion = eliminarComentarioEvaluacion;
+
+window.toggleOverhaul = toggleOverhaul;
+window.subirFotoOverhaul = subirFotoOverhaul;
+window.eliminarFotoOverhaul = eliminarFotoOverhaul;
+window.agregarComentarioOverhaul = agregarComentarioOverhaul;
+window.eliminarComentarioOverhaul = eliminarComentarioOverhaul;
+
+window.togglePrueba = togglePrueba;
+window.subirFotoPrueba = subirFotoPrueba;
+window.eliminarFotoPrueba = eliminarFotoPrueba;
+window.agregarComentarioPrueba = agregarComentarioPrueba;
+window.eliminarComentarioPrueba = eliminarComentarioPrueba;
+
+window.abrirDocSeccion = abrirDocSeccion;
+window.eliminarDocSeccion = eliminarDocSeccion;
+window.verImagenModal = verImagenModal;
+
+window.aprobarOverhaulDesdeEvaluacion = aprobarOverhaulDesdeEvaluacion;
+window.rechazarOverhaulDesdeEvaluacion = rechazarOverhaulDesdeEvaluacion;
+
+window.renderDocsDecisionEvaluacionPreview = renderDocsDecisionEvaluacionPreview;
+window.abrirArchivoTemporal = abrirArchivoTemporal;
+
+window.abrirDocumentoDecisionEvaluacion = abrirDocumentoDecisionEvaluacion;

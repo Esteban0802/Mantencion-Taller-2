@@ -1142,3 +1142,561 @@ canvas {
     #ff0000
   );
 }
+
+.login-overtrack {
+  margin: 0;
+  min-height: 100vh;
+  background: radial-gradient(circle at top left, #1e293b, #020617 60%);
+  color: #fff;
+  font-family: Arial, sans-serif;
+  overflow: hidden;
+}
+
+.login-bg-grid {
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255,255,255,.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.04) 1px, transparent 1px);
+  background-size: 40px 40px;
+  mask-image: linear-gradient(to bottom, black, transparent);
+}
+
+.login-wrapper {
+  position: relative;
+  z-index: 2;
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 1.2fr 420px;
+  gap: 40px;
+  align-items: center;
+  padding: 60px;
+}
+
+.login-brand h1 {
+  font-size: 64px;
+  margin: 20px 0 10px;
+  letter-spacing: 2px;
+}
+
+.login-brand p {
+  max-width: 520px;
+  font-size: 25px;
+  line-height: 1.4;
+  color: #cbd5e1;
+  font-weight: 300;
+  text-align:center;
+  margin: auto;
+}
+
+.brand-logo {
+  width: 80vh;
+  max-width: 100%;
+  margin: auto;
+}
+
+.brand-logo img {
+  width: 100%;
+  height: auto;
+
+  filter:
+    drop-shadow(0 15px 35px rgba(249,115,22,.18));
+
+  transition: 0.35s ease;
+}
+
+.brand-logo img:hover {
+  transform: scale(1.02);
+}
+
+.login-panel {
+  background: rgba(15, 23, 42, .85);
+  border: 1px solid rgba(148,163,184,.25);
+  box-shadow: 0 30px 80px rgba(0,0,0,.45);
+  border-radius: 24px;
+  padding: 36px;
+  backdrop-filter: blur(16px);
+}
+
+.login-panel h2 {
+  margin: 0;
+  font-size: 28px;
+}
+
+.login-subtitle {
+  color: #94a3b8;
+  margin-bottom: 28px;
+}
+
+.login-panel label {
+  display: block;
+  margin: 16px 0 8px;
+  color: #cbd5e1;
+  font-size: 14px;
+}
+
+.login-panel input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid #334155;
+  background: #020617;
+  color: white;
+  font-size: 15px;
+}
+
+.login-panel input:focus {
+  outline: none;
+  border-color: #f97316;
+  box-shadow: 0 0 0 3px rgba(249,115,22,.18);
+}
+
+.btn-login {
+  width: 100%;
+  margin-top: 26px;
+  padding: 15px;
+  border: none;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #f97316, #f59e0b);
+  color: #111827;
+  font-size: 16px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.btn-login:hover {
+  transform: translateY(-1px);
+}
+
+.login-error {
+  color: #fca5a5;
+  margin-top: 16px;
+  min-height: 20px;
+}
+
+@media (max-width: 850px) {
+  .login-wrapper {
+    grid-template-columns: 1fr;
+    padding: 24px;
+  }
+
+  .login-brand h1 {
+    font-size: 42px;
+  }
+
+  .login-brand p {
+    font-size: 16px;
+  }
+}
+
+/* ==========================
+   OVERTRACK GLOBAL UI
+========================== */
+
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: radial-gradient(circle at top left, #1e293b, #020617 65%);
+  color: #e5e7eb;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events: none;
+  z-index: -1;
+}
+
+/* ==========================
+   SIDEBAR
+========================== */
+
+.sidebar {
+  background: rgba(15, 23, 42, .92) !important;
+  border-right: 1px solid rgba(148,163,184,.18);
+  box-shadow: 20px 0 60px rgba(0,0,0,.35);
+}
+
+.logo {
+  color: #f97316 !important;
+  font-weight: 900;
+  letter-spacing: 1px;
+}
+
+.sidebar li {
+  color: #cbd5e1;
+  border-radius: 12px;
+  margin: 6px 12px;
+  transition: .25s;
+}
+
+.sidebar li:hover,
+.sidebar li.active {
+  background: linear-gradient(135deg, #f97316, #f59e0b);
+  color: #111827;
+  font-weight: 800;
+}
+
+/* ==========================
+   MAIN CONTENT
+========================== */
+
+.main-content,
+.container {
+  background: transparent !important;
+}
+
+.header h2,
+.card h2,
+.card h3 {
+  color: #ffffff;
+}
+
+/* ==========================
+   CARDS
+========================== */
+
+.card,
+.kpi-card,
+.login-panel {
+  background: rgba(15, 23, 42, .86) !important;
+  border: 1px solid rgba(148,163,184,.20);
+  border-radius: 22px;
+  box-shadow: 0 25px 70px rgba(0,0,0,.35);
+  backdrop-filter: blur(14px);
+  color: #e5e7eb;
+}
+
+/* ==========================
+   INPUTS
+========================== */
+
+input,
+select,
+textarea {
+  background: #020617 !important;
+  color: #ffffff !important;
+  border: 1px solid #334155 !important;
+  border-radius: 14px !important;
+  padding: 13px 15px;
+}
+
+input:focus,
+textarea:focus {
+  outline: none;
+  border-color: #f97316 !important;
+  box-shadow: 0 0 0 3px rgba(249,115,22,.18);
+}
+
+/* ==========================
+   BOTONES
+========================== */
+
+button,
+.btn-primary {
+  border: none;
+  border-radius: 14px;
+  padding: 12px 18px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: .25s;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #f97316, #f59e0b) !important;
+  color: #111827 !important;
+}
+
+.btn-success {
+  background: linear-gradient(135deg, #10b981, #059669) !important;
+  color: white !important;
+}
+
+.btn-warning {
+  background: linear-gradient(135deg, #f59e0b, #f97316) !important;
+  color: #111827 !important;
+}
+
+button:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.05);
+}
+
+/* ==========================
+   TABLAS
+========================== */
+
+.tabla-ot {
+  background: transparent;
+  color: #e5e7eb;
+}
+
+.tabla-ot th {
+  background: #111827 !important;
+  color: #ffffff !important;
+  border-bottom: 1px solid #334155;
+}
+
+.tabla-ot td {
+  color: #e5e7eb;
+  border-bottom: 1px solid rgba(148,163,184,.18);
+}
+
+.tabla-ot tr:hover {
+  background: rgba(249,115,22,.07);
+}
+
+/* ==========================
+   TABS INDEX
+========================== */
+
+.tabs {
+  background: rgba(15,23,42,.85);
+  border: 1px solid rgba(148,163,184,.20);
+  border-radius: 20px;
+  padding: 10px;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.tab {
+  background: #111827;
+  color: #cbd5e1;
+}
+
+.tab.active {
+  background: linear-gradient(135deg, #f97316, #f59e0b);
+  color: #111827;
+}
+
+.tab.disabled {
+  opacity: .35;
+  cursor: not-allowed;
+}
+
+/* ==========================
+   PIPELINE
+========================== */
+
+.pipeline {
+  background: rgba(15,23,42,.88);
+  border: 1px solid rgba(148,163,184,.20);
+  border-radius: 22px;
+  padding: 16px;
+  margin: 20px;
+  box-shadow: 0 20px 50px rgba(0,0,0,.30);
+}
+
+.step {
+  background: #111827;
+  color: #94a3b8;
+  border: 1px solid #334155;
+}
+
+.step.active {
+  background: linear-gradient(135deg, #f97316, #f59e0b);
+  color: #111827;
+  font-weight: 900;
+}
+
+.step.done {
+  background: #10b981;
+  color: white;
+}
+
+/* ==========================
+   COMENTARIOS / ITEMS
+========================== */
+
+.item,
+.comentario-card,
+.doc-item {
+  background: rgba(30,41,59,.82) !important;
+  border: 1px solid rgba(148,163,184,.18);
+  border-radius: 18px;
+  color: #e5e7eb;
+}
+
+.comentario-fecha {
+  color: #f59e0b !important;
+}
+
+/* ==========================
+   DOCUMENTOS DESPACHO
+========================== */
+
+.doc-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 18px;
+}
+
+.doc-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.doc-icon {
+  color: #f97316;
+  font-size: 20px;
+}
+
+.doc-name {
+  color: #ffffff !important;
+  font-weight: 600;
+  opacity: 1 !important;
+}
+
+.doc-actions button {
+  opacity: 1 !important;
+}
+
+.user-box {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(15,23,42,.8);
+  border: 1px solid rgba(148,163,184,.25);
+  padding: 10px 14px;
+  border-radius: 16px;
+}
+
+.user-box span {
+  color: #fff;
+  font-weight: 800;
+}
+
+.user-box small {
+  color: #f59e0b;
+  font-weight: 700;
+}
+
+.btn-logout {
+  background: #ef4444 !important;
+  color: white !important;
+  padding: 8px 12px;
+  border-radius: 10px;
+}
+
+.topbar-overtrack {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 28px;
+}
+
+/* =========================
+   BRAND OVERTRACK
+========================= */
+
+.brand-overtrack {
+  display: flex;
+  align-items: center;
+}
+
+.brand-overtrack img {
+  height: 90px;
+  width: auto;
+  object-fit: contain;
+  filter: drop-shadow(0 0 12px rgba(249,115,22,.25));
+}
+
+/* =========================
+   LOGO SIDEBAR
+========================= */
+
+.sidebar-logo {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 28px 12px 18px;
+  border-bottom: 1px solid rgba(255,255,255,.06);
+  margin-bottom: 20px;
+}
+
+.sidebar-logo img {
+  width: 220px;
+  max-width: 100%;
+  object-fit: contain;
+
+  filter:
+    drop-shadow(0 0 12px rgba(249,115,22,.25))
+    drop-shadow(0 0 20px rgba(59,130,246,.15));
+
+  transition: .3s ease;
+}
+
+.sidebar-logo img:hover {
+  transform: scale(1.03);
+}
+
+/* =========================
+   HEADER RIGHT
+========================= */
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  margin-left: auto;
+}
+
+/* =========================
+   DECISIÓN JEFE TALLER
+========================= */
+
+.decision-box {
+  margin-top: 28px;
+  padding: 24px;
+  border-radius: 22px;
+  background: rgba(15, 23, 42, .9);
+  border: 1px solid rgba(249, 115, 22, .35);
+  box-shadow: 0 20px 50px rgba(0,0,0,.30);
+}
+
+.decision-box h3 {
+  color: #fff;
+  margin-bottom: 8px;
+}
+
+.decision-text {
+  color: #cbd5e1;
+  margin-bottom: 18px;
+}
+
+.decision-box textarea {
+  width: 100%;
+  min-height: 110px;
+  resize: vertical;
+  margin-bottom: 16px;
+}
+
+.decision-actions {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin: 18px 0;
+}
+
+.btn-danger {
+  background: linear-gradient(135deg, #ef4444, #b91c1c) !important;
+  color: white !important;
+}

@@ -1,3 +1,11 @@
+import { db } from "./firebase-config.js";
+
+import {
+  collection,
+  onSnapshot,
+  query,
+  orderBy
+} from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 let listaOTs = [];
 let listaFiltrada = [];
@@ -6,16 +14,26 @@ let listaFiltrada = [];
 // ESTADO AUTOMÁTICO
 // =======================
 function obtenerEstadoOT(ot) {
+
   if (!ot) return "INGRESO";
 
+  if (ot.estado === "CERRADA" || ot.cerrada === true) {
+    return "CERRADA";
+  }
+
   if (!ot.ingresoAprobado) return "INGRESO";
+
   if (!ot.evaluacionAprobada) return "EVALUACION";
-  if (!ot.overhaulAprobado) return "OVERHAUL";
+
+  if (ot.overhaulRequerido === false) return "DESPACHO";
+
+  if (ot.overhaulRequerido === true && !ot.overhaulAprobado) {
+    return "OVERHAUL";
+  }
+
   if (!ot.pruebasAprobado) return "PRUEBAS";
 
-  if (!ot.despacho) return "DESPACHO";
-
-  return "CERRADA";
+  return "DESPACHO";
 }
 
 // =======================
@@ -38,18 +56,9 @@ function calcularProgreso(ot) {
 // CARGAR TODAS LAS OT
 // =======================
 window.onload = () => {
-  const data = localStorage.getItem("ots");
 
-  if (data) {
-    listaOTs = JSON.parse(data);
-  }
+  escucharOTsTiempoReal();
 
-  listaFiltrada = [...listaOTs];
-
-  renderTabla(listaFiltrada);
-  calcularKPIs(listaFiltrada);
-
-  // Sidebar activo
   document.querySelectorAll(".sidebar li").forEach(item => {
     item.addEventListener("click", function() {
       document.querySelectorAll(".sidebar li").forEach(i => i.classList.remove("active"));
@@ -57,8 +66,35 @@ window.onload = () => {
     });
   });
 
-  renderGraficos(listaFiltrada);
 };
+
+function escucharOTsTiempoReal() {
+
+  const q = query(
+    collection(db, "ots"),
+    orderBy("fechaCreacion", "desc")
+  );
+
+  onSnapshot(q, (snapshot) => {
+
+    listaOTs = snapshot.docs.map(docSnap => ({
+      id: docSnap.id,
+      ...docSnap.data()
+    }));
+
+    listaFiltrada = [...listaOTs];
+
+    renderTabla(listaFiltrada);
+    calcularKPIs(listaFiltrada);
+    renderGraficos(listaFiltrada);
+
+    console.log("Dashboard actualizado en tiempo real ✅", listaOTs);
+
+  }, (error) => {
+    console.error("Error escuchando OTs:", error);
+    alert("Error al cargar OTs desde Firebase");
+  });
+}
 
 // =======================
 // RENDER TABLA
@@ -155,9 +191,17 @@ function calcularKPIs(lista = listaOTs) {
 function abrirOT(index) {
   const ot = listaOTs[index];
 
+  if (!ot) {
+    alert("No se encontró la OT");
+    return;
+  }
+
   localStorage.setItem("otActiva", ot.id);
   window.location.href = "index.html";
 }
+
+window.abrirOT = abrirOT;
+
 
 // =======================
 // NUEVA OT
@@ -167,12 +211,16 @@ function nuevaOT() {
   window.location.href = "index.html";
 }
 
+window.nuevaOT = nuevaOT;
+
 // =======================
 // IR DASHBOARD
 // =======================
 function irDashboard() {
   window.location.href = "dashboard.html";
 }
+
+window.irDashboard = irDashboard;
 
 function filtrarOTs() {
   const texto = document.getElementById("inputBuscar").value.toLowerCase();
@@ -193,6 +241,8 @@ function filtrarOTs() {
   renderTabla(listaFiltrada);
   calcularKPIs(listaFiltrada);
 }
+
+window.filtrarOTs = filtrarOTs;
 
 let chartEstados = null;
 let chartProgreso = null;
@@ -286,3 +336,28 @@ window.addEventListener("storage", () => {
     renderGraficos(listaFiltrada);
   }
 });
+
+function renderUsuarioActivo() {
+  const usuario = JSON.parse(localStorage.getItem("usuarioActivo"));
+
+  if (!usuario) return;
+
+  const nombre = document.getElementById("usuarioNombre");
+  const rol = document.getElementById("usuarioRol");
+
+  if (nombre) nombre.textContent = usuario.nombre || "Usuario";
+  if (rol) rol.textContent = usuario.rol || "Sin rol";
+}
+
+function cerrarSesion() {
+  localStorage.removeItem("usuarioActivo");
+  localStorage.removeItem("otActiva");
+  window.location.href = "login.html";
+}
+
+window.cerrarSesion = cerrarSesion;
+
+window.abrirOT = abrirOT;
+window.nuevaOT = nuevaOT;
+window.irDashboard = irDashboard;
+window.filtrarOTs = filtrarOTs;

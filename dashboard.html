@@ -2,7 +2,8 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Panel de Órdenes</title>
+  <title>Dashboard Órdenes</title>
+  <link rel="icon" type="image/png" href="/img/logo_overtrack - pestaña.png">
   <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
@@ -11,21 +12,40 @@
 
   <!-- SIDEBAR -->
   <aside class="sidebar">
-    <h2 class="logo">⚙️ Mantención</h2>
+    <div class="sidebar-logo">
+      <img src="/img/logo_overtrack.png" alt="OverTrack">
+    </div>
 
     <ul>
       <li onclick="irDashboard()">📊 Dashboard</li>
       <li onclick="nuevaOT()">➕ Nueva OT</li>
-      <li onclick="irDashboard()">📁 Órdenes</li>
     </ul>
   </aside>
 
   <!-- CONTENIDO -->
   <main class="main-content">
 
-    <div class="header">
-      <h2>Órdenes de Trabajo</h2>
+  <div class="header">
+
+  <h2>Órdenes de Trabajo</h2>
+
+  <div class="header-right">
+
+    <div class="user-box">
+      <span id="usuarioNombre">Usuario</span>
+      <small id="usuarioRol">Rol</small>
+
+      <button
+        onclick="cerrarSesion()"
+        class="btn-logout permitido-bloqueo"
+      >
+        Salir
+      </button>
     </div>
+
+  </div>
+
+</div>
 
     <div class="buscador">
   <input 
@@ -101,6 +121,6 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="js/dashboard.js"></script>
+<script type="module" src="js/dashboard.js"></script>
 </body>
 </html>
