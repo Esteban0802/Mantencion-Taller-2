@@ -126,7 +126,7 @@ button {
 /* APP LAYOUT */
 .app {
   display: flex;
-  height: 100vh;
+  height: auto;
   font-family: Arial, sans-serif;
 }
 
@@ -1699,4 +1699,154 @@ button:hover {
 .btn-danger {
   background: linear-gradient(135deg, #ef4444, #b91c1c) !important;
   color: white !important;
+}
+
+.comentario-jefe {
+  border: 1px solid rgba(245, 158, 11, .65) !important;
+  background: rgba(120, 53, 15, .35) !important;
+  box-shadow: 0 0 20px rgba(245, 158, 11, .18);
+}
+
+.comentario-jefe strong {
+  color: #f59e0b !important;
+}
+
+.comentario-jefe::before {
+  content: "⚠ Comentario Jefe de Taller";
+  display: block;
+  color: #f59e0b;
+  font-size: 12px;
+  font-weight: 800;
+  margin-bottom: 8px;
+}
+
+.alerta-jefe-dashboard {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 28px;
+  height: 28px;
+
+  margin-left: 10px;
+
+  border-radius: 50%;
+
+  background: linear-gradient(
+    135deg,
+    #f59e0b,
+    #dc2626
+  );
+
+  color: white;
+
+  font-size: 16px;
+  font-weight: 900;
+
+  box-shadow:
+    0 0 12px rgba(245,158,11,.75),
+    0 0 24px rgba(220,38,38,.45);
+
+  animation: pulseWarning 1.8s infinite;
+
+  cursor: help;
+}
+
+/* 🔥 ANIMACIÓN */
+@keyframes pulseWarning {
+
+  0% {
+    transform: scale(1);
+    box-shadow:
+      0 0 12px rgba(245,158,11,.75),
+      0 0 24px rgba(220,38,38,.45);
+  }
+
+  50% {
+    transform: scale(1.12);
+    box-shadow:
+      0 0 18px rgba(245,158,11,1),
+      0 0 32px rgba(220,38,38,.75);
+  }
+
+  100% {
+    transform: scale(1);
+    box-shadow:
+      0 0 12px rgba(245,158,11,.75),
+      0 0 24px rgba(220,38,38,.45);
+  }
+}
+
+/* =========================
+   FIX FONDO Y ESPACIADO DASHBOARD
+========================= */
+
+body {
+  min-height: auto;
+  background: radial-gradient(circle at top left, #1e293b, #020617 65%) !important;
+}
+
+/* contenedor principal del dashboard */
+.main-content {
+  min-height: 100vh;
+  padding-bottom: 80px !important;
+  background: transparent !important;
+}
+
+/* evita que los gráficos queden pegados al final */
+.charts,
+.graficos,
+.dashboard-charts {
+  margin-bottom: 80px !important;
+}
+
+/* si tus gráficos están dentro de cards */
+.chart-card,
+.card canvas,
+.kpi-card {
+  margin-bottom: 24px;
+}
+
+/* mejora visual de las tarjetas de gráficos */
+.chart-card,
+.grafico-card {
+  padding: 24px !important;
+  border-radius: 24px !important;
+  background: rgba(15, 23, 42, .86) !important;
+  border: 1px solid rgba(148,163,184,.20);
+  box-shadow: 0 25px 70px rgba(0,0,0,.35);
+}
+
+/* espacio general bajo la tabla */
+.table-card,
+.tabla-card,
+.card {
+  margin-bottom: 28px;
+}
+
+.dashboard-container {
+  padding-bottom: 100px !important;
+}
+
+/* =========================
+   SIDEBAR ALTURA COMPLETA
+========================= */
+
+.dashboard-layout,
+.layout,
+.wrapper {
+  display: flex;
+  align-items: stretch;
+  min-height: 100vh;
+}
+
+.sidebar {
+  min-height:auto;
+  height: auto !important;
+  align-self: stretch;
+}
+
+.main-content {
+  flex: 1;
+  min-height: 100vh;
 }

@@ -128,8 +128,14 @@ function renderTabla(lista = listaOTs) {
       </td>
 
       <td>
-        <button class="btn-icon" onclick="abrirOT(${listaOTs.indexOf(o)})">👁</button>
-      </td>
+  <button class="btn-icon" onclick="abrirOT(${listaOTs.indexOf(o)})">👁</button>
+
+  ${
+    o.alertaJefe
+      ? `<span class="alerta-jefe-dashboard" title="Comentario del Jefe de Taller">⚠</span>`
+      : ""
+  }
+</td>
     `;
 
     tbody.appendChild(tr);
@@ -364,7 +370,7 @@ function renderUsuarioActivo() {
 function cerrarSesion() {
   localStorage.removeItem("usuarioActivo");
   localStorage.removeItem("otActiva");
-  window.location.href = "index.html";
+  window.location.href = "flujo.html";
 }
 
 window.cerrarSesion = cerrarSesion;

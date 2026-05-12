@@ -181,7 +181,7 @@ async function guardarDatosOS() {
 
     alert("OS creada correctamente ✅");
 
-    window.location.href = "index.html";
+    window.location.href = "flujo.html";
 
   } catch (error) {
     console.error("Error creando OS:", error);
@@ -408,8 +408,16 @@ function agregarComentarioItem(i) {
   ot.ingreso[i].comentarios.push({
     nombre,
     texto,
-    fecha: new Date().toLocaleString()
+    fecha: new Date().toLocaleString(),
+    rol: usuario?.rol || "usuario_taller"
   });
+
+  if (esJefeTaller()) {
+  ot.alertaJefe = true;
+}
+else if (esUsuarioTaller()) {
+  ot.alertaJefe = false;
+}
 
   guardarCambiosOT();
   renderComentariosItem(i);
@@ -433,7 +441,9 @@ function renderComentariosItem(i) {
   ot.ingreso[i].comentarios.forEach((c, index) => {
 
     const div = document.createElement("div");
-    div.className = "comentario-card";
+    div.className = c.rol === "jefe_taller"
+  ? "comentario-card comentario-jefe"
+  : "comentario-card";
 
     div.innerHTML = `
       <strong>👨‍🔧${c.nombre}</strong>
@@ -805,8 +815,16 @@ function agregarComentarioEvaluacion(i) {
   ot.evaluacion[i].comentarios.push({
     nombre,
     texto,
-    fecha: new Date().toLocaleString()
+    fecha: new Date().toLocaleString(),
+    rol: usuario?.rol || "usuario_taller"
   });
+
+  if (esJefeTaller()) {
+  ot.alertaJefe = true;
+}
+else if (esUsuarioTaller()) {
+  ot.alertaJefe = false;
+}
 
   guardarCambiosOT();
   renderComentariosEvaluacion(i);
@@ -827,7 +845,9 @@ function renderComentariosEvaluacion(i) {
   comentarios.forEach((c, index) => {
 
     const div = document.createElement("div");
-    div.className = "comentario-card";
+    div.className = c.rol === "jefe_taller"
+  ? "comentario-card comentario-jefe"
+  : "comentario-card";
 
     div.innerHTML = `
       <strong>👨‍🔧${c.nombre}</strong>
@@ -1258,6 +1278,8 @@ window.onload = async () => {
     if (ot.pruebas.electrico?.length > 0) {
       renderChecklist("electrico");
     }
+
+    renderDocsDecisionPruebasPreview();
   }
 
   if (
@@ -1587,8 +1609,16 @@ function agregarComentarioOverhaul(i) {
   ot.overhaul[i].comentarios.push({
     nombre,
     texto,
-    fecha: new Date().toLocaleString()
+    fecha: new Date().toLocaleString(),
+    rol: usuario?.rol || "usuario_taller"
   });
+
+  if (esJefeTaller()) {
+  ot.alertaJefe = true;
+}
+else if (esUsuarioTaller()) {
+  ot.alertaJefe = false;
+}
 
   guardarCambiosOT();
 
@@ -1608,7 +1638,9 @@ function renderComentariosOverhaul(i) {
   (ot.overhaul[i].comentarios || []).forEach((c, index) => {
 
     const div = document.createElement("div");
-    div.className = "comentario-card";
+    div.className = c.rol === "jefe_taller"
+  ? "comentario-card comentario-jefe"
+  : "comentario-card";
 
     div.innerHTML = `
       <strong>👨‍🔧${c.nombre}</strong>
@@ -1876,8 +1908,16 @@ function agregarComentarioPrueba(tipo, i) {
   ot.pruebas[tipo][i].comentarios.push({
     nombre,
     texto,
-    fecha
+    fecha: new Date().toLocaleString(),
+    rol: usuario?.rol || "usuario_taller"
   });
+
+  if (esJefeTaller()) {
+  ot.alertaJefe = true;
+}
+else if (esUsuarioTaller()) {
+  ot.alertaJefe = false;
+}
 
   // 🔥 guardar fecha del item
   if (!ot.pruebas[tipo][i].fecha) {
@@ -1905,7 +1945,9 @@ function renderComentariosPrueba(tipo, i) {
   comentarios.forEach((c, index) => {
 
     const div = document.createElement("div");
-    div.className = "comentario-card";
+    div.className = c.rol === "jefe_taller"
+  ? "comentario-card comentario-jefe"
+  : "comentario-card";
 
     div.innerHTML = `
       <strong>👨‍🔧${c.nombre}</strong>
@@ -2292,7 +2334,7 @@ function validarDespachoCompleto() {
 // =======================
 // CERRAR OT
 // =======================
-function cerrarOT() {
+async function cerrarOT() {
 
   if (!ot) {
     alert("No hay OT cargada");
@@ -2313,7 +2355,7 @@ function cerrarOT() {
   ot.cerrada = true;
   ot.fechaCierre = new Date().toLocaleString();
 
-  guardarCambiosOT();
+  await guardarCambiosOT();
 
   aplicarModoSoloLectura();
 
@@ -2321,6 +2363,237 @@ function cerrarOT() {
 
   localStorage.removeItem("otActiva");
   window.location.href = "dashboard.html";
+}
+
+// =======================
+// DECISIÓN JEFE TALLER - PRUEBAS
+// =======================
+async function subirDocumentoDecisionPruebas(file, resultado) {
+
+  const urlArchivo = await subirArchivoStorage(
+    file,
+    `decision_pruebas_${resultado.toLowerCase()}`,
+    "documentos"
+  );
+
+  return {
+    nombre: file.name,
+    tipo: file.type,
+    url: urlArchivo,
+    fecha: new Date().toLocaleString()
+  };
+}
+
+function renderDocsDecisionPruebasPreview() {
+
+  const cont = document.getElementById("listaDocsDecisionPruebas");
+  const input = document.getElementById("docsDecisionPruebas");
+
+  if (!cont) return;
+
+  cont.innerHTML = "";
+
+  const docsGuardados = ot?.decisionPruebas?.documentos || [];
+
+  docsGuardados.forEach((doc, index) => {
+
+    const div = document.createElement("div");
+    div.className = "doc-item";
+
+    div.innerHTML = `
+      <div class="doc-left">
+        <span class="doc-icon">📄</span>
+        <span class="doc-name">${doc.nombre}</span>
+      </div>
+
+      <div class="doc-actions">
+        <button
+          type="button"
+          class="permitido-bloqueo"
+          onclick="abrirDocumentoDecisionPruebas(${index})">
+          👁
+        </button>
+      </div>
+    `;
+
+    cont.appendChild(div);
+  });
+
+  if (!input || !input.files.length) return;
+
+  Array.from(input.files).forEach(file => {
+
+    const div = document.createElement("div");
+    div.className = "doc-item";
+
+    const urlTemp = URL.createObjectURL(file);
+
+    div.innerHTML = `
+      <div class="doc-left">
+        <span class="doc-icon">📄</span>
+        <span class="doc-name">${file.name}</span>
+      </div>
+
+      <div class="doc-actions">
+        <button
+          type="button"
+          class="permitido-bloqueo"
+          onclick="abrirArchivoTemporal('${urlTemp}')">
+          👁
+        </button>
+      </div>
+    `;
+
+    cont.appendChild(div);
+  });
+}
+
+function abrirDocumentoDecisionPruebas(index) {
+
+  const doc = ot?.decisionPruebas?.documentos?.[index];
+
+  if (!doc) return;
+
+  abrirDocumento({
+    nombre: doc.nombre,
+    tipo: doc.tipo,
+    url: doc.url
+  });
+}
+
+async function aprobarPruebasDesdeDecision() {
+
+  if (OTBloqueada()) return;
+
+  if (!esJefeTaller()) {
+    alert("Solo Jefe de Taller puede aprobar pruebas");
+    return;
+  }
+
+  if (!validarPruebasCompleto()) return;
+
+  const comentario = document
+    .getElementById("comentarioDecisionPruebas")
+    .value
+    .trim();
+
+  const inputDocs = document.getElementById("docsDecisionPruebas");
+  const files = inputDocs.files;
+
+  if (!comentario) {
+    alert("Debes ingresar comentario de aprobación");
+    return;
+  }
+
+  if (!files.length) {
+    alert("Debes cargar al menos un documento de evidencia");
+    return;
+  }
+
+  try {
+
+    const documentos = [];
+
+    for (let file of files) {
+      const docSubido = await subirDocumentoDecisionPruebas(
+        file,
+        "APROBADO"
+      );
+
+      documentos.push(docSubido);
+    }
+
+    ot.decisionPruebas = {
+      resultado: "APROBADO",
+      comentario,
+      documentos,
+      usuario: usuario?.nombre || "Jefe Taller",
+      rol: usuario?.rol || "jefe_taller",
+      fecha: new Date().toLocaleString()
+    };
+
+    ot.pruebasAprobado = true;
+    ot.alertaJefe = false;
+
+    ot.estado = obtenerEstadoOT(ot);
+
+    await guardarCambiosOT();
+
+    habilitarTab("despacho");
+    cambiarTab("despacho");
+
+    alert("Pruebas aprobadas. Se habilita DESPACHO ✅");
+
+  } catch (error) {
+    console.error("Error aprobando pruebas:", error);
+    alert("Error al guardar decisión de pruebas");
+  }
+}
+
+async function rechazarPruebasDesdeDecision() {
+
+  if (OTBloqueada()) return;
+
+  if (!esJefeTaller()) {
+    alert("Solo Jefe de Taller puede rechazar pruebas");
+    return;
+  }
+
+  const comentario = document
+    .getElementById("comentarioDecisionPruebas")
+    .value
+    .trim();
+
+  const inputDocs = document.getElementById("docsDecisionPruebas");
+  const files = inputDocs.files;
+
+  if (!comentario) {
+    alert("Debes ingresar comentario de rechazo");
+    return;
+  }
+
+  if (!files.length) {
+    alert("Debes cargar al menos un documento de evidencia");
+    return;
+  }
+
+  try {
+
+    const documentos = [];
+
+    for (let file of files) {
+      const docSubido = await subirDocumentoDecisionPruebas(
+        file,
+        "RECHAZADO"
+      );
+
+      documentos.push(docSubido);
+    }
+
+    ot.decisionPruebas = {
+      resultado: "RECHAZADO",
+      comentario,
+      documentos,
+      usuario: usuario?.nombre || "Jefe Taller",
+      rol: usuario?.rol || "jefe_taller",
+      fecha: new Date().toLocaleString()
+    };
+
+    ot.pruebasAprobado = false;
+    ot.alertaJefe = true;
+
+    ot.estado = "PRUEBAS";
+
+    await guardarCambiosOT();
+
+    cambiarTab("pruebas");
+
+    alert("Pruebas rechazadas. La OS queda en PRUEBAS ⚠");
+
+  } catch (error) {
+    console.error("Error rechazando pruebas:", error);
+    alert("Error al guardar rechazo de pruebas");
+  }
 }
 
 // =======================
@@ -2359,6 +2632,9 @@ function validarOTCompleta() {
   }
 
   // 🔹 OVERHAUL
+  // 🔹 OVERHAUL Y PRUEBAS SOLO SI APLICAN
+if (ot.overhaulRequerido !== false) {
+
   if (!ot.overhaul || ot.overhaul.length === 0) {
     alert("Falta OVERHAUL");
     return false;
@@ -2396,6 +2672,7 @@ function validarOTCompleta() {
       alert(`PRUEBAS ${tipo} incompleto`);
       return false;
     }
+  }
   }
 
   // 🔹 DESPACHO
@@ -3233,3 +3510,8 @@ window.renderDocsDecisionEvaluacionPreview = renderDocsDecisionEvaluacionPreview
 window.abrirArchivoTemporal = abrirArchivoTemporal;
 
 window.abrirDocumentoDecisionEvaluacion = abrirDocumentoDecisionEvaluacion;
+
+window.renderDocsDecisionPruebasPreview = renderDocsDecisionPruebasPreview;
+window.abrirDocumentoDecisionPruebas = abrirDocumentoDecisionPruebas;
+window.aprobarPruebasDesdeDecision = aprobarPruebasDesdeDecision;
+window.rechazarPruebasDesdeDecision = rechazarPruebasDesdeDecision;

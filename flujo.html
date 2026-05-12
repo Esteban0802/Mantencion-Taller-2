@@ -167,9 +167,48 @@
 
     <br>
     <button class="btn-success" onclick="guardarPruebas()">
-        💾 Guardar Progreso
+  💾 Guardar Progreso
+</button>
+
+<!-- DECISIÓN JEFE DE TALLER - PRUEBAS -->
+<div class="decision-box solo-jefe">
+
+  <h3>Decisión Jefe de Taller - Pruebas</h3>
+  <p class="decision-text">
+    Para aprobar o rechazar las pruebas, debes ingresar comentario y evidencia.
+  </p>
+
+  <textarea
+    id="comentarioDecisionPruebas"
+    placeholder="Comentario de aprobación o rechazo de pruebas"
+  ></textarea>
+
+  <input
+    type="file"
+    id="docsDecisionPruebas"
+    multiple
+    onchange="renderDocsDecisionPruebasPreview()"
+  >
+
+  <div class="decision-actions">
+    <button
+      class="btn-success"
+      onclick="aprobarPruebasDesdeDecision()"
+    >
+      ✅ Aprobar Pruebas
     </button>
-    <button class="btn-primary solo-jefe" onclick="aprobarPruebas()">Aprobar</button>
+
+    <button
+      class="btn-danger"
+      onclick="rechazarPruebasDesdeDecision()"
+    >
+      ❌ Rechazar Pruebas
+    </button>
+  </div>
+
+  <div id="listaDocsDecisionPruebas"></div>
+
+</div>
   </div>
 </div>
 
