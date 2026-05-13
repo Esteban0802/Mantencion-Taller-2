@@ -1850,3 +1850,207 @@ body {
   flex: 1;
   min-height: 100vh;
 }
+
+/* =========================
+   MODAL REPUESTOS
+========================= */
+
+.modal-repuestos {
+  display: none;
+  position: fixed;
+  z-index: 9999;
+  inset: 0;
+  background: rgba(0, 0, 0, .75);
+  backdrop-filter: blur(6px);
+}
+
+.modal-repuestos-content {
+
+  width: 90%;
+  max-width: 900px;
+
+  max-height: 90vh;
+
+  margin: 30px auto;
+
+  background: rgba(15, 23, 42, .96);
+
+  border: 1px solid rgba(249,115,22,.35);
+
+  border-radius: 24px;
+
+  box-shadow: 0 30px 90px rgba(0,0,0,.55);
+
+  display: flex;
+  flex-direction: column;
+
+  overflow: hidden;
+}
+
+.modal-repuestos-header,
+.modal-repuestos-footer {
+  padding: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.repuestos-lista {
+
+  flex: 1;
+
+  overflow-y: auto;
+
+  padding: 20px;
+
+  min-height: 0;
+}
+
+.repuesto-item {
+  background: rgba(30,41,59,.85);
+  border: 1px solid rgba(148,163,184,.20);
+  border-radius: 18px;
+  padding: 16px;
+  margin-bottom: 14px;
+  display: grid;
+  grid-template-columns: 1fr 1.5fr;
+  gap: 14px;
+  align-items: center;
+}
+
+.repuesto-check {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  color: white;
+  font-weight: 700;
+}
+
+.repuesto-check input {
+  width: 18px;
+  height: 18px;
+}
+
+.overhaul-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 20px 0;
+}
+
+.overhaul-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  margin: 16px 0 28px;
+  vertical-align: middle;
+}
+
+.overhaul-actions button {
+  height: 50px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#excelOverhaul {
+  display: inline-block;
+  vertical-align: middle;
+  margin-right: 12px;
+}
+
+/* =========================
+   OVERHAUL TOP
+========================= */
+
+.overhaul-top {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+  margin: 20px 0 30px;
+}
+
+.overhaul-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.overhaul-actions button {
+  height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#excelOverhaul {
+  margin: 0;
+}
+
+.overhaul-actions .btn-primary,
+.overhaul-actions .btn-warning {
+
+  height: 52px !important;
+
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+
+  padding: 0 26px !important;
+
+  margin: 0 !important;
+
+  line-height: 1 !important;
+}
+
+/* =========================
+   FILE ACTIONS GLOBAL
+========================= */
+
+.file-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin: 22px 0 30px;
+}
+
+.file-actions .btn-primary,
+.file-actions .btn-warning,
+.file-actions .btn-success {
+
+  height: 52px !important;
+
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+
+  padding: 0 26px !important;
+
+  margin: 0 !important;
+
+  line-height: 1 !important;
+}
+
+.file-actions input[type="file"] {
+  margin: 0 !important;
+}
+
+.modal-repuestos-footer {
+
+  position: sticky;
+  bottom: 0;
+
+  background: rgba(15,23,42,.98);
+
+  padding: 20px;
+
+  border-top: 1px solid rgba(148,163,184,.15);
+
+  display: flex;
+  justify-content: flex-start;
+
+  z-index: 5;
+}

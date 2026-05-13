@@ -58,8 +58,15 @@
     <div class="card">
       <h3>Checklist Ingreso</h3>
 
-      <input type="file" id="excelIngreso">
-      <button class="btn-primary" onclick="cargarIngreso()">Cargar Checklist</button>
+      <div class="file-actions">
+
+        <input type="file" id="excelIngreso">
+
+        <button class="btn-primary" onclick="cargarIngreso()">
+          Cargar Checklist
+        </button>
+
+      </div>
 
       <div id="listaIngreso"></div>
 
@@ -77,8 +84,15 @@
     <div class="card">
       <h2>Evaluación</h2>
 
-      <input type="file" id="excelEvaluacion">
-      <button class="btn-primary" onclick="cargarEvaluacion()">Cargar Checklist</button>
+      <div class="file-actions">
+
+        <input type="file" id="excelEvaluacion">
+
+        <button class="btn-primary" onclick="cargarEvaluacion()">
+          Cargar Checklist
+        </button>
+
+      </div>
 
 
       <div id="listaEvaluacion"></div>
@@ -126,6 +140,9 @@
         <div id="listaDocsDecisionEvaluacion"></div>
 
       </div>
+
+      <div id="comentarioDecisionEvaluacionGuardado"></div>
+
     </div>
   </div>
 
@@ -134,8 +151,36 @@
   <div class="card">
     <h2>Overhaul</h2>
 
-    <input type="file" id="excelOverhaul">
-    <button class="btn-primary" onclick="cargarOverhaul()">Cargar Checklist</button>
+
+  <div class="file-actions">
+
+  <input type="file" id="excelOverhaul">
+
+  <div class="overhaul-actions">
+
+    <button class="btn-primary" onclick="cargarOverhaul()">
+      Cargar Checklist
+    </button>
+
+    <button class="btn-warning solo-usuario" onclick="abrirModalRepuestos()">
+      Repuestos
+    </button>
+
+  </div>
+
+</div>
+
+<br>
+
+<div class="solo-jefe">
+  <h3>Cargar listado de repuestos</h3>
+
+  <input type="file" id="excelRepuestos">
+
+  <button class="btn-primary" onclick="cargarRepuestosExcel()">
+    Cargar Repuestos
+  </button>
+</div>
 
     <div id="listaOverhaul"></div>
 
@@ -154,15 +199,29 @@
     <h2>Pruebas Funcionales</h2>
 
     <h3>Checklist Mecánico</h3>
-    <input type="file" id="excelMecanico">
-    <button class="btn-primary" onclick="cargarChecklist('mecanico')">Cargar Mecánico</button>
+    <div class="file-actions">
+
+  <input type="file" id="excelPruebaMecanica">
+
+  <button class="btn-primary" onclick="cargarChecklist('mecanico')">
+    Cargar Mecánico
+  </button>
+
+</div>
     <div id="listaMecanico"></div>
 
     <hr>
 
     <h3>Checklist Eléctrico</h3>
-    <input type="file" id="excelElectrico">
-    <button class="btn-primary" onclick="cargarChecklist('electrico')">Cargar Eléctrico</button>
+    <div class="file-actions">
+
+    <input type="file" id="excelPruebaMecanica">
+
+    <button class="btn-primary" onclick="cargarChecklist('mecanico')">
+      Cargar Eléctrico
+    </button>
+
+</div>
     <div id="listaElectrico"></div>
 
     <br>
@@ -208,6 +267,8 @@
 
   <div id="listaDocsDecisionPruebas"></div>
 
+  <div id="comentarioDecisionPruebasGuardado"></div>
+
 </div>
   </div>
 </div>
@@ -219,15 +280,35 @@
     <h2>Despacho</h2>
 
 <h3>Preparación de Despacho</h3>
-<input type="file" id="docsPrep" multiple>
-<button class="btn-primary" onclick="subirDocsSeccion('preparacion')">Subir</button>
+<div class="file-actions">
+
+  <input type="file" id="docsPreparacion" multiple>
+
+  <button
+    class="btn-warning"
+    onclick="subirDocumentosPreparacion()"
+  >
+    Cargar
+  </button>
+
+</div>
 <div id="listaDocsPrep"></div>
 
 <hr>
 
 <h3>Despacho Final</h3>
-<input type="file" id="docsFinal" multiple>
-<button class="btn-primary" onclick="subirDocsSeccion('final')">Subir</button>
+<div class="file-actions">
+
+  <input type="file" id="docsFinal" multiple>
+
+  <button
+    class="btn-warning"
+    onclick="subirDocumentosFinal()"
+  >
+    Cargar
+  </button>
+
+</div>
 <div id="listaDocsFinal"></div>
 
 <hr>
@@ -272,6 +353,27 @@
   <img class="contenido-img" id="imgExpandida">
 </div>
 
+</div>
+
+<div id="modalRepuestos" class="modal-repuestos">
+  <div class="modal-repuestos-content">
+
+    <div class="modal-repuestos-header">
+      <h2>Repuestos Utilizados</h2>
+      <button onclick="cerrarModalRepuestos()" class="btn-danger permitido-bloqueo">
+        Cerrar
+      </button>
+    </div>
+
+    <div id="listaRepuestosModal" class="repuestos-lista"></div>
+
+    <div class="modal-repuestos-footer">
+      <button onclick="guardarRepuestosUsados()" class="btn-success">
+        💾 Guardar Repuestos
+      </button>
+    </div>
+
+  </div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>

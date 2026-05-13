@@ -47,11 +47,17 @@ function aplicarPermisosRol() {
 
   if (!usuario) return;
 
-  // 🔒 Usuario Taller
   if (esUsuarioTaller()) {
-
     document
       .querySelectorAll(".solo-jefe")
+      .forEach(el => {
+        el.style.display = "none";
+      });
+  }
+
+  if (esJefeTaller()) {
+    document
+      .querySelectorAll(".solo-usuario")
       .forEach(el => {
         el.style.display = "none";
       });
@@ -1004,6 +1010,8 @@ async function aprobarOverhaulDesdeEvaluacion() {
 
     await guardarCambiosOT();
 
+    renderComentarioDecisionEvaluacion();
+
     habilitarTab("overhaul");
     cambiarTab("overhaul");
 
@@ -1083,6 +1091,8 @@ async function rechazarOverhaulDesdeEvaluacion() {
     ot.estado = obtenerEstadoOT(ot);
 
     await guardarCambiosOT();
+
+    renderComentarioDecisionEvaluacion();
 
     habilitarTab("despacho");
     cambiarTab("despacho");
@@ -1170,6 +1180,48 @@ function abrirDocumentoDecisionEvaluacion(index) {
   });
 }
 
+function renderComentarioDecisionEvaluacion() {
+  const cont = document.getElementById("comentarioDecisionEvaluacionGuardado");
+  if (!cont) return;
+
+  cont.innerHTML = "";
+
+  if (!ot.decisionEvaluacion?.comentario) return;
+
+  const div = document.createElement("div");
+  div.className = "comentario-card comentario-jefe";
+
+  div.innerHTML = `
+    <strong>👨‍💼 ${ot.decisionEvaluacion.usuario || "Jefe Taller"}</strong>
+    <p class="comentario-fecha">${ot.decisionEvaluacion.fecha || ""}</p>
+    <p>${ot.decisionEvaluacion.comentario}</p>
+
+    <button 
+      class="btn-delete-comment"
+      onclick="eliminarComentarioDecisionEvaluacion()">
+      🗑
+    </button>
+  `;
+
+  cont.appendChild(div);
+}
+
+async function eliminarComentarioDecisionEvaluacion() {
+  if (OTBloqueada()) return;
+
+  if (!esJefeTaller()) {
+    alert("Solo Jefe de Taller puede eliminar este comentario");
+    return;
+  }
+
+  if (!confirm("¿Eliminar comentario de decisión de evaluación?")) return;
+
+  ot.decisionEvaluacion.comentario = "";
+
+  await guardarCambiosOT();
+  renderComentarioDecisionEvaluacion();
+}
+
 function abrirArchivoTemporal(url) {
   const modal = document.getElementById("modalDoc");
   const visor = document.getElementById("visorDoc");
@@ -1249,6 +1301,7 @@ window.onload = async () => {
     renderEvaluacion();
     habilitarTab("evaluacion");
     renderDocsDecisionEvaluacionPreview();
+    renderComentarioDecisionEvaluacion();
   }
 
   // ✅ SI EVALUACIÓN FUE APROBADA PARA OVERHAUL
@@ -1280,6 +1333,7 @@ window.onload = async () => {
     }
 
     renderDocsDecisionPruebasPreview();
+    renderComentarioDecisionPruebas();
   }
 
   if (
@@ -1731,6 +1785,141 @@ function aprobarOverhaul() {
   habilitarTab("pruebas");
 
   alert("Overhaul aprobado, se habilita PRUEBAS");
+}
+
+// =======================
+// REPUESTOS OVERHAUL
+// =======================
+
+function cargarRepuestosExcel() {
+
+  if (!esJefeTaller()) {
+    alert("Solo Jefe de Taller puede cargar repuestos");
+    return;
+  }
+
+  const file = document.getElementById("excelRepuestos").files[0];
+
+  if (!file) {
+    alert("Debes subir un archivo Excel de repuestos");
+    return;
+  }
+
+  const reader = new FileReader();
+
+  reader.onload = async function(e) {
+
+    const data = new Uint8Array(e.target.result);
+    const workbook = XLSX.read(data, { type: "array" });
+
+    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+    const json = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+
+    const repuestos = json
+      .flat()
+      .filter(x => x)
+      .map(x => ({
+        nombre: x,
+        usado: false,
+        comentario: "",
+        tecnico: "",
+        fecha: ""
+      }));
+
+    ot.repuestos = {
+      items: repuestos,
+      cargadoPor: usuario?.nombre || "Jefe Taller",
+      fechaCarga: new Date().toLocaleString()
+    };
+
+    await guardarCambiosOT();
+
+    alert("Listado de repuestos cargado correctamente ✅");
+  };
+
+  reader.readAsArrayBuffer(file);
+}
+
+function abrirModalRepuestos() {
+
+  if (!ot.repuestos || !ot.repuestos.items || ot.repuestos.items.length === 0) {
+    alert("No hay listado de repuestos cargado");
+    return;
+  }
+
+  renderRepuestosModal();
+
+  document.getElementById("modalRepuestos").style.display = "block";
+}
+
+function cerrarModalRepuestos() {
+  document.getElementById("modalRepuestos").style.display = "none";
+}
+
+function renderRepuestosModal() {
+
+  const cont = document.getElementById("listaRepuestosModal");
+  if (!cont) return;
+
+  cont.innerHTML = "";
+
+  ot.repuestos.items.forEach((rep, index) => {
+
+    const div = document.createElement("div");
+    div.className = "repuesto-item";
+
+    div.innerHTML = `
+      <label class="repuesto-check">
+        <input 
+          type="checkbox"
+          id="rep-check-${index}"
+          ${rep.usado ? "checked" : ""}
+          ${OTBloqueada() ? "disabled" : ""}
+        >
+        <span>${rep.nombre}</span>
+      </label>
+
+      <input
+        type="text"
+        id="rep-com-${index}"
+        placeholder="Comentario del técnico"
+        value="${rep.comentario || ""}"
+        ${OTBloqueada() ? "disabled" : ""}
+      >
+    `;
+
+    cont.appendChild(div);
+  });
+}
+
+async function guardarRepuestosUsados() {
+
+  if (OTBloqueada()) return;
+
+  if (!ot.repuestos || !ot.repuestos.items) {
+    alert("No hay repuestos cargados");
+    return;
+  }
+
+  ot.repuestos.items.forEach((rep, index) => {
+
+    const check = document.getElementById(`rep-check-${index}`);
+    const comentario = document.getElementById(`rep-com-${index}`);
+
+    rep.usado = check.checked;
+    rep.comentario = comentario.value.trim();
+
+    if (rep.usado) {
+      rep.tecnico = usuario?.nombre || "Usuario Taller";
+      rep.fecha = new Date().toLocaleString();
+    }
+  });
+
+  await guardarCambiosOT();
+
+  alert("Repuestos guardados correctamente ✅");
+
+  cerrarModalRepuestos();
 }
 
 // =======================
@@ -2448,6 +2637,48 @@ function renderDocsDecisionPruebasPreview() {
   });
 }
 
+function renderComentarioDecisionPruebas() {
+  const cont = document.getElementById("comentarioDecisionPruebasGuardado");
+  if (!cont) return;
+
+  cont.innerHTML = "";
+
+  if (!ot.decisionPruebas?.comentario) return;
+
+  const div = document.createElement("div");
+  div.className = "comentario-card comentario-jefe";
+
+  div.innerHTML = `
+    <strong>👨‍💼 ${ot.decisionPruebas.usuario || "Jefe Taller"}</strong>
+    <p class="comentario-fecha">${ot.decisionPruebas.fecha || ""}</p>
+    <p>${ot.decisionPruebas.comentario}</p>
+
+    <button 
+      class="btn-delete-comment"
+      onclick="eliminarComentarioDecisionPruebas()">
+      🗑
+    </button>
+  `;
+
+  cont.appendChild(div);
+}
+
+async function eliminarComentarioDecisionPruebas() {
+  if (OTBloqueada()) return;
+
+  if (!esJefeTaller()) {
+    alert("Solo Jefe de Taller puede eliminar este comentario");
+    return;
+  }
+
+  if (!confirm("¿Eliminar comentario de decisión de pruebas?")) return;
+
+  ot.decisionPruebas.comentario = "";
+
+  await guardarCambiosOT();
+  renderComentarioDecisionPruebas();
+}
+
 function abrirDocumentoDecisionPruebas(index) {
 
   const doc = ot?.decisionPruebas?.documentos?.[index];
@@ -2519,6 +2750,8 @@ async function aprobarPruebasDesdeDecision() {
 
     await guardarCambiosOT();
 
+    renderComentarioDecisionPruebas();
+
     habilitarTab("despacho");
     cambiarTab("despacho");
 
@@ -2585,6 +2818,8 @@ async function rechazarPruebasDesdeDecision() {
     ot.estado = "PRUEBAS";
 
     await guardarCambiosOT();
+
+    renderComentarioDecisionPruebas();
 
     cambiarTab("pruebas");
 
@@ -3515,3 +3750,11 @@ window.renderDocsDecisionPruebasPreview = renderDocsDecisionPruebasPreview;
 window.abrirDocumentoDecisionPruebas = abrirDocumentoDecisionPruebas;
 window.aprobarPruebasDesdeDecision = aprobarPruebasDesdeDecision;
 window.rechazarPruebasDesdeDecision = rechazarPruebasDesdeDecision;
+
+window.eliminarComentarioDecisionEvaluacion = eliminarComentarioDecisionEvaluacion;
+window.eliminarComentarioDecisionPruebas = eliminarComentarioDecisionPruebas;
+
+window.cargarRepuestosExcel = cargarRepuestosExcel;
+window.abrirModalRepuestos = abrirModalRepuestos;
+window.cerrarModalRepuestos = cerrarModalRepuestos;
+window.guardarRepuestosUsados = guardarRepuestosUsados;
