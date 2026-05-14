@@ -193,93 +193,66 @@
 </div>
 
 
+
+
 <!--PRUEBAS-->
   <div id="pruebas" class="content">
   <div class="card">
     <h2>Pruebas Funcionales</h2>
 
     <h3>Checklist Mecánico</h3>
-    <div class="file-actions">
 
-  <input type="file" id="excelPruebaMecanica">
+<div class="file-actions">
+  <input type="file" id="excelMecanico">
 
   <button class="btn-primary" onclick="cargarChecklist('mecanico')">
     Cargar Mecánico
   </button>
-
 </div>
-    <div id="listaMecanico"></div>
 
-    <hr>
+<div id="listaMecanico"></div>
 
-    <h3>Checklist Eléctrico</h3>
-    <div class="file-actions">
+<hr>
 
-    <input type="file" id="excelPruebaMecanica">
+<h3>Checklist Eléctrico</h3>
 
-    <button class="btn-primary" onclick="cargarChecklist('mecanico')">
-      Cargar Eléctrico
-    </button>
+<div class="file-actions">
+  <input type="file" id="excelElectrico">
 
+  <button class="btn-primary" onclick="cargarChecklist('electrico')">
+    Cargar Eléctrico
+  </button>
 </div>
-    <div id="listaElectrico"></div>
 
-    <br>
-    <button class="btn-success" onclick="guardarPruebas()">
+<div id="listaElectrico"></div>
+
+<br>
+
+<button class="btn-success" onclick="guardarPruebas()">
   💾 Guardar Progreso
 </button>
 
+<button
+  class="btn-primary solo-jefe"
+  onclick="aprobarPruebas()"
+>
+  ✅ Aprobar Pruebas
+</button>
+
+</div>
+</div>
+
 <!-- DECISIÓN JEFE DE TALLER - PRUEBAS -->
-<div class="decision-box solo-jefe">
 
-  <h3>Decisión Jefe de Taller - Pruebas</h3>
-  <p class="decision-text">
-    Para aprobar o rechazar las pruebas, debes ingresar comentario y evidencia.
-  </p>
-
-  <textarea
-    id="comentarioDecisionPruebas"
-    placeholder="Comentario de aprobación o rechazo de pruebas"
-  ></textarea>
-
-  <input
-    type="file"
-    id="docsDecisionPruebas"
-    multiple
-    onchange="renderDocsDecisionPruebasPreview()"
-  >
-
-  <div class="decision-actions">
-    <button
-      class="btn-success"
-      onclick="aprobarPruebasDesdeDecision()"
-    >
-      ✅ Aprobar Pruebas
-    </button>
-
-    <button
-      class="btn-danger"
-      onclick="rechazarPruebasDesdeDecision()"
-    >
-      ❌ Rechazar Pruebas
-    </button>
-  </div>
-
-  <div id="listaDocsDecisionPruebas"></div>
-
-  <div id="comentarioDecisionPruebasGuardado"></div>
-
-</div>
-  </div>
-</div>
 
 
 <!--DESPACHO-->
-  <div id="despacho" class="content">
+<div id="despacho" class="content">
   <div class="card">
     <h2>Despacho</h2>
 
-<h3>Preparación de Despacho</h3>
+    <h3>Preparación de Despacho</h3>
+
 <div class="file-actions">
 
   <input type="file" id="docsPreparacion" multiple>
@@ -292,6 +265,7 @@
   </button>
 
 </div>
+
 <div id="listaDocsPrep"></div>
 
 <hr>
@@ -309,6 +283,7 @@
   </button>
 
 </div>
+
 <div id="listaDocsFinal"></div>
 
 <hr>
@@ -329,12 +304,16 @@
 <br>
 <br>
 
-<button
-  onclick="window.location.href='dashboard.html'"
-  class="permitido-bloqueo"
->
-  ← Volver al Panel
-</button>
+<div class="volver-panel-box">
+  <button
+    onclick="window.location.href='dashboard.html'"
+    class="permitido-bloqueo btn-volver-panel"
+  >
+    ← Volver al Panel
+  </button>
+</div>
+
+<!-- 🔥 MODAL VISOR DOCUMENTOS -->
 
 <!-- 🔥 MODAL VISOR DOCUMENTOS -->
 <div id="modalDoc" class="modal-doc">

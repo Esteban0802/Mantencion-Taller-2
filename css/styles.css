@@ -2054,3 +2054,73 @@ body {
 
   z-index: 5;
 }
+
+/* =========================
+   MODAL ALERTAS JEFE
+========================= */
+
+.modal-alertas {
+
+  display: none;
+
+  position: fixed;
+
+  inset: 0;
+
+  background: rgba(0,0,0,.75);
+
+  z-index: 9999;
+
+  align-items: center;
+  justify-content: center;
+
+  backdrop-filter: blur(5px);
+}
+
+.modal-alertas-content {
+
+  width: 90%;
+  max-width: 500px;
+
+  background: rgba(15,23,42,.97);
+
+  border-radius: 24px;
+
+  border: 1px solid rgba(249,115,22,.25);
+
+  padding: 24px;
+
+  box-shadow: 0 30px 80px rgba(0,0,0,.45);
+}
+
+.modal-alertas-header {
+
+  display: flex;
+
+  justify-content: space-between;
+
+  align-items: center;
+
+  margin-bottom: 24px;
+}
+
+.alerta-item {
+
+  background: rgba(30,41,59,.9);
+
+  border: 1px solid rgba(148,163,184,.15);
+
+  border-radius: 16px;
+
+  padding: 16px;
+
+  margin-bottom: 12px;
+
+  font-weight: 700;
+
+  color: white;
+}
+
+.sin-alertas {
+  color: #94a3b8;
+}

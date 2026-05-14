@@ -1332,8 +1332,6 @@ window.onload = async () => {
       renderChecklist("electrico");
     }
 
-    renderDocsDecisionPruebasPreview();
-    renderComentarioDecisionPruebas();
   }
 
   if (
@@ -2231,56 +2229,28 @@ function guardarPruebas() {
 // =======================
 // APROBAR PRUEBAS
 // =======================
-function aprobarPruebas() {
+async function aprobarPruebas() {
+
+  if (OTBloqueada()) return;
 
   if (!esJefeTaller()) {
-  alert("Solo Jefe de Taller puede aprobar pruebas");
-  return;
-}
-
-  if (!ot.pruebas) {
-    alert("Debes cargar los checklist");
+    alert("Solo Jefe de Taller puede aprobar pruebas");
     return;
   }
 
-  const tipos = ["mecanico", "electrico"];
+  if (!validarPruebasCompleto()) return;
 
-  for (let tipo of tipos) {
-
-    const lista = ot.pruebas[tipo];
-
-    if (!lista || lista.length === 0) {
-      alert(`Falta checklist ${tipo}`);
-      return;
-    }
-
-    // ✅ checklist completo
-    const completo = lista.every(i => i.ok);
-
-    // ✅ fotos obligatorias
-    const conFotos = lista.every(i => i.fotos && i.fotos.length > 0);
-
-    // ✅ comentarios obligatorios
-    const conComentarios = lista.every(
-      i => i.comentarios && i.comentarios.length > 0
-    );
-
-    if (!completo || !conFotos || !conComentarios) {
-      alert(`Checklist ${tipo} incompleto`);
-      return;
-    }
-  }
-
-  // ✅ aprobar
   ot.pruebasAprobado = true;
 
   ot.estado = obtenerEstadoOT(ot);
 
-  guardarCambiosOT();
+  await guardarCambiosOT();
 
   habilitarTab("despacho");
 
-  alert("PRUEBAS aprobadas, se habilita DESPACHO");
+  cambiarTab("despacho");
+
+  alert("Pruebas aprobadas ✅");
 }
 
 function validarPruebasCompleto() {
@@ -2557,279 +2527,7 @@ async function cerrarOT() {
 // =======================
 // DECISIÓN JEFE TALLER - PRUEBAS
 // =======================
-async function subirDocumentoDecisionPruebas(file, resultado) {
 
-  const urlArchivo = await subirArchivoStorage(
-    file,
-    `decision_pruebas_${resultado.toLowerCase()}`,
-    "documentos"
-  );
-
-  return {
-    nombre: file.name,
-    tipo: file.type,
-    url: urlArchivo,
-    fecha: new Date().toLocaleString()
-  };
-}
-
-function renderDocsDecisionPruebasPreview() {
-
-  const cont = document.getElementById("listaDocsDecisionPruebas");
-  const input = document.getElementById("docsDecisionPruebas");
-
-  if (!cont) return;
-
-  cont.innerHTML = "";
-
-  const docsGuardados = ot?.decisionPruebas?.documentos || [];
-
-  docsGuardados.forEach((doc, index) => {
-
-    const div = document.createElement("div");
-    div.className = "doc-item";
-
-    div.innerHTML = `
-      <div class="doc-left">
-        <span class="doc-icon">📄</span>
-        <span class="doc-name">${doc.nombre}</span>
-      </div>
-
-      <div class="doc-actions">
-        <button
-          type="button"
-          class="permitido-bloqueo"
-          onclick="abrirDocumentoDecisionPruebas(${index})">
-          👁
-        </button>
-      </div>
-    `;
-
-    cont.appendChild(div);
-  });
-
-  if (!input || !input.files.length) return;
-
-  Array.from(input.files).forEach(file => {
-
-    const div = document.createElement("div");
-    div.className = "doc-item";
-
-    const urlTemp = URL.createObjectURL(file);
-
-    div.innerHTML = `
-      <div class="doc-left">
-        <span class="doc-icon">📄</span>
-        <span class="doc-name">${file.name}</span>
-      </div>
-
-      <div class="doc-actions">
-        <button
-          type="button"
-          class="permitido-bloqueo"
-          onclick="abrirArchivoTemporal('${urlTemp}')">
-          👁
-        </button>
-      </div>
-    `;
-
-    cont.appendChild(div);
-  });
-}
-
-function renderComentarioDecisionPruebas() {
-  const cont = document.getElementById("comentarioDecisionPruebasGuardado");
-  if (!cont) return;
-
-  cont.innerHTML = "";
-
-  if (!ot.decisionPruebas?.comentario) return;
-
-  const div = document.createElement("div");
-  div.className = "comentario-card comentario-jefe";
-
-  div.innerHTML = `
-    <strong>👨‍💼 ${ot.decisionPruebas.usuario || "Jefe Taller"}</strong>
-    <p class="comentario-fecha">${ot.decisionPruebas.fecha || ""}</p>
-    <p>${ot.decisionPruebas.comentario}</p>
-
-    <button 
-      class="btn-delete-comment"
-      onclick="eliminarComentarioDecisionPruebas()">
-      🗑
-    </button>
-  `;
-
-  cont.appendChild(div);
-}
-
-async function eliminarComentarioDecisionPruebas() {
-  if (OTBloqueada()) return;
-
-  if (!esJefeTaller()) {
-    alert("Solo Jefe de Taller puede eliminar este comentario");
-    return;
-  }
-
-  if (!confirm("¿Eliminar comentario de decisión de pruebas?")) return;
-
-  ot.decisionPruebas.comentario = "";
-
-  await guardarCambiosOT();
-  renderComentarioDecisionPruebas();
-}
-
-function abrirDocumentoDecisionPruebas(index) {
-
-  const doc = ot?.decisionPruebas?.documentos?.[index];
-
-  if (!doc) return;
-
-  abrirDocumento({
-    nombre: doc.nombre,
-    tipo: doc.tipo,
-    url: doc.url
-  });
-}
-
-async function aprobarPruebasDesdeDecision() {
-
-  if (OTBloqueada()) return;
-
-  if (!esJefeTaller()) {
-    alert("Solo Jefe de Taller puede aprobar pruebas");
-    return;
-  }
-
-  if (!validarPruebasCompleto()) return;
-
-  const comentario = document
-    .getElementById("comentarioDecisionPruebas")
-    .value
-    .trim();
-
-  const inputDocs = document.getElementById("docsDecisionPruebas");
-  const files = inputDocs.files;
-
-  if (!comentario) {
-    alert("Debes ingresar comentario de aprobación");
-    return;
-  }
-
-  if (!files.length) {
-    alert("Debes cargar al menos un documento de evidencia");
-    return;
-  }
-
-  try {
-
-    const documentos = [];
-
-    for (let file of files) {
-      const docSubido = await subirDocumentoDecisionPruebas(
-        file,
-        "APROBADO"
-      );
-
-      documentos.push(docSubido);
-    }
-
-    ot.decisionPruebas = {
-      resultado: "APROBADO",
-      comentario,
-      documentos,
-      usuario: usuario?.nombre || "Jefe Taller",
-      rol: usuario?.rol || "jefe_taller",
-      fecha: new Date().toLocaleString()
-    };
-
-    ot.pruebasAprobado = true;
-    ot.alertaJefe = false;
-
-    ot.estado = obtenerEstadoOT(ot);
-
-    await guardarCambiosOT();
-
-    renderComentarioDecisionPruebas();
-
-    habilitarTab("despacho");
-    cambiarTab("despacho");
-
-    alert("Pruebas aprobadas. Se habilita DESPACHO ✅");
-
-  } catch (error) {
-    console.error("Error aprobando pruebas:", error);
-    alert("Error al guardar decisión de pruebas");
-  }
-}
-
-async function rechazarPruebasDesdeDecision() {
-
-  if (OTBloqueada()) return;
-
-  if (!esJefeTaller()) {
-    alert("Solo Jefe de Taller puede rechazar pruebas");
-    return;
-  }
-
-  const comentario = document
-    .getElementById("comentarioDecisionPruebas")
-    .value
-    .trim();
-
-  const inputDocs = document.getElementById("docsDecisionPruebas");
-  const files = inputDocs.files;
-
-  if (!comentario) {
-    alert("Debes ingresar comentario de rechazo");
-    return;
-  }
-
-  if (!files.length) {
-    alert("Debes cargar al menos un documento de evidencia");
-    return;
-  }
-
-  try {
-
-    const documentos = [];
-
-    for (let file of files) {
-      const docSubido = await subirDocumentoDecisionPruebas(
-        file,
-        "RECHAZADO"
-      );
-
-      documentos.push(docSubido);
-    }
-
-    ot.decisionPruebas = {
-      resultado: "RECHAZADO",
-      comentario,
-      documentos,
-      usuario: usuario?.nombre || "Jefe Taller",
-      rol: usuario?.rol || "jefe_taller",
-      fecha: new Date().toLocaleString()
-    };
-
-    ot.pruebasAprobado = false;
-    ot.alertaJefe = true;
-
-    ot.estado = "PRUEBAS";
-
-    await guardarCambiosOT();
-
-    renderComentarioDecisionPruebas();
-
-    cambiarTab("pruebas");
-
-    alert("Pruebas rechazadas. La OS queda en PRUEBAS ⚠");
-
-  } catch (error) {
-    console.error("Error rechazando pruebas:", error);
-    alert("Error al guardar rechazo de pruebas");
-  }
-}
 
 // =======================
 // VALIDACIÓN COMPLETA OT
@@ -3679,6 +3377,69 @@ function cerrarSesion() {
 window.cerrarSesion = cerrarSesion;
 
 
+function mostrarAlertasJefe(ot) {
+
+  const lista = document.getElementById("listaAlertasJefe");
+
+  lista.innerHTML = "";
+
+  const alertas = [];
+
+  // EVALUACIÓN
+  if (ot.decisionEvaluacion?.comentario) {
+    alertas.push("📋 Evaluación");
+  }
+
+  // OVERHAUL
+  if (ot.overhaul?.some(item =>
+    item.comentarios?.some(c => c.rol === "jefe_taller")
+  )) {
+    alertas.push("🔧 Overhaul");
+  }
+
+  // PRUEBAS MECÁNICAS
+  if (ot.pruebas?.mecanico?.some(item =>
+    item.comentarios?.some(c => c.rol === "jefe_taller")
+  )) {
+    alertas.push("🛠 Pruebas Mecánicas");
+  }
+
+  // PRUEBAS ELÉCTRICAS
+  if (ot.pruebas?.electrico?.some(item =>
+    item.comentarios?.some(c => c.rol === "jefe_taller")
+  )) {
+    alertas.push("⚡ Pruebas Eléctricas");
+  }
+
+  if (alertas.length === 0) {
+
+    lista.innerHTML = `
+      <p class="sin-alertas">
+        No existen comentarios pendientes.
+      </p>
+    `;
+
+  } else {
+
+    alertas.forEach(alerta => {
+
+      const div = document.createElement("div");
+
+      div.className = "alerta-item";
+
+      div.innerHTML = alerta;
+
+      lista.appendChild(div);
+    });
+  }
+
+  document.getElementById("modalAlertasJefe").style.display = "flex";
+}
+
+function cerrarModalAlertas() {
+  document.getElementById("modalAlertasJefe").style.display = "none";
+}
+
 // =======================
 // FUNCIONES GLOBALES PARA HTML
 // =======================
@@ -3746,13 +3507,7 @@ window.abrirArchivoTemporal = abrirArchivoTemporal;
 
 window.abrirDocumentoDecisionEvaluacion = abrirDocumentoDecisionEvaluacion;
 
-window.renderDocsDecisionPruebasPreview = renderDocsDecisionPruebasPreview;
-window.abrirDocumentoDecisionPruebas = abrirDocumentoDecisionPruebas;
-window.aprobarPruebasDesdeDecision = aprobarPruebasDesdeDecision;
-window.rechazarPruebasDesdeDecision = rechazarPruebasDesdeDecision;
-
 window.eliminarComentarioDecisionEvaluacion = eliminarComentarioDecisionEvaluacion;
-window.eliminarComentarioDecisionPruebas = eliminarComentarioDecisionPruebas;
 
 window.cargarRepuestosExcel = cargarRepuestosExcel;
 window.abrirModalRepuestos = abrirModalRepuestos;

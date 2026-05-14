@@ -131,10 +131,16 @@ function renderTabla(lista = listaOTs) {
   <button class="btn-icon" onclick="abrirOT(${listaOTs.indexOf(o)})">👁</button>
 
   ${
-    o.alertaJefe
-      ? `<span class="alerta-jefe-dashboard" title="Comentario del Jefe de Taller">⚠</span>`
-      : ""
-  }
+  o.alertaJefe
+    ? `<button
+          class="alerta-jefe-dashboard"
+          title="Ver comentarios del Jefe de Taller"
+          onclick='mostrarAlertasJefe(${JSON.stringify(o)})'
+       >
+          ⚠
+       </button>`
+    : ""
+}
 </td>
     `;
 
@@ -379,3 +385,97 @@ window.abrirOT = abrirOT;
 window.nuevaOT = nuevaOT;
 window.irDashboard = irDashboard;
 window.filtrarOTs = filtrarOTs;
+
+// =========================
+// MODAL ALERTAS JEFE
+// =========================
+
+function mostrarAlertasJefe(ot) {
+
+  const lista = document.getElementById("listaAlertasJefe");
+
+  if (!lista) return;
+
+  lista.innerHTML = "";
+
+  const alertas = [];
+
+  // 🔥 EVALUACIÓN
+  if (ot.decisionEvaluacion?.comentario) {
+    alertas.push("📋 Evaluación");
+  }
+
+  // 🔥 OVERHAUL
+  if (
+    ot.overhaul?.some(item =>
+      item.comentarios?.some(
+        c => c.rol === "jefe_taller"
+      )
+    )
+  ) {
+    alertas.push("🔧 Overhaul");
+  }
+
+  // 🔥 PRUEBAS MECÁNICAS
+  if (
+    ot.pruebas?.mecanico?.some(item =>
+      item.comentarios?.some(
+        c => c.rol === "jefe_taller"
+      )
+    )
+  ) {
+    alertas.push("🛠 Pruebas Mecánicas");
+  }
+
+  // 🔥 PRUEBAS ELÉCTRICAS
+  if (
+    ot.pruebas?.electrico?.some(item =>
+      item.comentarios?.some(
+        c => c.rol === "jefe_taller"
+      )
+    )
+  ) {
+    alertas.push("⚡ Pruebas Eléctricas");
+  }
+
+  // 🔥 SIN ALERTAS
+  if (alertas.length === 0) {
+
+    lista.innerHTML = `
+      <p class="sin-alertas">
+        No existen comentarios pendientes.
+      </p>
+    `;
+
+  } else {
+
+    alertas.forEach(alerta => {
+
+      const div = document.createElement("div");
+
+      div.className = "alerta-item";
+
+      div.innerHTML = alerta;
+
+      lista.appendChild(div);
+    });
+  }
+
+  document.getElementById("modalAlertasJefe").style.display = "flex";
+}
+
+// =========================
+// CERRAR MODAL
+// =========================
+
+function cerrarModalAlertas() {
+
+  document.getElementById("modalAlertasJefe").style.display = "none";
+}
+
+// =========================
+// HACER FUNCIONES GLOBALES
+// =========================
+
+window.mostrarAlertasJefe = mostrarAlertasJefe;
+window.cerrarModalAlertas = cerrarModalAlertas;
