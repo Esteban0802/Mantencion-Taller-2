@@ -2327,7 +2327,7 @@ async function subirDocsSeccion(tipo) {
 
   if (OTBloqueada()) return;
 
-  const inputId = tipo === "preparacion" ? "docsPrep" : "docsFinal";
+  const inputId = tipo === "preparacion" ? "docsPreparacion" : "docsFinal";
   const input = document.getElementById(inputId);
 
   if (!input || !input.files.length) {
@@ -3587,3 +3587,5 @@ window.cargarRepuestosExcel = cargarRepuestosExcel;
 window.abrirModalRepuestos = abrirModalRepuestos;
 window.cerrarModalRepuestos = cerrarModalRepuestos;
 window.guardarRepuestosUsados = guardarRepuestosUsados;
+
+window.subirDocsSeccion = subirDocsSeccion;
