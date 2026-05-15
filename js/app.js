@@ -274,7 +274,6 @@ function renderIngreso() {
       <input 
         type="file"
         accept="image/*"
-        capture="environment"
         onchange="subirFotoIngreso(event, ${i})"
 >
       <div id="fotos-ingreso-${i}"></div>
@@ -731,8 +730,7 @@ function renderEvaluacion() {
 
       <input 
         type="file"
-        accept="image/*"
-        capture="environment"
+        accept="image/*"       
         onchange="subirFotoEvaluacion(event, ${i})"
       >
 
@@ -1522,7 +1520,6 @@ function renderOverhaul() {
       <input 
         type="file"
         accept="image/*"
-        capture="environment"
         onchange="subirFotoOverhaul(event, ${i})"
       >
 
@@ -1811,13 +1808,18 @@ function cargarRepuestosExcel() {
     const workbook = XLSX.read(data, { type: "array" });
 
     const sheet = workbook.Sheets[workbook.SheetNames[0]];
-    const json = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+
+    const json = XLSX.utils.sheet_to_json(sheet, {
+      header: 1
+    });
 
     const repuestos = json
-      .flat()
-      .filter(x => x)
-      .map(x => ({
-        nombre: x,
+      .slice(1)
+      .filter(row => row.length > 0)
+      .map(row => ({
+        codigo: row[0] || "",
+        descripcion: row[1] || "",
+        cantidad: row[2] || "",
         usado: false,
         comentario: "",
         tecnico: "",
@@ -1861,38 +1863,63 @@ function renderRepuestosModal() {
 
   cont.innerHTML = "";
 
+  const tabla = document.createElement("div");
+  tabla.className = "tabla-repuestos";
+
+  tabla.innerHTML = `
+    <div class="tabla-repuestos-header">
+      <div>Usado</div>
+      <div>Código</div>
+      <div>Descripción</div>
+      <div>Cantidad</div>
+      <div>Comentario</div>
+    </div>
+  `;
+
   ot.repuestos.items.forEach((rep, index) => {
 
-    const div = document.createElement("div");
-    div.className = "repuesto-item";
+    const row = document.createElement("div");
+    row.className = "tabla-repuestos-row";
 
-    div.innerHTML = `
-      <label class="repuesto-check">
+    row.innerHTML = `
+      <div>
         <input 
           type="checkbox"
           id="rep-check-${index}"
           ${rep.usado ? "checked" : ""}
           ${OTBloqueada() ? "disabled" : ""}
         >
-        <span>${rep.nombre}</span>
-      </label>
+      </div>
 
-      <input
-        type="text"
-        id="rep-com-${index}"
-        placeholder="Comentario del técnico"
-        value="${rep.comentario || ""}"
-        ${OTBloqueada() ? "disabled" : ""}
-      >
+      <div>${rep.codigo || "-"}</div>
+
+      <div>${rep.descripcion || "-"}</div>
+
+      <div>${rep.cantidad || "-"}</div>
+
+      <div>
+        <input
+          type="text"
+          id="rep-com-${index}"
+          placeholder="Comentario"
+          value="${rep.comentario || ""}"
+          ${OTBloqueada() ? "disabled" : ""}
+        >
+      </div>
     `;
 
-    cont.appendChild(div);
+    tabla.appendChild(row);
   });
+
+  cont.appendChild(tabla);
 }
 
 async function guardarRepuestosUsados() {
 
-  if (OTBloqueada()) return;
+  if (OTBloqueada()) {
+    alert("La OS está cerrada. No se pueden editar repuestos.");
+    return;
+  }
 
   if (!ot.repuestos || !ot.repuestos.items) {
     alert("No hay repuestos cargados");
@@ -1900,7 +1927,6 @@ async function guardarRepuestosUsados() {
   }
 
   ot.repuestos.items.forEach((rep, index) => {
-
     const check = document.getElementById(`rep-check-${index}`);
     const comentario = document.getElementById(`rep-com-${index}`);
 
@@ -2001,7 +2027,6 @@ function renderChecklist(tipo) {
       <input 
         type="file"
         accept="image/*"
-        capture="environment"
         onchange="subirFotoPrueba(event, '${tipo}', ${i})"
       >
 
@@ -3380,55 +3405,104 @@ window.cerrarSesion = cerrarSesion;
 function mostrarAlertasJefe(ot) {
 
   const lista = document.getElementById("listaAlertasJefe");
+  if (!lista) return;
 
   lista.innerHTML = "";
 
-  const alertas = [];
+  const alertas = new Set();
 
-  // EVALUACIÓN
-  if (ot.decisionEvaluacion?.comentario) {
-    alertas.push("📋 Evaluación");
+  // 🔥 INGRESO
+  if (
+    ot.ingreso?.some(item =>
+      item.comentarios?.some(c => c.rol === "jefe_taller")
+    )
+  ) {
+    alertas.add("📥 Ingreso");
   }
 
-  // OVERHAUL
-  if (ot.overhaul?.some(item =>
-    item.comentarios?.some(c => c.rol === "jefe_taller")
-  )) {
-    alertas.push("🔧 Overhaul");
+  // 🔥 EVALUACIÓN
+  if (
+    (
+      ot.decisionEvaluacion?.comentario &&
+      ot.decisionEvaluacion.comentario.trim() !== ""
+    ) ||
+    ot.evaluacion?.some(item =>
+      item.comentarios?.some(c => c.rol === "jefe_taller")
+    )
+  ) {
+    alertas.add("📋 Evaluación");
   }
 
-  // PRUEBAS MECÁNICAS
-  if (ot.pruebas?.mecanico?.some(item =>
-    item.comentarios?.some(c => c.rol === "jefe_taller")
-  )) {
-    alertas.push("🛠 Pruebas Mecánicas");
+  // 🔥 OVERHAUL
+  if (
+    ot.overhaul?.some(item =>
+      item.comentarios?.some(c => c.rol === "jefe_taller")
+    )
+  ) {
+    alertas.add("🔧 Overhaul");
   }
 
-  // PRUEBAS ELÉCTRICAS
-  if (ot.pruebas?.electrico?.some(item =>
-    item.comentarios?.some(c => c.rol === "jefe_taller")
-  )) {
-    alertas.push("⚡ Pruebas Eléctricas");
+  // 🔥 PRUEBAS MECÁNICAS
+  if (
+    ot.pruebas?.mecanico?.some(item =>
+      item.comentarios?.some(c => c.rol === "jefe_taller")
+    )
+  ) {
+    alertas.add("🛠 Pruebas Mecánicas");
   }
 
-  if (alertas.length === 0) {
+  // 🔥 PRUEBAS ELÉCTRICAS
+  if (
+    ot.pruebas?.electrico?.some(item =>
+      item.comentarios?.some(c => c.rol === "jefe_taller")
+    )
+  ) {
+    alertas.add("⚡ Pruebas Eléctricas");
+  }
 
+  // 🔥 DESPACHO
+if (
+
+  // comentarios generales
+  ot.despacho?.comentarios?.some(
+    c => c.rol === "jefe_taller"
+  )
+
+  ||
+
+  // preparación
+  ot.despacho?.preparacion?.some(item =>
+    item.comentarios?.some(
+      c => c.rol === "jefe_taller"
+    )
+  )
+
+  ||
+
+  // despacho final
+  ot.despacho?.final?.some(item =>
+    item.comentarios?.some(
+      c => c.rol === "jefe_taller"
+    )
+  )
+
+) {
+
+  alertas.add("📦 Despacho");
+
+}
+
+  if (alertas.size === 0) {
     lista.innerHTML = `
       <p class="sin-alertas">
         No existen comentarios pendientes.
       </p>
     `;
-
   } else {
-
     alertas.forEach(alerta => {
-
       const div = document.createElement("div");
-
       div.className = "alerta-item";
-
       div.innerHTML = alerta;
-
       lista.appendChild(div);
     });
   }

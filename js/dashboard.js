@@ -393,70 +393,70 @@ window.filtrarOTs = filtrarOTs;
 function mostrarAlertasJefe(ot) {
 
   const lista = document.getElementById("listaAlertasJefe");
-
   if (!lista) return;
 
   lista.innerHTML = "";
 
-  const alertas = [];
+  const alertas = new Set();
 
-  // 🔥 EVALUACIÓN
-  if (ot.decisionEvaluacion?.comentario) {
-    alertas.push("📋 Evaluación");
+  const tieneComentarioJefe = (items) => {
+    return Array.isArray(items) && items.some(item =>
+      Array.isArray(item.comentarios) &&
+      item.comentarios.some(c => c.rol === "jefe_taller")
+    );
+  };
+
+  // INGRESO
+  if (tieneComentarioJefe(ot.ingreso)) {
+    alertas.add("📥 Ingreso");
   }
 
-  // 🔥 OVERHAUL
+  // EVALUACIÓN
   if (
-    ot.overhaul?.some(item =>
-      item.comentarios?.some(
-        c => c.rol === "jefe_taller"
-      )
+    tieneComentarioJefe(ot.evaluacion) ||
+    (
+      ot.decisionEvaluacion?.comentario &&
+      ot.decisionEvaluacion.comentario.trim() !== ""
     )
   ) {
-    alertas.push("🔧 Overhaul");
+    alertas.add("📋 Evaluación");
   }
 
-  // 🔥 PRUEBAS MECÁNICAS
+  // OVERHAUL
+  if (tieneComentarioJefe(ot.overhaul)) {
+    alertas.add("🔧 Overhaul");
+  }
+
+  // PRUEBAS MECÁNICAS
+  if (tieneComentarioJefe(ot.pruebas?.mecanico)) {
+    alertas.add("🛠 Pruebas Mecánicas");
+  }
+
+  // PRUEBAS ELÉCTRICAS
+  if (tieneComentarioJefe(ot.pruebas?.electrico)) {
+    alertas.add("⚡ Pruebas Eléctricas");
+  }
+
+  // DESPACHO
   if (
-    ot.pruebas?.mecanico?.some(item =>
-      item.comentarios?.some(
-        c => c.rol === "jefe_taller"
-      )
-    )
+    tieneComentarioJefe(ot.despacho?.comentarios) ||
+    tieneComentarioJefe(ot.despacho?.preparacion) ||
+    tieneComentarioJefe(ot.despacho?.final)
   ) {
-    alertas.push("🛠 Pruebas Mecánicas");
+    alertas.add("📦 Despacho");
   }
 
-  // 🔥 PRUEBAS ELÉCTRICAS
-  if (
-    ot.pruebas?.electrico?.some(item =>
-      item.comentarios?.some(
-        c => c.rol === "jefe_taller"
-      )
-    )
-  ) {
-    alertas.push("⚡ Pruebas Eléctricas");
-  }
-
-  // 🔥 SIN ALERTAS
-  if (alertas.length === 0) {
-
+  if (alertas.size === 0) {
     lista.innerHTML = `
       <p class="sin-alertas">
         No existen comentarios pendientes.
       </p>
     `;
-
   } else {
-
     alertas.forEach(alerta => {
-
       const div = document.createElement("div");
-
       div.className = "alerta-item";
-
       div.innerHTML = alerta;
-
       lista.appendChild(div);
     });
   }
