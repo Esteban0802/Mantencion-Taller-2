@@ -2202,3 +2202,20 @@ body {
 
   scrollbar-gutter: stable;
 }
+
+.respuesta-observacion {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(16, 185, 129, .16);
+  border: 1px solid rgba(16, 185, 129, .45);
+  color: #d1fae5;
+}
+
+.respuesta-observacion strong {
+  color: #34d399;
+}
+
+.respuesta-observacion small {
+  color: #a7f3d0;
+}

@@ -411,17 +411,19 @@ function agregarComentarioItem(i) {
   }
 
   ot.ingreso[i].comentarios.push({
-    nombre,
-    texto,
-    fecha: new Date().toLocaleString(),
-    rol: usuario?.rol || "usuario_taller"
-  });
+  nombre,
+  texto,
+  fecha: new Date().toLocaleString(),
+  rol: usuario?.rol || "usuario_taller",
 
-  if (esJefeTaller()) {
+  atendido: esJefeTaller() ? false : true,
+  respuestaUsuario: "",
+  atendidoPor: "",
+  fechaAtendido: ""
+});
+
+if (esJefeTaller()) {
   ot.alertaJefe = true;
-}
-else if (esUsuarioTaller()) {
-  ot.alertaJefe = false;
 }
 
   guardarCambiosOT();
@@ -451,15 +453,36 @@ function renderComentariosItem(i) {
   : "comentario-card";
 
     div.innerHTML = `
-      <strong>👨‍🔧${c.nombre}</strong>
-      <p class="comentario-fecha">${c.fecha}</p>
-      <p>${c.texto}</p>
-      <button 
-        class="btn-delete-comment"
-        onclick="eliminarComentarioIngreso(${i}, ${index})">
-        🗑
-      </button>
-    `;
+  <strong>👨‍🔧 ${c.nombre}</strong>
+  <p class="comentario-fecha">${c.fecha}</p>
+  <p>${c.texto}</p>
+
+  ${
+    c.rol === "jefe_taller" && c.atendido !== true && esUsuarioTaller()
+      ? `<button 
+          class="btn-success"
+          onclick="responderComentarioJefe('ingreso', ${i}, ${index})">
+          ✅ Responder observación
+        </button>`
+      : ""
+  }
+
+  ${
+    c.rol === "jefe_taller" && c.atendido === true
+      ? `<div class="respuesta-observacion">
+          <strong>✅ Respondido por ${c.atendidoPor || "Usuario Taller"}</strong>
+          <p>${c.respuestaUsuario || ""}</p>
+          <small>${c.fechaAtendido || ""}</small>
+        </div>`
+      : ""
+  }
+
+  <button 
+    class="btn-delete-comment"
+    onclick="eliminarComentarioIngreso(${i}, ${index})">
+    🗑
+  </button>
+`;
 
     cont.appendChild(div);
   });
@@ -817,17 +840,19 @@ function agregarComentarioEvaluacion(i) {
   }
 
   ot.evaluacion[i].comentarios.push({
-    nombre,
-    texto,
-    fecha: new Date().toLocaleString(),
-    rol: usuario?.rol || "usuario_taller"
-  });
+  nombre,
+  texto,
+  fecha: new Date().toLocaleString(),
+  rol: usuario?.rol || "usuario_taller",
 
-  if (esJefeTaller()) {
+  atendido: esJefeTaller() ? false : true,
+  respuestaUsuario: "",
+  atendidoPor: "",
+  fechaAtendido: ""
+});
+
+if (esJefeTaller()) {
   ot.alertaJefe = true;
-}
-else if (esUsuarioTaller()) {
-  ot.alertaJefe = false;
 }
 
   guardarCambiosOT();
@@ -854,15 +879,36 @@ function renderComentariosEvaluacion(i) {
   : "comentario-card";
 
     div.innerHTML = `
-      <strong>👨‍🔧${c.nombre}</strong>
-      <p class="comentario-fecha">${c.fecha}</p>
-      <p>${c.texto}</p>
-      <button 
-        class="btn-delete-comment"
-        onclick="eliminarComentarioEvaluacion(${i}, ${index})">
-        🗑
-      </button>
-    `;
+  <strong>👨‍🔧 ${c.nombre}</strong>
+  <p class="comentario-fecha">${c.fecha}</p>
+  <p>${c.texto}</p>
+
+  ${
+    c.rol === "jefe_taller" && c.atendido !== true && esUsuarioTaller()
+      ? `<button 
+          class="btn-success"
+          onclick="responderComentarioJefe('evaluacion', ${i}, ${index})">
+          ✅ Responder observación
+        </button>`
+      : ""
+  }
+
+  ${
+    c.rol === "jefe_taller" && c.atendido === true
+      ? `<div class="respuesta-observacion">
+          <strong>✅ Respondido por ${c.atendidoPor || "Usuario Taller"}</strong>
+          <p>${c.respuestaUsuario || ""}</p>
+          <small>${c.fechaAtendido || ""}</small>
+        </div>`
+      : ""
+  }
+
+  <button 
+    class="btn-delete-comment"
+    onclick="eliminarComentarioEvaluacion(${i}, ${index})">
+    🗑
+  </button>
+`;
 
     cont.appendChild(div);
   });
@@ -1656,17 +1702,19 @@ function agregarComentarioOverhaul(i) {
   }
 
   ot.overhaul[i].comentarios.push({
-    nombre,
-    texto,
-    fecha: new Date().toLocaleString(),
-    rol: usuario?.rol || "usuario_taller"
-  });
+  nombre,
+  texto,
+  fecha: new Date().toLocaleString(),
+  rol: usuario?.rol || "usuario_taller",
 
-  if (esJefeTaller()) {
+  atendido: esJefeTaller() ? false : true,
+  respuestaUsuario: "",
+  atendidoPor: "",
+  fechaAtendido: ""
+});
+
+if (esJefeTaller()) {
   ot.alertaJefe = true;
-}
-else if (esUsuarioTaller()) {
-  ot.alertaJefe = false;
 }
 
   guardarCambiosOT();
@@ -1692,15 +1740,36 @@ function renderComentariosOverhaul(i) {
   : "comentario-card";
 
     div.innerHTML = `
-      <strong>👨‍🔧${c.nombre}</strong>
-      <p class="comentario-fecha">${c.fecha}</p>
-      <p>${c.texto}</p>
-      <button 
-        class="btn-delete-comment"
-        onclick="eliminarComentarioOverhaul(${i}, ${index})">
-        🗑
-      </button>
-    `;
+  <strong>👨‍🔧 ${c.nombre}</strong>
+  <p class="comentario-fecha">${c.fecha}</p>
+  <p>${c.texto}</p>
+
+  ${
+    c.rol === "jefe_taller" && c.atendido !== true && esUsuarioTaller()
+      ? `<button 
+          class="btn-success"
+          onclick="responderComentarioJefe('overhaul', ${i}, ${index})">
+          ✅ Responder observación
+        </button>`
+      : ""
+  }
+
+  ${
+    c.rol === "jefe_taller" && c.atendido === true
+      ? `<div class="respuesta-observacion">
+          <strong>✅ Respondido por ${c.atendidoPor || "Usuario Taller"}</strong>
+          <p>${c.respuestaUsuario || ""}</p>
+          <small>${c.fechaAtendido || ""}</small>
+        </div>`
+      : ""
+  }
+
+  <button 
+    class="btn-delete-comment"
+    onclick="eliminarComentarioOverhaul(${i}, ${index})">
+    🗑
+  </button>
+`;
 
     cont.appendChild(div);
   });
@@ -2118,13 +2187,18 @@ function agregarComentarioPrueba(tipo, i) {
   const fecha = new Date().toLocaleString();
 
   ot.pruebas[tipo][i].comentarios.push({
-    nombre,
-    texto,
-    fecha: new Date().toLocaleString(),
-    rol: usuario?.rol || "usuario_taller"
-  });
+  nombre,
+  texto,
+  fecha: new Date().toLocaleString(),
+  rol: usuario?.rol || "usuario_taller",
 
-  if (esJefeTaller()) {
+  atendido: esJefeTaller() ? false : true,
+  respuestaUsuario: "",
+  atendidoPor: "",
+  fechaAtendido: ""
+});
+
+if (esJefeTaller()) {
   ot.alertaJefe = true;
 }
 else if (esUsuarioTaller()) {
@@ -2145,6 +2219,88 @@ else if (esUsuarioTaller()) {
   document.getElementById(`comentario-${tipo}-${i}`).value = "";
 }
 
+function existenComentariosJefePendientes(ot) {
+
+  const revisarLista = (lista) => {
+    return Array.isArray(lista) && lista.some(item =>
+      Array.isArray(item.comentarios) &&
+      item.comentarios.some(c =>
+        c.rol === "jefe_taller" && c.atendido !== true
+      )
+    );
+  };
+
+  return (
+    revisarLista(ot.ingreso) ||
+    revisarLista(ot.evaluacion) ||
+    revisarLista(ot.overhaul) ||
+    revisarLista(ot.pruebas?.mecanico) ||
+    revisarLista(ot.pruebas?.electrico)
+  );
+}
+
+function actualizarAlertaJefe() {
+  ot.alertaJefe = existenComentariosJefePendientes(ot);
+}
+
+async function responderComentarioJefe(etapa, itemIndex, comentarioIndex, tipo = null) {
+
+  if (OTBloqueada()) return;
+
+  if (!esUsuarioTaller()) {
+    alert("Solo Usuario Taller puede responder observaciones");
+    return;
+  }
+
+  const respuesta = prompt("Respuesta a la observación del Jefe:");
+
+  if (!respuesta || !respuesta.trim()) {
+    alert("Debes ingresar una respuesta");
+    return;
+  }
+
+  let lista;
+
+  if (etapa === "ingreso") {
+    lista = ot.ingreso;
+  }
+
+  if (etapa === "evaluacion") {
+    lista = ot.evaluacion;
+  }
+
+  if (etapa === "overhaul") {
+    lista = ot.overhaul;
+  }
+
+  if (etapa === "pruebas") {
+    lista = ot.pruebas?.[tipo];
+  }
+
+  const comentario = lista?.[itemIndex]?.comentarios?.[comentarioIndex];
+
+  if (!comentario) {
+    alert("No se encontró el comentario");
+    return;
+  }
+
+  comentario.atendido = true;
+  comentario.respuestaUsuario = respuesta.trim();
+  comentario.atendidoPor = usuario?.nombre || "Usuario Taller";
+  comentario.fechaAtendido = new Date().toLocaleString();
+
+  actualizarAlertaJefe();
+
+  await guardarCambiosOT();
+
+  if (etapa === "ingreso") renderIngreso();
+  if (etapa === "evaluacion") renderEvaluacion();
+  if (etapa === "overhaul") renderOverhaul();
+  if (etapa === "pruebas") renderChecklist(tipo);
+
+  alert("Observación atendida ✅");
+}
+
 function renderComentariosPrueba(tipo, i) {
 
   const cont = document.getElementById(`comentarios-${tipo}-${i}`);
@@ -2162,15 +2318,36 @@ function renderComentariosPrueba(tipo, i) {
   : "comentario-card";
 
     div.innerHTML = `
-      <strong>👨‍🔧${c.nombre}</strong>
-      <p class="comentario-fecha">${c.fecha}</p>
-      <p>${c.texto}</p>
-      <button 
-        class="btn-delete-comment"
-        onclick="eliminarComentarioPrueba('${tipo}', ${i}, ${index})">
-        🗑
-      </button>
-    `;
+  <strong>👨‍🔧 ${c.nombre}</strong>
+  <p class="comentario-fecha">${c.fecha}</p>
+  <p>${c.texto}</p>
+
+  ${
+    c.rol === "jefe_taller" && c.atendido !== true && esUsuarioTaller()
+      ? `<button 
+          class="btn-success"
+          onclick="responderComentarioJefe('pruebas', ${i}, ${index}, '${tipo}')">
+          ✅ Responder observación
+        </button>`
+      : ""
+  }
+
+  ${
+    c.rol === "jefe_taller" && c.atendido === true
+      ? `<div class="respuesta-observacion">
+          <strong>✅ Respondido por ${c.atendidoPor || "Usuario Taller"}</strong>
+          <p>${c.respuestaUsuario || ""}</p>
+          <small>${c.fechaAtendido || ""}</small>
+        </div>`
+      : ""
+  }
+
+  <button 
+    class="btn-delete-comment"
+    onclick="eliminarComentarioPrueba('${tipo}', ${i}, ${index})">
+    🗑
+  </button>
+`;
 
     cont.appendChild(div);
   });
@@ -3589,3 +3766,5 @@ window.cerrarModalRepuestos = cerrarModalRepuestos;
 window.guardarRepuestosUsados = guardarRepuestosUsados;
 
 window.subirDocsSeccion = subirDocsSeccion;
+
+window.responderComentarioJefe = responderComentarioJefe;

@@ -399,49 +399,45 @@ function mostrarAlertasJefe(ot) {
 
   const alertas = new Set();
 
-  const tieneComentarioJefe = (items) => {
+  const tienePendientesJefe = (items) => {
     return Array.isArray(items) && items.some(item =>
       Array.isArray(item.comentarios) &&
-      item.comentarios.some(c => c.rol === "jefe_taller")
+      item.comentarios.some(c =>
+        c.rol === "jefe_taller" && c.atendido !== true
+      )
     );
   };
 
-  // INGRESO
-  if (tieneComentarioJefe(ot.ingreso)) {
+  if (tienePendientesJefe(ot.ingreso)) {
     alertas.add("📥 Ingreso");
   }
 
-  // EVALUACIÓN
   if (
-    tieneComentarioJefe(ot.evaluacion) ||
+    tienePendientesJefe(ot.evaluacion) ||
     (
       ot.decisionEvaluacion?.comentario &&
-      ot.decisionEvaluacion.comentario.trim() !== ""
+      ot.decisionEvaluacion.atendido !== true
     )
   ) {
     alertas.add("📋 Evaluación");
   }
 
-  // OVERHAUL
-  if (tieneComentarioJefe(ot.overhaul)) {
+  if (tienePendientesJefe(ot.overhaul)) {
     alertas.add("🔧 Overhaul");
   }
 
-  // PRUEBAS MECÁNICAS
-  if (tieneComentarioJefe(ot.pruebas?.mecanico)) {
+  if (tienePendientesJefe(ot.pruebas?.mecanico)) {
     alertas.add("🛠 Pruebas Mecánicas");
   }
 
-  // PRUEBAS ELÉCTRICAS
-  if (tieneComentarioJefe(ot.pruebas?.electrico)) {
+  if (tienePendientesJefe(ot.pruebas?.electrico)) {
     alertas.add("⚡ Pruebas Eléctricas");
   }
 
-  // DESPACHO
   if (
-    tieneComentarioJefe(ot.despacho?.comentarios) ||
-    tieneComentarioJefe(ot.despacho?.preparacion) ||
-    tieneComentarioJefe(ot.despacho?.final)
+    tienePendientesJefe(ot.despacho?.preparacion) ||
+    tienePendientesJefe(ot.despacho?.final) ||
+    tienePendientesJefe(ot.despacho?.comentarios)
   ) {
     alertas.add("📦 Despacho");
   }
