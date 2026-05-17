@@ -17,6 +17,18 @@ const loginError = document.getElementById("loginError");
 
 btnLogin.addEventListener("click", iniciarSesion);
 
+emailInput.addEventListener("keydown", function(e) {
+  if (e.key === "Enter") {
+    iniciarSesion();
+  }
+});
+
+passwordInput.addEventListener("keydown", function(e) {
+  if (e.key === "Enter") {
+    iniciarSesion();
+  }
+});
+
 async function iniciarSesion() {
   const email = emailInput.value.trim();
   const password = passwordInput.value.trim();

@@ -1,3 +1,11 @@
+const usuario = JSON.parse(
+  localStorage.getItem("usuarioActivo")
+);
+
+if (!usuario) {
+  window.location.replace("index.html");
+}
+
 import { db } from "./firebase-config.js";
 
 import {
@@ -374,9 +382,19 @@ function renderUsuarioActivo() {
 }
 
 function cerrarSesion() {
+
+  const confirmar = confirm(
+    "¿Estás seguro de que deseas cerrar sesión?"
+  );
+
+  if (!confirmar) return;
+
   localStorage.removeItem("usuarioActivo");
   localStorage.removeItem("otActiva");
-  window.location.href = "flujo.html";
+
+  sessionStorage.clear();
+
+  window.location.replace("index.html");
 }
 
 window.cerrarSesion = cerrarSesion;
