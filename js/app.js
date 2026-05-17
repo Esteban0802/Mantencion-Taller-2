@@ -12,7 +12,8 @@ import {
 import {
   ref,
   uploadBytes,
-  getDownloadURL
+  getDownloadURL,
+  getBytes
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 
 console.log("🔥 Firebase conectado correctamente");
@@ -2827,6 +2828,31 @@ if (ot.overhaulRequerido !== false) {
   return true;
 }
 
+async function convertirImagenABase64(url) {
+
+  try {
+    const imagenRef = ref(storage, url);
+
+    const bytes = await getBytes(imagenRef);
+
+    const blob = new Blob([bytes], {
+      type: "image/jpeg"
+    });
+
+    return await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+
+      reader.onloadend = () => resolve(reader.result);
+      reader.onerror = reject;
+
+      reader.readAsDataURL(blob);
+    });
+
+  } catch (error) {
+    console.warn("No se pudo convertir imagen desde Storage:", error);
+    return null;
+  }
+}
 
 
 
@@ -2836,7 +2862,7 @@ if (ot.overhaulRequerido !== false) {
 // =======================
 // GENERAR PDF CON FOTOS
 // =======================
-function generarPDF() {
+async function generarPDF() {
 
   if (!ot) {
     alert("No hay OT cargada");
@@ -3210,13 +3236,13 @@ function justificarTexto(texto, x, y, ancho) {
   // =========================
 // BLOQUE SERVICIO
 // =========================
-function renderBloqueServicio(tituloSeccion, lista) {
+async function renderBloqueServicio(tituloSeccion, lista) {
 
   if (!lista || lista.length === 0) return;
 
   titulo(tituloSeccion);
 
-  lista.forEach((item, index) => {
+  for (const [index, item] of lista.entries()) {
 
     checkPage();
 
@@ -3237,37 +3263,44 @@ function renderBloqueServicio(tituloSeccion, lista) {
     // =========================
     // COMENTARIOS
     // =========================
-    if (item.comentarios?.length > 0) {
+    // =========================
+// COMENTARIOS SOLO TÉCNICOS
+// =========================
+const comentariosTecnicos =
+  (item.comentarios || []).filter(
+    c => c.rol !== "jefe_taller"
+  );
 
-      doc.setFontSize(10);
-      doc.setFont("helvetica", "bold");
+if (comentariosTecnicos.length > 0) {
 
-      doc.text(
-        "Trabajos realizados:",
-        15,
-        y
-      );
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "bold");
 
-      y += 6;
+  doc.text(
+    "Trabajos realizados:",
+    15,
+    y
+  );
 
-      item.comentarios.forEach(c => {
+  y += 6;
 
-        doc.setFont("helvetica", "normal");
+  comentariosTecnicos.forEach(c => {
 
-        const texto =
-          `• ${c.nombre}: ${c.texto}`;
+    doc.setFont("helvetica", "normal");
 
-        const split =
-          doc.splitTextToSize(texto, 170);
+    const texto =
+      `• ${c.nombre}: ${c.texto}`;
 
-        doc.text(split, 20, y);
+    const split =
+      doc.splitTextToSize(texto, 170);
 
-        y += split.length * 5 + 3;
+    doc.text(split, 20, y);
 
-      });
+    y += split.length * 5 + 3;
 
-    }
+  });
 
+}
     // =========================
     // GALERÍA PROFESIONAL
     // =========================
@@ -3284,7 +3317,8 @@ function renderBloqueServicio(tituloSeccion, lista) {
       );
 
       y += 10;
-
+    
+    
       // =========================
 // CONFIGURACIÓN GALERÍA
 // =========================
@@ -3303,68 +3337,55 @@ const anchoTotal =
 // 🔥 CENTRAR AUTOMÁTICAMENTE
 const margenX =
   (pageWidth - anchoTotal) / 2;
-      item.fotos.forEach((foto, fotoIndex) => {
+      for (let fotoIndex = 0; fotoIndex < item.fotos.length; fotoIndex++) {
 
-        const fila =
-          Math.floor(fotoIndex / columnas);
+  const foto = item.fotos[fotoIndex];
 
-        const columna =
-          fotoIndex % columnas;
+  const fila = Math.floor(fotoIndex / columnas);
+  const columna = fotoIndex % columnas;
 
-        const posX =
-          margenX +
-          (columna * (anchoImg + espacioX));
+  const posX = margenX + (columna * (anchoImg + espacioX));
+  const posY = y + (fila * (altoImg + 12));
 
-        const posY =
-          y +
-          (fila * (altoImg + 12));
+  if (posY + altoImg > 250) {
+    footer(doc.getNumberOfPages());
+    doc.addPage();
+    header();
+    y = 40;
+  }
 
-        // =========================
-        // NUEVA PÁGINA
-        // =========================
-        if (posY + altoImg > 250) {
+  try {
+    const fotoBase64 =
+  foto.startsWith("http")
+    ? await convertirImagenABase64(foto)
+    : foto;
 
-          footer(doc.getNumberOfPages());
+if (!fotoBase64) continue;
 
-          doc.addPage();
+    doc.setDrawColor(180);
 
-          header();
+    doc.roundedRect(
+      posX - 1,
+      posY - 1,
+      anchoImg + 2,
+      altoImg + 2,
+      2,
+      2
+    );
 
-          y = 40;
+    doc.addImage(
+      fotoBase64,
+      "JPEG",
+      posX,
+      posY,
+      anchoImg,
+      altoImg
+    );
 
-        }
-
-        try {
-
-          // MARCO
-          doc.setDrawColor(180);
-
-          doc.roundedRect(
-            posX - 1,
-            posY - 1,
-            anchoImg + 2,
-            altoImg + 2,
-            2,
-            2
-          );
-
-          // IMAGEN
-          doc.addImage(
-            foto,
-            "JPEG",
-            posX,
-            posY,
-            anchoImg,
-            altoImg
-          );
-
-        } catch(e) {
-
-          console.warn(e);
-
-        }
-
-      });
+  } catch (e) {
+    console.warn("No se pudo agregar imagen al PDF:", e);
+  }
+}
 
       // =========================
       // AJUSTAR ALTURA FINAL
@@ -3379,43 +3400,31 @@ const margenX =
 
     y += 15;
 
-  });
+  }
 
 }
 
 // =========================
 // INGRESO
 // =========================
-renderBloqueServicio(
-  "3. INGRESO",
-  ot.ingreso
-);
+await renderBloqueServicio("3. INGRESO", ot.ingreso);
 
 // =========================
 // EVALUACIÓN
 // =========================
-renderBloqueServicio(
-  "4. EVALUACIÓN",
-  ot.evaluacion
-);
+await renderBloqueServicio("4. EVALUACIÓN", ot.evaluacion);
 
 // =========================
 // OVERHAUL
 // =========================
-renderBloqueServicio(
-  "5. OVERHAUL",
-  ot.overhaul
-);
+await renderBloqueServicio("5. OVERHAUL", ot.overhaul);
 
 // =========================
 // PRUEBAS MECÁNICAS
 // =========================
 if (ot.pruebas?.mecanico) {
 
-  renderBloqueServicio(
-    "6. PRUEBAS MECÁNICAS",
-    ot.pruebas.mecanico
-  );
+  await renderBloqueServicio("6. PRUEBAS MECÁNICAS", ot.pruebas.mecanico);
 
 }
 
@@ -3424,10 +3433,7 @@ if (ot.pruebas?.mecanico) {
 // =========================
 if (ot.pruebas?.electrico) {
 
-  renderBloqueServicio(
-    "7. PRUEBAS ELÉCTRICAS",
-    ot.pruebas.electrico
-  );
+  await renderBloqueServicio("7. PRUEBAS ELÉCTRICAS", ot.pruebas.electrico);
 
 }
 
@@ -3466,6 +3472,8 @@ parrafo(
   // =========================
   doc.save(`Informe_${ot.os}.pdf`);
 }
+
+
 
 
 function mostrarAlerta(msg, tipo = "error") {
