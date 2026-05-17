@@ -478,11 +478,15 @@ function renderComentariosItem(i) {
       : ""
   }
 
-  <button 
-    class="btn-delete-comment"
-    onclick="eliminarComentarioIngreso(${i}, ${index})">
-    🗑
-  </button>
+  ${
+  esJefeTaller()
+    ? `<button 
+        class="btn-delete-comment"
+        onclick="eliminarComentarioIngreso(${i}, ${index})">
+        🗑
+      </button>`
+    : ""
+}
 `;
 
     cont.appendChild(div);
@@ -534,7 +538,7 @@ function aprobarIngreso() {
 
   habilitarTab("evaluacion");
 
-  alert("Ingreso aprobado");
+  alert("Ingreso completado ✅");
 }
 
 // =======================
@@ -904,11 +908,15 @@ function renderComentariosEvaluacion(i) {
       : ""
   }
 
-  <button 
-    class="btn-delete-comment"
-    onclick="eliminarComentarioEvaluacion(${i}, ${index})">
-    🗑
-  </button>
+  ${
+  esJefeTaller()
+    ? `<button 
+        class="btn-delete-comment"
+        onclick="eliminarComentarioEvaluacion(${i}, ${index})">
+        🗑
+      </button>`
+    : ""
+}
 `;
 
     cont.appendChild(div);
@@ -1241,11 +1249,15 @@ function renderComentarioDecisionEvaluacion() {
     <p class="comentario-fecha">${ot.decisionEvaluacion.fecha || ""}</p>
     <p>${ot.decisionEvaluacion.comentario}</p>
 
-    <button 
-      class="btn-delete-comment"
-      onclick="eliminarComentarioDecisionEvaluacion()">
-      🗑
-    </button>
+    ${
+  esJefeTaller()
+    ? `<button 
+        class="btn-delete-comment"
+        onclick="eliminarComentarioDecisionEvaluacion()">
+        🗑
+      </button>`
+    : ""
+}
   `;
 
   cont.appendChild(div);
@@ -1394,6 +1406,9 @@ window.onload = async () => {
     if (ot.despacho.final?.length > 0) {
       renderDocsSeccion("final");
     }
+
+    renderComentariosDespacho("preparacion");
+    renderComentariosDespacho("final");
   }
 
   // =========================
@@ -1765,11 +1780,15 @@ function renderComentariosOverhaul(i) {
       : ""
   }
 
-  <button 
-    class="btn-delete-comment"
-    onclick="eliminarComentarioOverhaul(${i}, ${index})">
-    🗑
-  </button>
+  ${
+  esJefeTaller()
+    ? `<button 
+        class="btn-delete-comment"
+        onclick="eliminarComentarioOverhaul(${i}, ${index})">
+        🗑
+      </button>`
+    : ""
+}
 `;
 
     cont.appendChild(div);
@@ -2231,12 +2250,22 @@ function existenComentariosJefePendientes(ot) {
     );
   };
 
+  const revisarComentariosDirectos = (comentarios) => {
+  return Array.isArray(comentarios) &&
+    comentarios.some(c =>
+      c.rol === "jefe_taller" &&
+      c.atendido !== true
+    );
+};
+
   return (
     revisarLista(ot.ingreso) ||
     revisarLista(ot.evaluacion) ||
     revisarLista(ot.overhaul) ||
     revisarLista(ot.pruebas?.mecanico) ||
-    revisarLista(ot.pruebas?.electrico)
+    revisarLista(ot.pruebas?.electrico) ||
+    revisarComentariosDirectos(ot.despacho?.comentariosPreparacion) ||
+    revisarComentariosDirectos(ot.despacho?.comentariosFinal)
   );
 }
 
@@ -2343,11 +2372,15 @@ function renderComentariosPrueba(tipo, i) {
       : ""
   }
 
-  <button 
-    class="btn-delete-comment"
-    onclick="eliminarComentarioPrueba('${tipo}', ${i}, ${index})">
-    🗑
-  </button>
+  ${
+  esJefeTaller()
+    ? `<button 
+        class="btn-delete-comment"
+        onclick="eliminarComentarioPrueba(${i}, ${index})">
+        🗑
+      </button>`
+    : ""
+}
 `;
 
     cont.appendChild(div);
@@ -2459,7 +2492,7 @@ async function aprobarPruebas() {
 function validarPruebasCompleto() {
 
   if (!ot.pruebas) {
-    alert("Debes cargar los checklist de pruebas");
+    alert("Faltan pruebas funcionales");
     return false;
   }
 
@@ -2470,27 +2503,41 @@ function validarPruebasCompleto() {
     const lista = ot.pruebas[tipo];
 
     if (!lista || lista.length === 0) {
-      alert(`Falta checklist ${tipo}`);
+      alert(`Falta cargar checklist ${tipo}`);
       return false;
     }
 
-    const checklist = lista.every(i => i.ok);
-    const fotos = lista.every(i => i.fotos && i.fotos.length > 0);
-    const comentarios = lista.every(i => i.comentarios && i.comentarios.length > 0);
+    for (let i = 0; i < lista.length; i++) {
 
-    if (!checklist) {
-      alert(`Checklist ${tipo} incompleto`);
-      return false;
-    }
+      const item = lista[i];
 
-    if (!fotos) {
-      alert(`Faltan evidencias en ${tipo}`);
-      return false;
-    }
+      if (!item.ok) {
+        alert(`Falta marcar como realizado el ítem ${i + 1} en pruebas ${tipo}`);
+        return false;
+      }
 
-    if (!comentarios) {
-      alert(`Faltan comentarios en ${tipo}`);
-      return false;
+      if (!item.fotos || item.fotos.length === 0) {
+        alert(`Falta evidencia fotográfica en el ítem ${i + 1} de pruebas ${tipo}`);
+        return false;
+      }
+
+      const comentariosTecnicos = (item.comentarios || []).filter(c =>
+        c.rol !== "jefe_taller"
+      );
+
+      if (comentariosTecnicos.length === 0) {
+        alert(`Falta comentario técnico en el ítem ${i + 1} de pruebas ${tipo}`);
+        return false;
+      }
+
+      const observacionesPendientes = (item.comentarios || []).some(c =>
+        c.rol === "jefe_taller" && c.atendido !== true
+      );
+
+      if (observacionesPendientes) {
+        alert(`Existen observaciones pendientes del Jefe de Taller en pruebas ${tipo}, ítem ${i + 1}`);
+        return false;
+      }
     }
   }
 
@@ -2693,6 +2740,195 @@ function validarDespachoCompleto() {
   return true;
 }
 
+function prepararComentariosDespacho() {
+  if (!ot.despacho) {
+    ot.despacho = {
+      preparacion: [],
+      final: []
+    };
+  }
+
+  if (!ot.despacho.comentariosPreparacion) {
+    ot.despacho.comentariosPreparacion = [];
+  }
+
+  if (!ot.despacho.comentariosFinal) {
+    ot.despacho.comentariosFinal = [];
+  }
+}
+
+async function agregarComentarioDespacho(tipo) {
+
+  if (OTBloqueada()) return;
+
+  prepararComentariosDespacho();
+
+  const inputId = tipo === "preparacion"
+    ? "comentarioDespachoPrep"
+    : "comentarioDespachoFinal";
+
+  const input = document.getElementById(inputId);
+
+  if (!input || !input.value.trim()) {
+    alert("Debes ingresar un comentario");
+    return;
+  }
+
+  const comentario = {
+    nombre: usuario?.nombre || "Usuario",
+    texto: input.value.trim(),
+    fecha: new Date().toLocaleString(),
+    rol: usuario?.rol || "usuario_taller",
+    atendido: esJefeTaller() ? false : true,
+    respuestaUsuario: "",
+    atendidoPor: "",
+    fechaAtendido: ""
+  };
+
+  if (tipo === "preparacion") {
+    ot.despacho.comentariosPreparacion.push(comentario);
+  } else {
+    ot.despacho.comentariosFinal.push(comentario);
+  }
+
+  if (esJefeTaller()) {
+    ot.alertaJefe = true;
+  }
+
+  input.value = "";
+
+  await guardarCambiosOT();
+
+  renderComentariosDespacho(tipo);
+}
+
+function renderComentariosDespacho(tipo) {
+
+  prepararComentariosDespacho();
+
+  const contId = tipo === "preparacion"
+    ? "comentarios-despacho-preparacion"
+    : "comentarios-despacho-final";
+
+  const cont = document.getElementById(contId);
+  if (!cont) return;
+
+  const lista = tipo === "preparacion"
+    ? ot.despacho.comentariosPreparacion
+    : ot.despacho.comentariosFinal;
+
+  cont.innerHTML = "";
+
+  lista.forEach((c, index) => {
+
+    const div = document.createElement("div");
+
+    div.className = c.rol === "jefe_taller"
+      ? "comentario-card comentario-jefe"
+      : "comentario-card";
+
+    div.innerHTML = `
+      <strong>👨‍🔧 ${c.nombre}</strong>
+      <p class="comentario-fecha">${c.fecha}</p>
+      <p>${c.texto}</p>
+
+      ${
+        c.rol === "jefe_taller" && c.atendido !== true && esUsuarioTaller()
+          ? `<button 
+              class="btn-success"
+              onclick="responderComentarioJefeDespacho('${tipo}', ${index})">
+              ✅ Responder observación
+            </button>`
+          : ""
+      }
+
+      ${
+        c.rol === "jefe_taller" && c.atendido === true
+          ? `<div class="respuesta-observacion">
+              <strong>✅ Respondido por ${c.atendidoPor || "Usuario Taller"}</strong>
+              <p>${c.respuestaUsuario || ""}</p>
+              <small>${c.fechaAtendido || ""}</small>
+            </div>`
+          : ""
+      }
+
+      ${
+  esJefeTaller()
+    ? `<button 
+        class="btn-delete-comment"
+        onclick="eliminarComentarioDespacho('${tipo}', ${index})">
+        🗑
+      </button>`
+    : ""
+}
+    `;
+
+    cont.appendChild(div);
+  });
+}
+
+async function responderComentarioJefeDespacho(tipo, index) {
+
+  if (OTBloqueada()) return;
+
+  if (!esUsuarioTaller()) {
+    alert("Solo Usuario Taller puede responder observaciones");
+    return;
+  }
+
+  prepararComentariosDespacho();
+
+  const respuesta = prompt("Respuesta a la observación del Jefe:");
+
+  if (!respuesta || !respuesta.trim()) {
+    alert("Debes ingresar una respuesta");
+    return;
+  }
+
+  const lista = tipo === "preparacion"
+    ? ot.despacho.comentariosPreparacion
+    : ot.despacho.comentariosFinal;
+
+  const comentario = lista[index];
+
+  if (!comentario) {
+    alert("No se encontró el comentario");
+    return;
+  }
+
+  comentario.atendido = true;
+  comentario.respuestaUsuario = respuesta.trim();
+  comentario.atendidoPor = usuario?.nombre || "Usuario Taller";
+  comentario.fechaAtendido = new Date().toLocaleString();
+
+  actualizarAlertaJefe();
+
+  await guardarCambiosOT();
+
+  renderComentariosDespacho(tipo);
+
+  alert("Observación atendida ✅");
+}
+
+async function eliminarComentarioDespacho(tipo, index) {
+
+  if (OTBloqueada()) return;
+
+  prepararComentariosDespacho();
+
+  const lista = tipo === "preparacion"
+    ? ot.despacho.comentariosPreparacion
+    : ot.despacho.comentariosFinal;
+
+  lista.splice(index, 1);
+
+  actualizarAlertaJefe();
+
+  await guardarCambiosOT();
+
+  renderComentariosDespacho(tipo);
+}
+
 // =======================
 // CERRAR OT
 // =======================
@@ -2737,91 +2973,92 @@ async function cerrarOT() {
 // =======================
 function validarOTCompleta() {
 
-  // 🔹 INGRESO
-  if (!ot.ingreso || ot.ingreso.length === 0) {
-    alert("Falta completar INGRESO");
-    return false;
-  }
-
-  const ingresoOk = ot.ingreso.every(i => i.ok);
-  const ingresoFotos = ot.ingreso.every(i => i.fotos?.length > 0);
-  const ingresoComentarios = ot.ingreso.every(i => i.comentarios?.length > 0);
-
-  if (!ingresoOk || !ingresoFotos || !ingresoComentarios) {
-    alert("INGRESO incompleto");
-    return false;
-  }
-
-  // 🔹 EVALUACIÓN
-  if (!ot.evaluacion || ot.evaluacion.length === 0) {
-    alert("Falta EVALUACIÓN");
-    return false;
-  }
-
-  const evalOk = ot.evaluacion.every(i => i.ok);
-  const evalFotos = ot.evaluacion.every(i => i.fotos?.length > 0);
-  const evalComentarios = ot.evaluacion.every(i => i.comentarios?.length > 0);
-
-  if (!evalOk || !evalFotos || !evalComentarios) {
-    alert("EVALUACIÓN incompleta");
-    return false;
-  }
-
-  // 🔹 OVERHAUL
-  // 🔹 OVERHAUL Y PRUEBAS SOLO SI APLICAN
-if (ot.overhaulRequerido !== false) {
-
-  if (!ot.overhaul || ot.overhaul.length === 0) {
-    alert("Falta OVERHAUL");
-    return false;
-  }
-
-  const overOk = ot.overhaul.every(i => i.ok);
-  const overFotos = ot.overhaul.every(i => i.fotos?.length > 0);
-
-  if (!overOk || !overFotos) {
-    alert("OVERHAUL incompleto");
-    return false;
-  }
-
-  // 🔹 PRUEBAS
-  if (!ot.pruebas) {
-    alert("Faltan PRUEBAS");
-    return false;
-  }
-
-  const tipos = ["mecanico", "electrico"];
-
-  for (let tipo of tipos) {
-    const lista = ot.pruebas[tipo];
-
+  function validarLista(nombreEtapa, lista) {
     if (!lista || lista.length === 0) {
-      alert(`Falta checklist ${tipo}`);
+      alert(`Falta ${nombreEtapa}`);
       return false;
     }
 
-    const completo = lista.every(i => i.ok);
-    const conFotos = lista.every(i => i.fotos?.length > 0);
-    const conComentarios = lista.every(i => i.comentarios?.length > 0);
+    for (let i = 0; i < lista.length; i++) {
+      const item = lista[i];
 
-    if (!completo || !conFotos || !conComentarios) {
-      alert(`PRUEBAS ${tipo} incompleto`);
+      if (!item.ok) {
+        alert(`${nombreEtapa}: falta marcar el ítem ${i + 1}`);
+        return false;
+      }
+
+      if (!item.fotos || item.fotos.length === 0) {
+        alert(`${nombreEtapa}: falta foto en el ítem ${i + 1}`);
+        return false;
+      }
+
+      const comentariosTecnicos = (item.comentarios || []).filter(c =>
+        c.rol !== "jefe_taller"
+      );
+
+      if (comentariosTecnicos.length === 0) {
+        alert(`${nombreEtapa}: falta comentario técnico en el ítem ${i + 1}`);
+        return false;
+      }
+
+      const obsPendiente = (item.comentarios || []).some(c =>
+        c.rol === "jefe_taller" && c.atendido !== true
+      );
+
+      if (obsPendiente) {
+        alert(`${nombreEtapa}: hay observaciones del Jefe pendientes en el ítem ${i + 1}`);
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  if (!validarLista("INGRESO", ot.ingreso)) return false;
+  if (!validarLista("EVALUACIÓN", ot.evaluacion)) return false;
+
+  if (!ot.evaluacionAprobada) {
+    alert("Falta decisión del Jefe de Taller en Evaluación");
+    return false;
+  }
+
+  if (ot.overhaulRequerido !== false) {
+    if (!validarLista("OVERHAUL", ot.overhaul)) return false;
+
+    if (!validarLista("PRUEBAS MECÁNICAS", ot.pruebas?.mecanico)) return false;
+    if (!validarLista("PRUEBAS ELÉCTRICAS", ot.pruebas?.electrico)) return false;
+
+    if (!ot.pruebasAprobado) {
+      alert("Falta aprobación de Pruebas por Jefe de Taller");
       return false;
     }
   }
-  }
 
-  // 🔹 DESPACHO
   if (!ot.despacho) {
     alert("Falta DESPACHO");
     return false;
   }
 
-  const prep = ot.despacho.preparacion?.length > 0;
-  const final = ot.despacho.final?.length > 0;
+  if (!ot.despacho.preparacion || ot.despacho.preparacion.length === 0) {
+    alert("DESPACHO: falta documentación de Preparación");
+    return false;
+  }
 
-  if (!prep || !final) {
-    alert("DESPACHO incompleto");
+  if (!ot.despacho.final || ot.despacho.final.length === 0) {
+    alert("DESPACHO: falta documentación de Despacho Final");
+    return false;
+  }
+
+  const obsDespachoPrep = (ot.despacho.comentariosPreparacion || []).some(c =>
+    c.rol === "jefe_taller" && c.atendido !== true
+  );
+
+  const obsDespachoFinal = (ot.despacho.comentariosFinal || []).some(c =>
+    c.rol === "jefe_taller" && c.atendido !== true
+  );
+
+  if (obsDespachoPrep || obsDespachoFinal) {
+    alert("DESPACHO: existen observaciones del Jefe pendientes");
     return false;
   }
 
@@ -3776,3 +4013,8 @@ window.guardarRepuestosUsados = guardarRepuestosUsados;
 window.subirDocsSeccion = subirDocsSeccion;
 
 window.responderComentarioJefe = responderComentarioJefe;
+
+window.agregarComentarioDespacho = agregarComentarioDespacho;
+window.renderComentariosDespacho = renderComentariosDespacho;
+window.responderComentarioJefeDespacho = responderComentarioJefeDespacho;
+window.eliminarComentarioDespacho = eliminarComentarioDespacho;

@@ -403,22 +403,25 @@ function mostrarAlertasJefe(ot) {
     return Array.isArray(items) && items.some(item =>
       Array.isArray(item.comentarios) &&
       item.comentarios.some(c =>
-        c.rol === "jefe_taller" && c.atendido !== true
+        c.rol === "jefe_taller" &&
+        c.atendido !== true
       )
     );
+  };
+
+  const tienePendientesDirectos = (comentarios) => {
+    return Array.isArray(comentarios) &&
+      comentarios.some(c =>
+        c.rol === "jefe_taller" &&
+        c.atendido !== true
+      );
   };
 
   if (tienePendientesJefe(ot.ingreso)) {
     alertas.add("📥 Ingreso");
   }
 
-  if (
-    tienePendientesJefe(ot.evaluacion) ||
-    (
-      ot.decisionEvaluacion?.comentario &&
-      ot.decisionEvaluacion.atendido !== true
-    )
-  ) {
+  if (tienePendientesJefe(ot.evaluacion)) {
     alertas.add("📋 Evaluación");
   }
 
@@ -435,9 +438,8 @@ function mostrarAlertasJefe(ot) {
   }
 
   if (
-    tienePendientesJefe(ot.despacho?.preparacion) ||
-    tienePendientesJefe(ot.despacho?.final) ||
-    tienePendientesJefe(ot.despacho?.comentarios)
+    tienePendientesDirectos(ot.despacho?.comentariosPreparacion) ||
+    tienePendientesDirectos(ot.despacho?.comentariosFinal)
   ) {
     alertas.add("📦 Despacho");
   }
