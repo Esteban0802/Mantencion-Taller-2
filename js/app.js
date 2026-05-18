@@ -34,9 +34,7 @@ console.log(storage);
 // =======================
 let ot = null;
 let listaOTs = [];
-let usuario = JSON.parse(
-  localStorage.getItem("usuarioActivo")
-) || null;
+
 
 // =======================
 // VALIDAR ROLES
@@ -167,10 +165,14 @@ async function guardarDatosOS() {
       cliente,
       os,
 
+      empresaId: usuario.empresaId,
+      sucursalId: usuario.sucursalId,
+      creadoPor: usuario.uid,
+      creadoPorNombre: usuario.nombre,
+      creadoPorRol: usuario.rol,
+
       estado: "INGRESO",
 
-      empresaId: "empresa_demo",
-      sucursalId: "sucursal_demo",
 
       ingreso: [],
       evaluacion: [],
@@ -3812,15 +3814,19 @@ async function subirArchivoStorage(file, etapa, itemIndex) {
 }
 
 function renderUsuarioActivo() {
-  const usuario = JSON.parse(localStorage.getItem("usuarioActivo"));
 
   if (!usuario) return;
 
   const nombre = document.getElementById("usuarioNombre");
   const rol = document.getElementById("usuarioRol");
 
-  if (nombre) nombre.textContent = usuario.nombre || "Usuario";
-  if (rol) rol.textContent = usuario.rol || "Sin rol";
+  if (nombre) {
+    nombre.textContent = usuario.nombre || "Usuario";
+  }
+
+  if (rol) {
+    rol.textContent = usuario.rol || "Sin rol";
+  }
 }
 
 function cerrarSesion() {

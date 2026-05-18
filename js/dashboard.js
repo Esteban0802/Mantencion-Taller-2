@@ -10,9 +10,10 @@ import { db } from "./firebase-config.js";
 
 import {
   collection,
-  onSnapshot,
   query,
-  orderBy
+  where,
+  orderBy,
+  onSnapshot
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 let listaOTs = [];
@@ -79,8 +80,19 @@ window.onload = () => {
 
 function escucharOTsTiempoReal() {
 
+  const usuarioActivo = JSON.parse(
+    localStorage.getItem("usuarioActivo")
+  );
+
+  if (!usuarioActivo) {
+    window.location.replace("index.html");
+    return;
+  }
+
   const q = query(
     collection(db, "ots"),
+    where("empresaId", "==", usuarioActivo.empresaId),
+    where("sucursalId", "==", usuarioActivo.sucursalId),
     orderBy("fechaCreacion", "desc")
   );
 
@@ -97,7 +109,11 @@ function escucharOTsTiempoReal() {
     calcularKPIs(listaFiltrada);
     renderGraficos(listaFiltrada);
 
-    console.log("Dashboard actualizado en tiempo real ✅", listaOTs);
+    console.log(
+      "Dashboard actualizado por sucursal ✅",
+      usuarioActivo.sucursalId,
+      listaOTs
+    );
 
   }, (error) => {
     console.error("Error escuchando OTs:", error);
