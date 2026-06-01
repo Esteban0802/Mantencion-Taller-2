@@ -217,6 +217,19 @@ function habilitarTab(nombre) {
   tab.classList.remove("disabled");
 }
 
+function habilitarTabsPlanificacionJefe() {
+
+  if (!esJefeTaller()) return;
+
+  habilitarTab("ingreso");
+  habilitarTab("evaluacion");
+  habilitarTab("overhaul");
+  habilitarTab("pruebas");
+  habilitarTab("despacho");
+
+  console.log("Tabs desbloqueadas para planificación Jefe de Taller ✅");
+}
+
 // =======================
 // INGRESO (CARGAR EXCEL)
 // =======================
@@ -1473,9 +1486,28 @@ window.onload = async () => {
     cambiarTab("despacho");
   }
 
-  aplicarModoSoloLectura();
-  aplicarPermisosRol();
-  renderUsuarioActivo();
+  if (esJefeTaller()) {
+  habilitarTabsPlanificacionJefe();
+}
+
+if (ot.gantt) {
+  renderCartaGantt();
+}
+
+const btnGantt =
+  document.getElementById("btnGantt");
+
+if (btnGantt) {
+
+  btnGantt.innerHTML =
+    ot.gantt?.actividades?.length
+      ? "📊 Ver Carta Gantt"
+      : "📊 Crear Carta Gantt";
+}
+
+aplicarModoSoloLectura();
+aplicarPermisosRol();
+renderUsuarioActivo();
 };
 
 function cambiarTab(nombre) {
@@ -2044,6 +2076,709 @@ async function guardarRepuestosUsados() {
 
   cerrarModalRepuestos();
 }
+
+// =========================
+// CARTA GANTT OVERHAUL
+// =========================
+
+function abrirModalGantt() {
+
+  const modalForm = document.getElementById("modalGantt");
+  const modalVisual = document.getElementById("modalGanttVisual");
+
+  // 🔥 SI YA EXISTE GANTT
+  if (ot.gantt && ot.gantt.actividades?.length) {
+
+    renderCartaGantt();
+
+    modalVisual.style.display = "flex";
+
+    return;
+  }
+
+  // 🔥 PRIMER INGRESO
+  cargarFormularioGantt();
+
+  modalForm.style.display = "flex";
+}
+
+function cargarFormularioGantt() {
+
+  if (!ot.gantt) return;
+
+  document.getElementById("fechaInicioGantt").value =
+    ot.gantt.fechaInicio || "";
+
+  document.getElementById("fechaTerminoGantt").value =
+    ot.gantt.fechaTermino || "";
+
+  document.getElementById("diasRepuestos").value =
+    ot.gantt.diasRepuestos || 0;
+
+  document.getElementById("comentarioRepuestos").value =
+    ot.gantt.comentarioRepuestos || "";
+}
+
+function cerrarModalGantt() {
+  const modal = document.getElementById("modalGantt");
+  if (modal) modal.style.display = "none";
+}
+
+function sumarDias(fecha, dias) {
+
+  const nueva = new Date(fecha);
+
+  let diasAgregados = 0;
+
+  while (diasAgregados < dias) {
+
+    nueva.setDate(nueva.getDate() + 1);
+
+    const diaSemana = nueva.getDay();
+
+    // 0 = domingo
+    // 6 = sábado
+
+    if (diaSemana !== 0 && diaSemana !== 6) {
+      diasAgregados++;
+    }
+  }
+
+  return nueva;
+}
+
+function formatearFecha(fecha) {
+  return new Date(fecha).toLocaleDateString("es-CL");
+}
+
+function obtenerActividadesDesdeChecklist(
+  etapa,
+  checklist,
+  fechaInicio,
+  diasPorItem = 1
+) {
+
+  const actividades = [];
+
+  if (!checklist || checklist.length === 0) {
+    return actividades;
+  }
+
+  let fechaCursor = new Date(fechaInicio);
+
+  checklist.forEach((item) => {
+
+    actividades.push({
+      etapa,
+      actividad: item.item,
+      inicio: fechaCursor.toISOString(),
+      termino: sumarDias(fechaCursor, diasPorItem).toISOString(),
+      duracion: diasPorItem,
+
+      estado: item.ok
+        ? "Completado"
+        : "Planificado"
+    });
+
+    fechaCursor = sumarDias(
+      fechaCursor,
+      diasPorItem
+    );
+
+  });
+
+  return actividades;
+}
+
+function obtenerActividadesDesdeChecklistDistribuido(
+  etapa,
+  checklist,
+  fechaInicio,
+  diasTotalesEtapa
+) {
+
+  const actividades = [];
+
+  if (!checklist || checklist.length === 0) {
+    return actividades;
+  }
+
+  let fechaCursor = new Date(fechaInicio);
+
+  const cantidadItems = checklist.length;
+
+  const duracionBase =
+    Math.floor(diasTotalesEtapa / cantidadItems);
+
+  let diasSobrantes =
+    diasTotalesEtapa % cantidadItems;
+
+  checklist.forEach((item) => {
+
+    let duracion =
+      Math.max(1, duracionBase);
+
+    if (diasSobrantes > 0) {
+      duracion += 1;
+      diasSobrantes--;
+    }
+
+    actividades.push({
+      etapa,
+      actividad: item.item || "Actividad",
+      inicio: fechaCursor.toISOString(),
+      termino: sumarDias(fechaCursor, duracion - 1).toISOString(),
+      duracion,
+      estado: item.ok ? "Completado" : "Planificado"
+    });
+
+    fechaCursor = sumarDias(fechaCursor, duracion);
+  });
+
+  return actividades;
+}
+
+
+function cerrarModalGanttVisual() {
+  const modal = document.getElementById("modalGanttVisual");
+  if (modal) modal.style.display = "none";
+}
+
+function volverFormularioGantt() {
+  const visual = document.getElementById("modalGanttVisual");
+  const form = document.getElementById("modalGantt");
+
+  if (visual) visual.style.display = "none";
+  if (form) form.style.display = "flex";
+
+  cargarGanttGuardado();
+}
+
+async function generarCartaGantt() {
+
+  if (!esJefeTaller()) {
+    alert("Solo Jefe de Taller puede generar Carta Gantt");
+    return;
+  }
+
+  if (!ot) {
+    alert("No hay OS cargada");
+    return;
+  }
+
+  const fechaInicioInput = document.getElementById("ganttFechaInicio").value;
+  const fechaTerminoInput = document.getElementById("ganttFechaTermino").value;
+  const diasRepuestos = Number(document.getElementById("ganttDiasRepuestos").value || 0);
+  const comentarioRepuestos = document.getElementById("ganttComentarioRepuestos").value.trim();
+
+  if (!fechaInicioInput || !fechaTerminoInput) {
+    alert("Debes indicar fecha inicio y término");
+    return;
+  }
+
+  let fechaCursor = new Date(fechaInicioInput + "T00:00:00");
+  const fechaTermino = new Date(fechaTerminoInput + "T00:00:00");
+
+  const diferenciaMs = fechaTermino - fechaCursor;
+  const diasTotales = Math.ceil(diferenciaMs / (1000 * 60 * 60 * 24));
+
+  if (diasTotales <= 0) {
+    alert("La fecha término debe ser mayor a la fecha inicio");
+    return;
+  }
+
+  const actividades = [];
+
+  const crear = (etapa, actividad, inicio, duracion, estado = "Planificado") => {
+    const termino = sumarDias(inicio, duracion - 1);
+
+    return {
+      etapa,
+      actividad,
+      inicio: inicio.toISOString(),
+      termino: termino.toISOString(),
+      duracion: Number(duracion),
+      estado
+    };
+  };
+
+
+// =========================
+// DISTRIBUCIÓN DE DÍAS
+// =========================
+
+const totalDiasPlan =
+  Math.ceil(
+    (fechaTermino - new Date(fechaInicioInput + "T00:00:00")) /
+    (1000 * 60 * 60 * 24)
+  );
+
+const diasIngreso = 4;
+const diasPruebasMecanicas = 3;
+const diasPruebasElectricas = 3;
+
+const diasFijos =
+  diasIngreso +
+  diasRepuestos +
+  diasPruebasMecanicas +
+  diasPruebasElectricas;
+
+let diasRestantes =
+  totalDiasPlan - diasFijos;
+
+if (diasRestantes < 2) {
+  alert("El rango de fechas es muy corto para distribuir la planificación");
+  return;
+}
+
+const diasEvaluacion =
+  Math.max(1, Math.floor(diasRestantes * 0.45));
+
+const diasOverhaul =
+  Math.max(1, diasRestantes - diasEvaluacion);
+
+// =========================
+// INGRESO
+// =========================
+const ingresoActs =
+  obtenerActividadesDesdeChecklistDistribuido(
+    "Ingreso",
+    ot.ingreso,
+    fechaCursor,
+    diasIngreso
+  );
+
+actividades.push(...ingresoActs);
+fechaCursor = sumarDias(fechaCursor, diasIngreso);
+
+// =========================
+// EVALUACIÓN
+// =========================
+const evalActs =
+  obtenerActividadesDesdeChecklistDistribuido(
+    "Evaluación",
+    ot.evaluacion,
+    fechaCursor,
+    diasEvaluacion
+  );
+
+actividades.push(...evalActs);
+fechaCursor = sumarDias(fechaCursor, diasEvaluacion);
+
+// =========================
+// REPUESTOS
+// =========================
+if (diasRepuestos > 0) {
+
+  actividades.push(
+    crear(
+      "Repuestos",
+      comentarioRepuestos || "Espera repuestos",
+      fechaCursor,
+      diasRepuestos,
+      "Espera"
+    )
+  );
+
+  fechaCursor = sumarDias(fechaCursor, diasRepuestos);
+}
+
+// =========================
+// OVERHAUL
+// =========================
+const overhaulActs =
+  obtenerActividadesDesdeChecklistDistribuido(
+    "Overhaul",
+    ot.overhaul,
+    fechaCursor,
+    diasOverhaul
+  );
+
+actividades.push(...overhaulActs);
+fechaCursor = sumarDias(fechaCursor, diasOverhaul);
+
+// =========================
+// PRUEBAS MECÁNICAS
+// =========================
+const pruebasMec =
+  obtenerActividadesDesdeChecklistDistribuido(
+    "Pruebas Mecánicas",
+    ot.pruebas?.mecanico,
+    fechaCursor,
+    diasPruebasMecanicas
+  );
+
+actividades.push(...pruebasMec);
+fechaCursor = sumarDias(fechaCursor, diasPruebasMecanicas);
+
+// =========================
+// PRUEBAS ELÉCTRICAS
+// =========================
+const pruebasElec =
+  obtenerActividadesDesdeChecklistDistribuido(
+    "Pruebas Eléctricas",
+    ot.pruebas?.electrico,
+    fechaCursor,
+    diasPruebasElectricas
+  );
+
+actividades.push(...pruebasElec);
+fechaCursor = sumarDias(fechaCursor, diasPruebasElectricas);
+
+  ot.gantt = {
+    fechaInicio: fechaInicioInput,
+    fechaTermino: fechaTerminoInput,
+    fechaDespachoEstimada: fechaTermino.toISOString(),
+    diasRepuestos,
+    comentarioRepuestos,
+    creadoPor: usuario?.nombre || "Jefe Taller",
+    fechaCreacion: new Date().toLocaleString(),
+    actividades
+  };
+
+  await guardarCambiosOT();
+
+  const form = document.getElementById("modalGantt");
+  const visual = document.getElementById("modalGanttVisual");
+
+  if (form) form.style.display = "none";
+  if (visual) visual.style.display = "flex";
+
+
+renderCartaGantt();
+
+document.getElementById("modalGantt").style.display = "none";
+
+document.getElementById("modalGanttVisual").style.display = "flex";
+
+  alert("Carta Gantt guardada correctamente ✅");
+}
+
+function cargarGanttGuardado() {
+
+  const cont = document.getElementById("ganttResultado");
+
+  if (!ot?.gantt) {
+    if (cont) cont.innerHTML = "";
+    return;
+  }
+
+  const g = ot.gantt;
+
+  const fecha = document.getElementById("ganttFechaInicio");
+  const termino = document.getElementById("ganttFechaTermino");
+  const rep = document.getElementById("ganttDiasRepuestos");
+  const com = document.getElementById("ganttComentarioRepuestos");
+
+  if (fecha) fecha.value = g.fechaInicio || "";
+  if (termino) termino.value = g.fechaTermino || "";
+  if (rep) rep.value = g.diasRepuestos || 0;
+  if (com) com.value = g.comentarioRepuestos || "";
+
+  renderCartaGantt();
+}
+
+function renderCartaGantt() {
+
+  const cont = document.getElementById("ganttResultado");
+  if (!cont) return;
+
+  if (!ot?.gantt?.actividades?.length) {
+    cont.innerHTML = `<p class="sin-alertas">No existe Carta Gantt generada.</p>`;
+    return;
+  }
+
+  const g = ot.gantt;
+  const actividades = g.actividades;
+
+  const fechaInicio = new Date(g.fechaInicio + "T00:00:00");
+  const fechaTermino = new Date(g.fechaTermino + "T00:00:00");
+
+  const diasTotales = Math.max(
+  1,
+  calcularDiasHabilesEntre(
+    fechaInicio,
+    fechaTermino
+  )
+);
+
+  const colores = {
+    Ingreso: "azul",
+    Evaluación: "azul",
+    Repuestos: "naranjo",
+    Overhaul: "verde",
+    "Pruebas Mecánicas": "morado",
+    "Pruebas Eléctricas": "morado",
+    Pruebas: "morado",
+    Despacho: "cyan"
+  };
+
+  const meses = generarMesesGantt(fechaInicio, fechaTermino);
+  const semanas = generarSemanasGantt(fechaInicio, fechaTermino);
+  const anchoSemana = 86;
+  const anchoTimeline = Math.max(760, semanas.length * anchoSemana);
+
+  cont.innerHTML = `
+    <div class="gantt-dashboard gantt-pro-dashboard">
+
+      <div class="gantt-summary-grid gantt-summary-compact">
+
+        <div class="gantt-summary-card azul">
+          <span>🗓️ Fecha inicio</span>
+          <strong>${formatearFecha(fechaInicio)}</strong>
+        </div>
+
+        <div class="gantt-summary-card verde">
+          <span>🏁 Fecha estimada despacho</span>
+          <strong>${formatearFecha(fechaTermino)}</strong>
+        </div>
+
+        <div class="gantt-summary-card morado">
+          <span>⏱ Duración total estimada</span>
+          <strong>${diasTotales} días</strong>
+          <small>Días hábiles</small>
+        </div>
+
+        <div class="gantt-summary-card naranjo">
+          <span>👤 Creado por</span>
+          <strong>${g.creadoPor || "Jefe Taller"}</strong>
+        </div>
+
+      </div>
+
+      <div class="gantt-section-header">
+        <h3>📊 Línea de tiempo planificada</h3>
+
+        <div class="gantt-tools">
+          <span>Zoom</span>
+          <button type="button" onclick="zoomGantt(-10)">−</button>
+          <strong id="ganttZoomLabel">100%</strong>
+          <button type="button" onclick="zoomGantt(10)">+</button>
+          <button type="button" onclick="irHoyGantt()">📅 Hoy</button>
+        </div>
+      </div>
+
+      <div class="gantt-board gantt-board-pro">
+        <div class="gantt-board-inner">
+
+        <div class="gantt-board-header gantt-board-header-pro">
+          <div>Etapa</div>
+          <div>Actividad</div>
+
+          <div class="gantt-timeline-head" style="width:${anchoTimeline}px;">
+            <div class="gantt-months">
+              ${meses.map(m => `
+                <span style="width:${m.width}%">${m.label}</span>
+              `).join("")}
+            </div>
+
+            <div class="gantt-weeks">
+              ${semanas.map(s => `
+                <span>${s}</span>
+              `).join("")}
+            </div>
+          </div>
+        </div>
+
+        ${actividades.map((act, index) => {
+
+          const inicio = new Date(act.inicio);
+          const termino = new Date(act.termino);
+
+          const diffInicio =
+          calcularDiasHabilesEntre(
+            fechaInicio,
+            inicio
+          );
+
+          const duracion = Math.max(1, act.duracion || 1);
+
+          let left = (diffInicio / diasTotales) * 100;
+
+              // Evita que una actividad quede fuera del timeline
+              if (left > 97) {
+                left = 97;
+              }
+
+              let width = (duracion / diasTotales) * 100;
+
+              // Recorta si se pasa del final
+              if (left + width > 100) {
+                width = 100 - left;
+              }
+
+              // Ancho mínimo visible
+              width = Math.max(3, width);
+
+
+          const color = colores[act.etapa] || "azul";
+
+          return `
+            <div class="gantt-board-row gantt-board-row-pro">
+
+              <div>
+                <span class="gantt-dot ${color}"></span>
+                ${act.etapa}
+              </div>
+
+              <div>${act.actividad}</div>
+
+              <div class="gantt-board-track gantt-track-pro" style="width:${anchoTimeline}px;">
+
+                ${
+                  index > 0
+                    ? `<span class="gantt-link"></span>`
+                    : ""
+                }
+
+                <div
+                  class="gantt-board-bar ${color}"
+                  style="left:${left}%; width:${width}%;">
+                  ${duracion}d
+                </div>
+
+              </div>
+
+            </div>
+          `;
+        }).join("")}
+
+      </div>
+      </div>
+
+      <div class="gantt-legend">
+        <span><b class="azul"></b> Ingreso</span>
+        <span><b class="naranjo"></b> Repuestos</span>
+        <span><b class="verde"></b> Overhaul</span>
+        <span><b class="morado"></b> Pruebas</span>
+        <span><b class="cyan"></b> Despacho</span>
+      </div>
+
+      <div class="gantt-note">
+        ℹ Esta planificación es estimada. Las fechas reales pueden variar según avance del trabajo y disponibilidad de repuestos.
+      </div>
+
+    </div>
+  `;
+}
+
+let ganttZoom = 100;
+
+function zoomGantt(valor) {
+  ganttZoom += valor;
+
+  if (ganttZoom < 80) ganttZoom = 80;
+  if (ganttZoom > 150) ganttZoom = 150;
+
+  const label = document.getElementById("ganttZoomLabel");
+  if (label) label.textContent = `${ganttZoom}%`;
+
+  const baseSemana = 86;
+  const semanas = document.querySelectorAll(".gantt-weeks span").length;
+
+  const nuevoAncho =
+    Math.max(760, semanas * baseSemana * (ganttZoom / 100));
+
+  document
+    .querySelectorAll(".gantt-timeline-head, .gantt-track-pro")
+    .forEach(el => {
+      el.style.width = `${nuevoAncho}px`;
+    });
+}
+
+function irHoyGantt() {
+  const board = document.querySelector(".gantt-board-pro");
+  if (!board) return;
+
+  board.scrollTop = 0;
+  board.scrollLeft = 0;
+}
+
+function generarMesesGantt(inicio, termino) {
+
+  const meses = [];
+  const totalMs = termino - inicio;
+
+  let cursor = new Date(inicio.getFullYear(), inicio.getMonth(), 1);
+
+  while (cursor <= termino) {
+
+    const inicioMes = new Date(cursor);
+    const finMes = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0);
+
+    const desde = inicioMes < inicio ? inicio : inicioMes;
+    const hasta = finMes > termino ? termino : finMes;
+
+    const width =
+      ((hasta - desde) / totalMs) * 100;
+
+    meses.push({
+      label: cursor.toLocaleDateString("es-CL", {
+        month: "long",
+        year: "numeric"
+      }).toUpperCase(),
+      width: Math.max(width, 8)
+    });
+
+    cursor.setMonth(cursor.getMonth() + 1);
+  }
+
+  return meses;
+}
+
+function generarSemanasGantt(inicio, termino) {
+
+  const semanas = [];
+  const cursor = new Date(inicio);
+
+  while (cursor <= termino) {
+
+    const desde = new Date(cursor);
+    const hasta = sumarDiasNaturales(desde, 4);
+
+    const diaDesde = String(desde.getDate()).padStart(2, "0");
+    const diaHasta = String(hasta.getDate()).padStart(2, "0");
+
+    const mes = hasta
+      .toLocaleDateString("es-CL", { month: "short" })
+      .replace(".", "");
+
+    semanas.push(
+      `${diaDesde} - ${diaHasta} ${mes}`
+    );
+
+    cursor.setDate(cursor.getDate() + 7);
+  }
+
+  return semanas;
+}
+
+function sumarDiasNaturales(fecha, dias) {
+  const nueva = new Date(fecha);
+  nueva.setDate(nueva.getDate() + dias);
+  return nueva;
+}
+
+function calcularDiasHabilesEntre(fechaInicio, fechaFin) {
+
+  let contador = 0;
+
+  const actual = new Date(fechaInicio);
+
+  while (actual < fechaFin) {
+
+    const dia = actual.getDay();
+
+    if (dia !== 0 && dia !== 6) {
+      contador++;
+    }
+
+    actual.setDate(actual.getDate() + 1);
+  }
+
+  return contador;
+}
+
 
 // =======================
 // CARGAR CHECKLIST PRUEBAS
@@ -4042,3 +4777,13 @@ window.agregarComentarioDespacho = agregarComentarioDespacho;
 window.renderComentariosDespacho = renderComentariosDespacho;
 window.responderComentarioJefeDespacho = responderComentarioJefeDespacho;
 window.eliminarComentarioDespacho = eliminarComentarioDespacho;
+
+window.abrirModalGantt = abrirModalGantt;
+window.cerrarModalGantt = cerrarModalGantt;
+window.generarCartaGantt = generarCartaGantt;
+
+window.cerrarModalGanttVisual = cerrarModalGanttVisual;
+window.volverFormularioGantt = volverFormularioGantt;
+
+window.zoomGantt = zoomGantt;
+window.irHoyGantt = irHoyGantt;

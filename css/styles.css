@@ -2531,3 +2531,606 @@ body {
     margin: 0 auto !important;
   }
 }
+
+/* =========================
+   CARTA GANTT PRO FINAL
+========================= */
+
+.modal-gantt {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0,0,0,.82);
+  backdrop-filter: blur(6px);
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-gantt-content {
+  background: rgba(15,23,42,.98);
+  border: 1px solid rgba(249,115,22,.35);
+  border-radius: 24px;
+  box-shadow: 0 30px 90px rgba(0,0,0,.60);
+  color: white;
+  overflow: hidden;
+}
+
+.gantt-form-modal {
+  width: 90vw;
+  max-width: 900px;
+}
+
+.gantt-visual-modal {
+  width: 96vw;
+  height: 94vh;
+  max-width: 1850px;
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-gantt-header {
+  padding: 18px 28px;
+  border-bottom: 1px solid rgba(148,163,184,.18);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.modal-gantt-header h2 {
+  margin: 0;
+  font-size: 26px;
+}
+
+.modal-gantt-header p {
+  margin: 6px 0 0;
+  color: #94a3b8;
+}
+
+.gantt-header-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.gantt-resultado {
+  flex: 1;
+  min-height: 0;
+  padding: 18px 28px;
+  overflow: hidden;
+}
+
+.gantt-pro-dashboard {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* CARDS MÁS PEQUEÑAS */
+.gantt-summary-compact {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  flex-shrink: 0;
+}
+
+.gantt-summary-card {
+  min-height: 70px !important;
+  padding: 14px 18px !important;
+  border-radius: 16px;
+  background: linear-gradient(145deg, rgba(15,23,42,.95), rgba(2,6,23,.9));
+  border: 1px solid rgba(148,163,184,.22);
+}
+
+.gantt-summary-card span {
+  display: block;
+  color: #cbd5e1;
+  font-size: 14px;
+  margin-bottom: 6px;
+}
+
+.gantt-summary-card strong {
+  display: block;
+  color: white;
+  font-size: 22px;
+}
+
+.gantt-summary-card small {
+  color: #cbd5e1;
+  font-size: 13px;
+}
+
+.gantt-summary-card.azul { border-color: #3b82f6; }
+.gantt-summary-card.verde { border-color: #22c55e; }
+.gantt-summary-card.morado { border-color: #a855f7; }
+.gantt-summary-card.naranjo { border-color: #f59e0b; }
+
+/* TITULO + HERRAMIENTAS */
+.gantt-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.gantt-section-header h3 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 900;
+  color: #f59e0b;
+}
+
+.gantt-tools {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #e5e7eb;
+}
+
+.gantt-tools button {
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 10px;
+  background: rgba(15,23,42,.9);
+  border: 1px solid rgba(148,163,184,.25);
+  color: white;
+}
+
+/* BOARD */
+.gantt-board-pro {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  border-radius: 18px;
+  border: 1px solid rgba(148,163,184,.22);
+  background: rgba(2,6,23,.72);
+}
+
+/* COLUMNAS */
+.gantt-board-header-pro,
+.gantt-board-row-pro {
+  display: grid;
+  grid-template-columns:
+    135px
+    260px
+    115px
+    115px
+    110px
+    minmax(1050px, 1fr);
+  min-width: 1780px;
+  align-items: stretch;
+}
+
+.gantt-board-header-pro {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: #020617;
+  color: #f59e0b;
+  font-weight: 900;
+}
+
+.gantt-board-header-pro > div,
+.gantt-board-row-pro > div {
+  border-right: 1px solid rgba(148,163,184,.09);
+  border-bottom: 1px solid rgba(148,163,184,.10);
+}
+
+.gantt-board-header-pro > div:not(.gantt-timeline-head),
+.gantt-board-row-pro > div:not(.gantt-board-track) {
+  padding: 14px 14px;
+  display: flex;
+  align-items: center;
+}
+
+.gantt-board-row-pro {
+  min-height: 78px;
+  color: #e5e7eb;
+}
+
+.gantt-board-row-pro:hover {
+  background: rgba(249,115,22,.055);
+}
+
+/* CABECERA TIMELINE */
+.gantt-timeline-head {
+  display: flex;
+  flex-direction: column;
+  padding: 0 !important;
+}
+
+.gantt-months {
+  height: 34px;
+  display: flex;
+  border-bottom: 1px solid rgba(148,163,184,.15);
+}
+
+.gantt-months span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #f8fafc;
+  font-size: 13px;
+  font-weight: 900;
+  border-right: 1px solid rgba(148,163,184,.14);
+}
+
+.gantt-weeks {
+  height: 42px;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(76px, 1fr);
+}
+
+.gantt-weeks span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  color: #cbd5e1;
+  font-size: 12px;
+  border-right: 1px solid rgba(148,163,184,.12);
+}
+
+/* TRACK */
+.gantt-track-pro {
+  position: relative;
+  min-height: 78px;
+  overflow: visible;
+  background:
+    repeating-linear-gradient(
+      90deg,
+      rgba(148,163,184,.14) 0px,
+      rgba(148,163,184,.14) 1px,
+      transparent 1px,
+      transparent 52px
+    ),
+    linear-gradient(180deg, rgba(15,23,42,.82), rgba(15,23,42,.62));
+}
+
+/* BARRAS */
+.gantt-board-bar {
+  position: absolute;
+  top: 22px;
+  height: 34px;
+  border-radius: 8px;
+  min-width: 52px;
+  padding: 0 10px;
+  color: white;
+  font-size: 13px;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  box-shadow: 0 10px 22px rgba(0,0,0,.38);
+}
+
+.gantt-board-bar.azul {
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+}
+
+.gantt-board-bar.naranjo {
+  background: linear-gradient(135deg, #f59e0b, #f97316);
+  color: #111827;
+}
+
+.gantt-board-bar.verde {
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+}
+
+.gantt-board-bar.morado {
+  background: linear-gradient(135deg, #a855f7, #7e22ce);
+}
+
+.gantt-board-bar.cyan {
+  background: linear-gradient(135deg, #22d3ee, #0891b2);
+}
+
+/* CONECTOR ENTRE ACTIVIDADES */
+.gantt-link {
+  position: absolute;
+  left: 4px;
+  top: -22px;
+  width: 34px;
+  height: 36px;
+  border-right: 2px dashed rgba(226,232,240,.8);
+  border-bottom: 2px dashed rgba(226,232,240,.8);
+  border-radius: 0 0 10px 0;
+  opacity: .75;
+}
+
+/* DOTS */
+.gantt-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 4px;
+  display: inline-block;
+  margin-right: 10px;
+  flex-shrink: 0;
+}
+
+.gantt-dot.azul,
+.gantt-legend b.azul { background: #3b82f6; }
+
+.gantt-dot.naranjo,
+.gantt-legend b.naranjo { background: #f59e0b; }
+
+.gantt-dot.verde,
+.gantt-legend b.verde { background: #22c55e; }
+
+.gantt-dot.morado,
+.gantt-legend b.morado { background: #a855f7; }
+
+.gantt-dot.cyan,
+.gantt-legend b.cyan { background: #22d3ee; }
+
+/* LEYENDA */
+.gantt-legend {
+  flex-shrink: 0;
+  display: flex;
+  justify-content: center;
+  gap: 34px;
+  color: #cbd5e1;
+  flex-wrap: wrap;
+  padding-top: 4px;
+}
+
+.gantt-legend span {
+  display: flex;
+  align-items: center;
+}
+
+.gantt-legend b {
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  display: inline-block;
+  margin-right: 8px;
+}
+
+/* NOTA */
+.gantt-note {
+  flex-shrink: 0;
+  padding: 14px 18px;
+  border-radius: 14px;
+  background: rgba(30,41,59,.72);
+  border: 1px solid rgba(148,163,184,.2);
+  color: #cbd5e1;
+}
+
+/* SCROLL */
+.gantt-board-pro::-webkit-scrollbar {
+  height: 12px;
+  width: 12px;
+}
+
+.gantt-board-pro::-webkit-scrollbar-thumb {
+  background: #64748b;
+  border-radius: 999px;
+}
+
+.gantt-board-pro::-webkit-scrollbar-track {
+  background: rgba(15,23,42,.8);
+}
+
+/* FORMULARIO GANTT */
+.gantt-form {
+  padding: 28px;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 22px;
+}
+
+.gantt-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.gantt-field label {
+  color: #cbd5e1;
+  font-weight: 800;
+}
+
+.gantt-field input,
+.gantt-field textarea {
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+  box-sizing: border-box;
+}
+
+.gantt-field input[type="date"] {
+  min-height: 54px;
+  color-scheme: dark;
+  cursor: pointer;
+}
+
+.gantt-field textarea {
+  height: 100px;
+  resize: vertical;
+}
+
+.gantt-field-full {
+  grid-column: 1 / -1;
+}
+
+.gantt-actions {
+  grid-column: 1 / -1;
+}
+
+.gantt-actions button {
+  width: 280px;
+  height: 54px;
+}
+
+/* RESPONSIVE */
+@media (max-width: 1100px) {
+  .gantt-summary-compact {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .gantt-form {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 700px) {
+  .gantt-summary-compact {
+    grid-template-columns: 1fr;
+  }
+
+  .modal-gantt-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .gantt-header-actions {
+    width: 100%;
+  }
+
+  .gantt-header-actions button {
+    flex: 1;
+  }
+}
+
+
+
+
+/* FIX FINAL: GANTT SIN ESPACIO VACÍO HORIZONTAL */
+
+.gantt-board-pro {
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+}
+
+.gantt-board-inner {
+  width: 100% !important;
+  min-width: 100% !important;
+}
+
+.gantt-board-header-pro,
+.gantt-board-row-pro {
+  width: 100% !important;
+  min-width: 100% !important;
+
+  grid-template-columns:
+  140px
+  320px
+  minmax(0, 1fr);
+}
+
+.gantt-timeline-head,
+.gantt-track-pro {
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  overflow: hidden !important;
+}
+
+.gantt-board-bar {
+  max-width: calc(100% - 8px) !important;
+}
+
+.gantt-weeks {
+  grid-auto-columns: 1fr !important;
+}
+
+
+
+
+
+
+
+/* FIX ZOOM GANTT SIN ESPACIO VACÍO */
+
+:root {
+  --gantt-row-height: 78px;
+  --gantt-bar-height: 34px;
+  --gantt-bar-top: 22px;
+}
+
+.gantt-board-inner,
+.gantt-board-header-pro,
+.gantt-board-row-pro,
+.gantt-timeline-head,
+.gantt-track-pro {
+  transform: none !important;
+}
+
+.gantt-board-pro {
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+}
+
+.gantt-board-inner {
+  width: 100% !important;
+  min-width: 100% !important;
+}
+
+.gantt-board-header-pro,
+.gantt-board-row-pro {
+  width: 100% !important;
+  min-width: 100% !important;
+
+  grid-template-columns:
+    150px
+    340px
+    minmax(0, 1fr) !important;
+}
+
+.gantt-board-row-pro {
+  min-height: var(--gantt-row-height) !important;
+}
+
+.gantt-track-pro {
+  min-height: var(--gantt-row-height) !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  overflow: hidden !important;
+}
+
+.gantt-board-bar {
+  height: var(--gantt-bar-height) !important;
+  top: var(--gantt-bar-top) !important;
+}
+
+
+
+
+
+/* GANTT SCROLL HORIZONTAL SOLO SI ES NECESARIO */
+
+.gantt-board-pro {
+  overflow-x: auto !important;
+  overflow-y: auto !important;
+}
+
+.gantt-board-inner {
+  width: max-content !important;
+  min-width: 100% !important;
+}
+
+.gantt-board-header-pro,
+.gantt-board-row-pro {
+  display: grid !important;
+
+  grid-template-columns:
+    150px
+    340px
+    auto !important;
+
+  width: max-content !important;
+  min-width: 100% !important;
+}
+
+.gantt-timeline-head,
+.gantt-track-pro {
+  flex-shrink: 0 !important;
+  max-width: none !important;
+}
+
+.gantt-track-pro {
+  overflow: hidden !important;
+}

@@ -166,6 +166,14 @@
       Repuestos
     </button>
 
+    <button
+      id="btnGantt"
+      class="btn-primary"
+      onclick="abrirModalGantt()"
+    >
+      📊 Carta Gantt
+    </button>
+
   </div>
 
 </div>
@@ -374,6 +382,84 @@
 
   </div>
 </div>
+
+<!-- MODAL 1: FORMULARIO GANTT -->
+<div id="modalGantt" class="modal-gantt">
+  <div class="modal-gantt-content gantt-form-modal">
+
+    <div class="modal-gantt-header">
+      <div>
+        <h2>Carta Gantt Planificada</h2>
+        <p>Ingresa los datos base para generar la planificación.</p>
+      </div>
+
+      <button class="btn-danger" onclick="cerrarModalGantt()">
+        Cerrar
+      </button>
+    </div>
+
+    <div class="gantt-form">
+
+      <div class="gantt-field">
+        <label>Fecha inicio planificación</label>
+        <input type="date" id="ganttFechaInicio">
+      </div>
+
+      <div class="gantt-field">
+        <label>Fecha término estimada</label>
+        <input type="date" id="ganttFechaTermino">
+      </div>
+
+      <div class="gantt-field">
+        <label>Días espera repuestos</label>
+        <input type="number" id="ganttDiasRepuestos" min="0" value="0">
+      </div>
+
+      <div class="gantt-field gantt-field-full">
+        <label>Comentario repuestos</label>
+        <textarea
+          id="ganttComentarioRepuestos"
+          placeholder="Ej: Espera kit overhaul, filtros, rodamientos, etc."
+        ></textarea>
+      </div>
+
+      <div class="gantt-actions">
+        <button class="btn-success" onclick="generarCartaGantt()">
+          Generar / Guardar Gantt
+        </button>
+      </div>
+
+    </div>
+
+  </div>
+</div>
+
+<!-- MODAL 2: VISUAL CARTA GANTT -->
+<div id="modalGanttVisual" class="modal-gantt">
+  <div class="modal-gantt-content gantt-visual-modal">
+
+    <div class="modal-gantt-header">
+      <div>
+        <h2>📊 Carta Gantt Planificada</h2>
+        <p>Planificación estimada desde la creación de la OS hasta despacho.</p>
+      </div>
+
+      <div class="gantt-header-actions">
+        <button class="btn-warning" onclick="volverFormularioGantt()">
+          ← Volver
+        </button>
+
+        <button class="btn-danger" onclick="cerrarModalGanttVisual()">
+          Cerrar
+        </button>
+      </div>
+    </div>
+
+    <div id="ganttResultado" class="gantt-resultado"></div>
+
+  </div>
+</div>
+
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
