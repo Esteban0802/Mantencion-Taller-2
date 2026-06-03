@@ -298,7 +298,6 @@ function renderIngreso() {
       <input 
         type="file"
         accept="image/*"
-        capture="environment"
         multiple
         onchange="subirFotoIngreso(event, ${i})"
 >
@@ -792,7 +791,6 @@ function renderEvaluacion() {
       <input 
         type="file"
         accept="image/*"
-        capture="environment"
         multiple    
         onchange="subirFotoEvaluacion(event, ${i})"
       >
@@ -1644,7 +1642,6 @@ function renderOverhaul() {
       <input 
         type="file"
         accept="image/*"
-        capture="environment"
         multiple
         onchange="subirFotoOverhaul(event, ${i})"
       >
@@ -2925,7 +2922,6 @@ function renderChecklist(tipo) {
       <input 
         type="file"
         accept="image/*"
-        capture="environment"
         multiple
         onchange="subirFotoPrueba(event, '${tipo}', ${i})"
       >
