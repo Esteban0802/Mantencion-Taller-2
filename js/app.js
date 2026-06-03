@@ -298,6 +298,8 @@ function renderIngreso() {
       <input 
         type="file"
         accept="image/*"
+        capture="environment"
+        multiple
         onchange="subirFotoIngreso(event, ${i})"
 >
       <div id="fotos-ingreso-${i}"></div>
@@ -324,8 +326,16 @@ function renderIngreso() {
 // =======================
 function toggleIngreso(i) {
   if (OTBloqueada()) return;
+
   ot.ingreso[i].ok = !ot.ingreso[i].ok;
+
+  actualizarEstadoGanttDesdeChecklist();
+
   guardarCambiosOT();
+
+  if (ot.gantt?.actividades?.length) {
+    renderCartaGantt();
+  }
 }
 
 // =======================
@@ -781,7 +791,9 @@ function renderEvaluacion() {
 
       <input 
         type="file"
-        accept="image/*"       
+        accept="image/*"
+        capture="environment"
+        multiple    
         onchange="subirFotoEvaluacion(event, ${i})"
       >
 
@@ -806,8 +818,16 @@ function renderEvaluacion() {
 
 function toggleEvaluacion(i) {
   if (OTBloqueada()) return;
-  ot.evaluacion[i].ok = !ot.evaluacion[i].ok;
+
+  ot.ingreso[i].ok = !ot.ingreso[i].ok;
+
+  actualizarEstadoGanttDesdeChecklist();
+
   guardarCambiosOT();
+
+  if (ot.gantt?.actividades?.length) {
+    renderCartaGantt();
+  }
 }
 
 
@@ -1624,6 +1644,8 @@ function renderOverhaul() {
       <input 
         type="file"
         accept="image/*"
+        capture="environment"
+        multiple
         onchange="subirFotoOverhaul(event, ${i})"
       >
 
@@ -1648,9 +1670,17 @@ function renderOverhaul() {
 }
 
 function toggleOverhaul(i) {
-  if (OTBloqueada()) return;
-  ot.overhaul[i].ok = !ot.overhaul[i].ok;
+   if (OTBloqueada()) return;
+
+  ot.ingreso[i].ok = !ot.ingreso[i].ok;
+
+  actualizarEstadoGanttDesdeChecklist();
+
   guardarCambiosOT();
+
+  if (ot.gantt?.actividades?.length) {
+    renderCartaGantt();
+  }
 }
 
 async function subirFotoOverhaul(e, i) {
@@ -2611,7 +2641,11 @@ function renderCartaGantt() {
               width = Math.max(3, width);
 
 
-          const color = colores[act.etapa] || "azul";
+          const completado = act.estado === "Completado";
+
+          const color = completado
+            ? "completado"
+            : colores[act.etapa] || "azul";
 
           return `
             <div class="gantt-board-row gantt-board-row-pro">
@@ -2634,7 +2668,7 @@ function renderCartaGantt() {
                 <div
                   class="gantt-board-bar ${color}"
                   style="left:${left}%; width:${width}%;">
-                  ${duracion}d
+                  ${completado ? "✓" : duracion + "d"}
                 </div>
 
               </div>
@@ -2660,6 +2694,36 @@ function renderCartaGantt() {
 
     </div>
   `;
+}
+
+
+function actualizarEstadoGanttDesdeChecklist() {
+
+  if (!ot?.gantt?.actividades?.length) return;
+
+  const buscarItem = (etapa, actividad) => {
+
+    let lista = [];
+
+    if (etapa === "Ingreso") lista = ot.ingreso || [];
+    if (etapa === "Evaluación") lista = ot.evaluacion || [];
+    if (etapa === "Overhaul") lista = ot.overhaul || [];
+    if (etapa === "Pruebas Mecánicas") lista = ot.pruebas?.mecanico || [];
+    if (etapa === "Pruebas Eléctricas") lista = ot.pruebas?.electrico || [];
+
+    return lista.find(item => item.item === actividad);
+  };
+
+  ot.gantt.actividades.forEach(act => {
+
+    if (act.etapa === "Repuestos") return;
+
+    const item = buscarItem(act.etapa, act.actividad);
+
+    if (item) {
+      act.estado = item.ok ? "Completado" : "Planificado";
+    }
+  });
 }
 
 let ganttZoom = 100;
@@ -2861,6 +2925,8 @@ function renderChecklist(tipo) {
       <input 
         type="file"
         accept="image/*"
+        capture="environment"
+        multiple
         onchange="subirFotoPrueba(event, '${tipo}', ${i})"
       >
 
@@ -2885,8 +2951,16 @@ function renderChecklist(tipo) {
 
 function togglePrueba(tipo, i) {
   if (OTBloqueada()) return;
+
   ot.pruebas[tipo][i].ok = !ot.pruebas[tipo][i].ok;
+
+  actualizarEstadoGanttDesdeChecklist();
+
   guardarCambiosOT();
+
+  if (ot.gantt?.actividades?.length) {
+    renderCartaGantt();
+  }
 }
 
 async function subirFotoPrueba(e, tipo, i) {

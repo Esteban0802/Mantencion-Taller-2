@@ -3134,3 +3134,20 @@ body {
 .gantt-track-pro {
   overflow: hidden !important;
 }
+
+
+
+
+/* GANTT ACTIVIDAD COMPLETADA */
+
+.gantt-board-bar.completado {
+  background: linear-gradient(135deg, #22c55e, #16a34a) !important;
+  color: white !important;
+  box-shadow:
+    0 0 12px rgba(34,197,94,.55),
+    0 10px 22px rgba(0,0,0,.38);
+}
+
+.gantt-board-row-pro:has(.gantt-board-bar.completado) {
+  background: rgba(34,197,94,.055);
+}
