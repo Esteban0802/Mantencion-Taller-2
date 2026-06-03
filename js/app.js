@@ -344,9 +344,9 @@ async function subirFotoIngreso(e, i) {
 
   if (OTBloqueada()) return;
 
-  const file = e.target.files[0];
+  const files = Array.from(e.target.files);
 
-  if (!file) return;
+  if (!files.length) return;
 
   try {
 
@@ -354,33 +354,39 @@ async function subirFotoIngreso(e, i) {
       ot.ingreso[i].fotos = [];
     }
 
-    // Comprimir imagen
-    const imagenBlob = await comprimirImagenBlob(file);
+    for (const file of files) {
 
-    // Crear archivo comprimido
-    const imagenComprimida = new File(
-      [imagenBlob],
-      `ingreso_${Date.now()}.jpg`,
-      { type: "image/jpeg" }
-    );
+      const imagenBlob = await comprimirImagenBlob(file);
 
-    // Subir a Firebase Storage
-    const urlFoto = await subirArchivoStorage(
-      imagenComprimida,
-      "ingreso",
-      i
-    );
+      console.log("Imagen optimizada:", {
+        originalKB: Math.round(file.size / 1024),
+        optimizadaKB: Math.round(imagenBlob.size / 1024)
+      });
 
-    // Guardar SOLO URL en Firestore
-    ot.ingreso[i].fotos.push(urlFoto);
+      const imagenComprimida = new File(
+        [imagenBlob],
+        `ingreso_${Date.now()}.jpg`,
+        { type: "image/jpeg" }
+      );
+
+      const urlFoto = await subirArchivoStorage(
+        imagenComprimida,
+        "ingreso",
+        i
+      );
+
+      ot.ingreso[i].fotos.push(urlFoto);
+    }
 
     await guardarCambiosOT();
 
     mostrarFotosIngreso(i);
 
+    e.target.value = "";
+
   } catch (error) {
-    console.error("Error subiendo foto ingreso:", error);
-    alert("Error al subir la imagen");
+    console.error("Error subiendo fotos ingreso:", error);
+    alert("Error al subir las imágenes de ingreso");
   }
 }
 
@@ -728,9 +734,9 @@ async function subirFotoEvaluacion(e, i) {
 
   if (OTBloqueada()) return;
 
-  const file = e.target.files[0];
+  const files = Array.from(e.target.files);
 
-  if (!file) return;
+  if (!files.length) return;
 
   try {
 
@@ -738,31 +744,41 @@ async function subirFotoEvaluacion(e, i) {
       ot.evaluacion[i].fotos = [];
     }
 
-    const imagenBlob = await comprimirImagenBlob(file);
+    for (const file of files) {
 
-    const imagenComprimida = new File(
-      [imagenBlob],
-      `evaluacion_${Date.now()}.jpg`,
-      { type: "image/jpeg" }
-    );
+      const imagenBlob = await comprimirImagenBlob(file);
 
-    const urlFoto = await subirArchivoStorage(
-      imagenComprimida,
-      "evaluacion",
-      i
-    );
+      console.log("Imagen optimizada:", {
+        originalKB: Math.round(file.size / 1024),
+        optimizadaKB: Math.round(imagenBlob.size / 1024)
+      });
 
-    ot.evaluacion[i].fotos.push(urlFoto);
+      const imagenComprimida = new File(
+        [imagenBlob],
+        `evaluacion_${Date.now()}.jpg`,
+        { type: "image/jpeg" }
+      );
+
+      const urlFoto = await subirArchivoStorage(
+        imagenComprimida,
+        "evaluacion",
+        i
+      );
+
+      ot.evaluacion[i].fotos.push(urlFoto);
+    }
 
     await guardarCambiosOT();
 
     mostrarFotosEvaluacion(i);
 
+    e.target.value = "";
+
   } catch (error) {
-    console.error("Error subiendo foto evaluación:", error);
-    alert("Error al subir la imagen de evaluación");
+    console.error("Error subiendo fotos evaluación:", error);
+    alert("Error al subir las imágenes de evaluación");
   }
-}
+} 
 
 function renderEvaluacion() {
 
@@ -1684,9 +1700,9 @@ async function subirFotoOverhaul(e, i) {
 
   if (OTBloqueada()) return;
 
-  const file = e.target.files[0];
+  const files = Array.from(e.target.files);
 
-  if (!file) return;
+  if (!files.length) return;
 
   try {
 
@@ -1694,29 +1710,39 @@ async function subirFotoOverhaul(e, i) {
       ot.overhaul[i].fotos = [];
     }
 
-    const imagenBlob = await comprimirImagenBlob(file);
+    for (const file of files) {
 
-    const imagenComprimida = new File(
-      [imagenBlob],
-      `overhaul_${Date.now()}.jpg`,
-      { type: "image/jpeg" }
-    );
+      const imagenBlob = await comprimirImagenBlob(file);
 
-    const urlFoto = await subirArchivoStorage(
-      imagenComprimida,
-      "overhaul",
-      i
-    );
+      console.log("Imagen optimizada:", {
+        originalKB: Math.round(file.size / 1024),
+        optimizadaKB: Math.round(imagenBlob.size / 1024)
+      });
 
-    ot.overhaul[i].fotos.push(urlFoto);
+      const imagenComprimida = new File(
+        [imagenBlob],
+        `overhaul_${Date.now()}.jpg`,
+        { type: "image/jpeg" }
+      );
+
+      const urlFoto = await subirArchivoStorage(
+        imagenComprimida,
+        "overhaul",
+        i
+      );
+
+      ot.overhaul[i].fotos.push(urlFoto);
+    }
 
     await guardarCambiosOT();
 
     mostrarFotosOverhaul(i);
 
+    e.target.value = "";
+
   } catch (error) {
-    console.error("Error subiendo foto overhaul:", error);
-    alert("Error al subir la imagen de Overhaul");
+    console.error("Error subiendo fotos overhaul:", error);
+    alert("Error al subir las imágenes de Overhaul");
   }
 }
 
@@ -2963,9 +2989,9 @@ async function subirFotoPrueba(e, tipo, i) {
 
   if (OTBloqueada()) return;
 
-  const file = e.target.files[0];
+  const files = Array.from(e.target.files);
 
-  if (!file) return;
+  if (!files.length) return;
 
   try {
 
@@ -2977,29 +3003,44 @@ async function subirFotoPrueba(e, tipo, i) {
       ot.pruebas[tipo][i].fotos = [];
     }
 
-    const imagenBlob = await comprimirImagenBlob(file);
+    for (const file of files) {
 
-    const imagenComprimida = new File(
-      [imagenBlob],
-      `pruebas_${tipo}_${Date.now()}.jpg`,
-      { type: "image/jpeg" }
-    );
+      const imagenBlob = await comprimirImagenBlob(file);
 
-    const urlFoto = await subirArchivoStorage(
-      imagenComprimida,
-      `pruebas_${tipo}`,
-      i
-    );
+      console.log(
+        "Imagen optimizada:",
+        {
+          originalKB: Math.round(file.size / 1024),
+          optimizadaKB: Math.round(imagenBlob.size / 1024)
+        }
+      );
 
-    ot.pruebas[tipo][i].fotos.push(urlFoto);
+      const imagenComprimida = new File(
+        [imagenBlob],
+        `pruebas_${tipo}_${Date.now()}.jpg`,
+        { type: "image/jpeg" }
+      );
+
+      const urlFoto = await subirArchivoStorage(
+        imagenComprimida,
+        `pruebas_${tipo}`,
+        i
+      );
+
+      ot.pruebas[tipo][i].fotos.push(urlFoto);
+    }
 
     await guardarCambiosOT();
 
     mostrarFotosPrueba(tipo, i);
 
+    e.target.value = "";
+
   } catch (error) {
+
     console.error("Error subiendo foto prueba:", error);
-    alert("Error al subir la imagen de pruebas");
+
+    alert("Error al subir imágenes de pruebas");
   }
 }
 
@@ -4555,8 +4596,14 @@ function cerrarImagen() {
 // =======================
 // COMPRIMIR IMAGEN COMO BLOB
 // =======================
-function comprimirImagenBlob(file, calidad = 0.7, maxWidth = 1600) {
-  return new Promise((resolve) => {
+function comprimirImagenBlob(file, calidad = 0.72, maxWidth = 1280) {
+  return new Promise((resolve, reject) => {
+
+    if (!file || !file.type.startsWith("image/")) {
+      reject("El archivo no es una imagen válida");
+      return;
+    }
+
     const reader = new FileReader();
 
     reader.onload = (event) => {
@@ -4570,7 +4617,7 @@ function comprimirImagenBlob(file, calidad = 0.7, maxWidth = 1600) {
         let height = img.height;
 
         if (width > maxWidth) {
-          height *= maxWidth / width;
+          height = Math.round(height * (maxWidth / width));
           width = maxWidth;
         }
 
@@ -4580,13 +4627,28 @@ function comprimirImagenBlob(file, calidad = 0.7, maxWidth = 1600) {
         ctx.drawImage(img, 0, 0, width, height);
 
         canvas.toBlob(
-          (blob) => resolve(blob),
+          (blob) => {
+            if (!blob) {
+              reject("No se pudo comprimir la imagen");
+              return;
+            }
+
+            resolve(blob);
+          },
           "image/jpeg",
           calidad
         );
       };
 
+      img.onerror = () => {
+        reject("No se pudo leer la imagen");
+      };
+
       img.src = event.target.result;
+    };
+
+    reader.onerror = () => {
+      reject("Error al leer el archivo");
     };
 
     reader.readAsDataURL(file);
