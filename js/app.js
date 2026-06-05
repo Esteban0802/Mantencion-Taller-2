@@ -21,7 +21,8 @@ import {
   ref,
   uploadBytes,
   getDownloadURL,
-  getBytes
+  getBytes,
+  deleteObject
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 
 console.log("🔥 Firebase conectado correctamente");
@@ -422,15 +423,20 @@ function mostrarFotosIngreso(i) {
   });
 }
 
-function eliminarFotoIngreso(i, index) {
+async function eliminarFotoIngreso(i, index) {
 
   if (OTBloqueada()) return;
 
   if (!confirm("¿Eliminar foto?")) return;
 
+  const urlFoto = ot.ingreso[i].fotos[index];
+
+  await eliminarArchivoStorage(urlFoto);
+
   ot.ingreso[i].fotos.splice(index, 1);
 
-  guardarCambiosOT();
+  await guardarCambiosOT();
+
   mostrarFotosIngreso(i);
 }
 
@@ -650,6 +656,47 @@ function obtenerEstadoOT(ot) {
   if (!ot.pruebasAprobado) return "PRUEBAS";
 
   return "DESPACHO";
+}
+
+function estaOTAtrasada(ot) {
+
+  if (!ot) return false;
+
+  // Si está cerrada, no cuenta como atrasada
+  if (ot.cerrada === true || ot.estado === "CERRADA") {
+    return false;
+  }
+
+  // Si no tiene Carta Gantt, no se puede calcular atraso
+  if (!ot.gantt || !ot.gantt.fechaTermino) {
+    return false;
+  }
+
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+
+  const fechaTermino = new Date(ot.gantt.fechaTermino + "T00:00:00");
+  fechaTermino.setHours(0, 0, 0, 0);
+
+  return hoy > fechaTermino;
+}
+
+function diasAtrasoOT(ot) {
+
+  if (!estaOTAtrasada(ot)) return 0;
+
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+
+  const fechaTermino = new Date(ot.gantt.fechaTermino + "T00:00:00");
+  fechaTermino.setHours(0, 0, 0, 0);
+
+  const diferencia =
+    hoy - fechaTermino;
+
+  return Math.floor(
+    diferencia / (1000 * 60 * 60 * 24)
+  );
 }
 
 // =======================
@@ -877,15 +924,20 @@ function mostrarFotosEvaluacion(i) {
   });
 }
 
-function eliminarFotoEvaluacion(i, index) {
+async function eliminarFotoEvaluacion(i, index) {
 
   if (OTBloqueada()) return;
 
   if (!confirm("¿Eliminar foto?")) return;
 
+  const urlFoto = ot.evaluacion[i].fotos[index];
+
+  await eliminarArchivoStorage(urlFoto);
+
   ot.evaluacion[i].fotos.splice(index, 1);
 
-  guardarCambiosOT();
+  await guardarCambiosOT();
+
   mostrarFotosEvaluacion(i);
 }
 
@@ -1780,18 +1832,19 @@ function mostrarFotosOverhaul(i) {
   });
 }
 
-function eliminarFotoOverhaul(i, index) {
+async function eliminarFotoOverhaul(i, index) {
 
   if (OTBloqueada()) return;
 
-  const confirmar = confirm("¿Eliminar foto?");
-  if (!confirmar) return;
+  if (!confirm("¿Eliminar foto?")) return;
 
-  if (!ot.overhaul[i].fotos) return;
+  const urlFoto = ot.overhaul[i].fotos[index];
+
+  await eliminarArchivoStorage(urlFoto);
 
   ot.overhaul[i].fotos.splice(index, 1);
 
-  guardarCambiosOT();
+  await guardarCambiosOT();
 
   mostrarFotosOverhaul(i);
 }
@@ -3289,16 +3342,19 @@ function mostrarFotosPrueba(tipo, i) {
   });
 }
 
-function eliminarFotoPrueba(tipo, i, index) {
+async function eliminarFotoPrueba(tipo, i, index) {
 
   if (OTBloqueada()) return;
 
-  const confirmar = confirm("¿Eliminar esta evidencia?");
-  if (!confirmar) return;
+  if (!confirm("¿Eliminar esta evidencia?")) return;
+
+  const urlFoto = ot.pruebas[tipo][i].fotos[index];
+
+  await eliminarArchivoStorage(urlFoto);
 
   ot.pruebas[tipo][i].fotos.splice(index, 1);
 
-  guardarCambiosOT();
+  await guardarCambiosOT();
 
   mostrarFotosPrueba(tipo, i);
 }
@@ -4678,6 +4734,22 @@ async function subirArchivoStorage(file, etapa, itemIndex) {
   const url = await getDownloadURL(archivoRef);
 
   return url;
+}
+
+async function eliminarArchivoStorage(urlArchivo) {
+
+  if (!urlArchivo) return;
+
+  try {
+    const archivoRef = ref(storage, urlArchivo);
+
+    await deleteObject(archivoRef);
+
+    console.log("Archivo eliminado de Firebase Storage ✅");
+
+  } catch (error) {
+    console.warn("No se pudo eliminar archivo de Storage:", error);
+  }
 }
 
 function renderUsuarioActivo() {

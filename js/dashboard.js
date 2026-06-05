@@ -108,6 +108,10 @@ function escucharOTsTiempoReal() {
     renderTabla(listaFiltrada);
     calcularKPIs(listaFiltrada);
     renderGraficos(listaFiltrada);
+    renderEstadoTaller(listaFiltrada);
+    renderAlertasDashboard(listaFiltrada);
+    renderProximosDespachos(listaFiltrada);
+    renderGanttTaller(listaFiltrada);
 
     console.log(
       "Dashboard actualizado por sucursal ✅",
@@ -121,55 +125,241 @@ function escucharOTsTiempoReal() {
   });
 }
 
+function estaOTAtrasada(o) {
+
+  if (!o) return false;
+
+  if (o.cerrada === true || o.estado === "CERRADA") {
+    return false;
+  }
+
+  if (!o.gantt || !o.gantt.fechaTermino) {
+    return false;
+  }
+
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+
+  const fechaTermino = new Date(o.gantt.fechaTermino + "T00:00:00");
+  fechaTermino.setHours(0, 0, 0, 0);
+
+  return hoy > fechaTermino;
+}
+
+function diasAtrasoOT(o) {
+
+  if (!estaOTAtrasada(o)) return 0;
+
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+
+  const fechaTermino = new Date(o.gantt.fechaTermino + "T00:00:00");
+  fechaTermino.setHours(0, 0, 0, 0);
+
+  const diferencia = hoy - fechaTermino;
+
+  return Math.floor(diferencia / (1000 * 60 * 60 * 24));
+}
+
 // =======================
 // RENDER TABLA
 // =======================
 function renderTabla(lista = listaOTs) {
-  const tbody = document.getElementById("tablaOT");
-  if (!tbody) return;
 
-  tbody.innerHTML = "";
+  const cont = document.getElementById("cardsOT");
+  if (!cont) return;
 
-  lista.forEach((o, i) => {
+  cont.innerHTML = "";
+
+  lista.forEach((o) => {
 
     const estado = obtenerEstadoOT(o);
     const progreso = calcularProgreso(o);
 
-    const tr = document.createElement("tr");
+    const atrasada = estaOTAtrasada(o);
+    const diasAtraso = diasAtrasoOT(o);
 
-    tr.innerHTML = `
-      <td>${o.os || "—"}</td>
-      <td>${o.equipo || "—"}</td>
-      <td>${o.serie || "—"}</td>
+    const fechaEntrega =
+      o.gantt?.fechaTermino
+        ? formatearFechaCorta(
+            new Date(o.gantt.fechaTermino + "T00:00:00")
+          )
+        : "Sin fecha";
 
-      <td class="estado ${estado.toLowerCase()}">${estado}</td>
+    const badgesOT = renderBadgesOT(o, estado, atrasada, diasAtraso);
 
-      <td>
-        <div class="progress-bar">
-          <div class="progress" style="width:${progreso}%"></div>
-        </div>
-        <small>${progreso}%</small>
-      </td>
+    const card = document.createElement("div");
 
-      <td>
-  <button class="btn-icon" onclick="abrirOT(${listaOTs.indexOf(o)})">👁</button>
-
-  ${
-  o.alertaJefe
-    ? `<button
-          class="alerta-jefe-dashboard"
-          title="Ver comentarios del Jefe de Taller"
-          onclick='mostrarAlertasJefe(${JSON.stringify(o)})'
-       >
-          ⚠
-       </button>`
-    : ""
-}
-</td>
+    card.className = `
+      ot-card-pro
+      ${atrasada ? "atrasada" : ""}
     `;
 
-    tbody.appendChild(tr);
+    card.innerHTML = `
+
+      <div class="ot-card-top">
+
+        <div>
+          <h3>${o.os || "Sin OS"}</h3>
+          <span>${o.equipo || "Equipo sin nombre"}</span>
+        </div>
+
+        <div class="estado-card ${estado.toLowerCase()}">
+          ${estado}
+        </div>
+
+      </div>
+
+      <div class="ot-card-cliente">
+        👤 ${o.cliente || "Cliente no definido"}
+      </div>
+
+      <div class="ot-card-badges">
+        ${badgesOT}
+      </div>
+
+      <div class="ot-card-progress">
+
+        <div class="progress-bar">
+          <div
+            class="progress"
+            style="width:${progreso}%"
+          ></div>
+        </div>
+
+        <small>${progreso}% completado</small>
+
+      </div>
+
+      <div class="mini-gantt">
+
+        ${renderMiniGantt(estado)}
+
+      </div>
+
+      <div class="ot-card-footer">
+
+        <div>
+          📅 ${fechaEntrega}
+        </div>
+
+        ${
+          atrasada
+            ? `<div class="badge-atraso">
+                ⚠ ${diasAtraso} día(s)
+              </div>`
+            : ""
+        }
+
+      </div>
+
+      <div class="ot-card-actions">
+
+        <button
+          class="btn-card-open"
+          onclick="abrirOT(${listaOTs.indexOf(o)})"
+        >
+          Abrir OT
+        </button>
+
+      </div>
+    `;
+
+    cont.appendChild(card);
   });
+}
+
+function renderMiniGantt(estadoActual) {
+
+  const etapas = [
+    "INGRESO",
+    "EVALUACION",
+    "OVERHAUL",
+    "PRUEBAS",
+    "DESPACHO"
+  ];
+
+  const indexActual = etapas.indexOf(estadoActual);
+
+  return etapas.map((etapa, i) => {
+
+    let clase = "mini-gantt-pendiente";
+
+    if (i < indexActual) {
+      clase = "mini-gantt-completo";
+    }
+
+    if (i === indexActual) {
+      clase = "mini-gantt-activo";
+    }
+
+    return `
+      <div class="mini-gantt-row">
+
+        <span>${etapa}</span>
+
+        <div class="mini-gantt-bar">
+
+          <div class="${clase}"></div>
+
+        </div>
+
+      </div>
+    `;
+  }).join("");
+}
+
+function renderBadgesOT(o, estado, atrasada, diasAtraso) {
+
+  const badges = [];
+
+  if (atrasada) {
+    badges.push(`
+      <span class="ot-badge badge-rojo">
+        🔴 Atrasada ${diasAtraso} día(s)
+      </span>
+    `);
+  } else if (o.gantt?.fechaTermino) {
+    badges.push(`
+      <span class="ot-badge badge-verde">
+        🟢 En tiempo
+      </span>
+    `);
+  }
+
+  if (o.gantt?.diasRepuestos > 0 && estado !== "CERRADA") {
+    badges.push(`
+      <span class="ot-badge badge-naranjo">
+        📦 Repuestos
+      </span>
+    `);
+  }
+
+  if (estado === "PRUEBAS") {
+    badges.push(`
+      <span class="ot-badge badge-morado">
+        🧪 Pruebas
+      </span>
+    `);
+  }
+
+  if (estado === "DESPACHO") {
+    badges.push(`
+      <span class="ot-badge badge-cyan">
+        🚚 Despacho
+      </span>
+    `);
+  }
+
+  if (o.alertaJefe) {
+    badges.push(`
+      <span class="ot-badge badge-amarillo">
+        ⚠ Observación
+      </span>
+    `);
+  }
+
+  return badges.join("");
 }
 
 function pintarEstado(ot) {
@@ -220,6 +410,267 @@ function calcularKPIs(lista = listaOTs) {
   document.getElementById("kpiTotal").textContent = total;
   document.getElementById("kpiProceso").textContent = proceso;
   document.getElementById("kpiCerradas").textContent = cerradas;
+  document.getElementById("kpiAtrasadas").textContent =
+  listaOTs.filter(o => estaOTAtrasada(o)).length;
+}
+
+function renderEstadoTaller(lista = listaOTs) {
+
+  const estados = {
+    INGRESO: 0,
+    EVALUACION: 0,
+    OVERHAUL: 0,
+    PRUEBAS: 0,
+    DESPACHO: 0
+  };
+
+  lista.forEach(ot => {
+    const estado = obtenerEstadoOT(ot);
+
+    if (estados[estado] !== undefined) {
+      estados[estado]++;
+    }
+  });
+
+  const ingreso = document.getElementById("estadoIngreso");
+  const evaluacion = document.getElementById("estadoEvaluacion");
+  const overhaul = document.getElementById("estadoOverhaul");
+  const pruebas = document.getElementById("estadoPruebas");
+  const despacho = document.getElementById("estadoDespacho");
+
+  if (ingreso) ingreso.textContent = estados.INGRESO;
+  if (evaluacion) evaluacion.textContent = estados.EVALUACION;
+  if (overhaul) overhaul.textContent = estados.OVERHAUL;
+  if (pruebas) pruebas.textContent = estados.PRUEBAS;
+  if (despacho) despacho.textContent = estados.DESPACHO;
+}
+
+function renderAlertasDashboard(lista = listaOTs) {
+
+  const cont = document.getElementById("alertasDashboard");
+  if (!cont) return;
+
+  cont.innerHTML = "";
+
+  const alertas = [];
+
+  lista.forEach(ot => {
+
+    const estado = obtenerEstadoOT(ot);
+
+    if (estaOTAtrasada(ot)) {
+      alertas.push({
+        tipo: "atraso",
+        texto: `⚠ ${ot.os || "OS sin número"} atrasada ${diasAtrasoOT(ot)} día(s)`
+      });
+    }
+
+    if (ot.gantt?.diasRepuestos > 0 && estado !== "CERRADA") {
+      alertas.push({
+        tipo: "repuestos",
+        texto: `📦 ${ot.os || "OS sin número"} tiene espera de repuestos`
+      });
+    }
+
+    if (estado === "PRUEBAS" && !ot.pruebasAprobado) {
+      alertas.push({
+        tipo: "pruebas",
+        texto: `🧪 ${ot.os || "OS sin número"} tiene pruebas pendientes de aprobación`
+      });
+    }
+
+    if (estado === "DESPACHO" && !ot.cerrada) {
+      alertas.push({
+        tipo: "despacho",
+        texto: `🚚 ${ot.os || "OS sin número"} está pendiente de cierre/despacho`
+      });
+    }
+
+    if (ot.alertaJefe) {
+      alertas.push({
+        tipo: "jefe",
+        texto: `👨‍💼 ${ot.os || "OS sin número"} tiene observaciones del Jefe de Taller`
+      });
+    }
+  });
+
+  if (alertas.length === 0) {
+    cont.innerHTML = `<p class="sin-alertas">Sin alertas activas.</p>`;
+    return;
+  }
+
+  alertas.slice(0, 6).forEach(alerta => {
+    const div = document.createElement("div");
+    div.className = "alerta-dashboard-item";
+    div.textContent = alerta.texto;
+    cont.appendChild(div);
+  });
+}
+
+function renderProximosDespachos(lista = listaOTs) {
+
+  const cont = document.getElementById("listaProximosDespachos");
+  if (!cont) return;
+
+  cont.innerHTML = "";
+
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+
+  const despachos = lista
+    .filter(ot => ot.gantt?.fechaTermino && obtenerEstadoOT(ot) !== "CERRADA")
+    .map(ot => {
+
+      const fecha = new Date(ot.gantt.fechaTermino + "T00:00:00");
+      fecha.setHours(0, 0, 0, 0);
+
+      const diff = Math.ceil(
+        (fecha - hoy) / (1000 * 60 * 60 * 24)
+      );
+
+      return {
+        ot,
+        fecha,
+        diff
+      };
+    })
+    .sort((a, b) => a.fecha - b.fecha)
+    .slice(0, 5);
+
+  if (despachos.length === 0) {
+    cont.innerHTML = `<p class="sin-alertas">No hay despachos programados.</p>`;
+    return;
+  }
+
+  despachos.forEach(item => {
+
+    let badge = "";
+    let clase = "";
+
+    if (item.diff < 0) {
+      badge = `🔴 Atrasada ${Math.abs(item.diff)} día(s)`;
+      clase = "badge-despacho-atrasado";
+    } else if (item.diff <= 2) {
+      badge = `🟡 ${item.diff === 0 ? "Hoy" : item.diff + " día(s)"}`;
+      clase = "badge-despacho-riesgo";
+    } else {
+      badge = `🟢 ${item.diff} día(s)`;
+      clase = "badge-despacho-ok";
+    }
+
+    const div = document.createElement("div");
+    div.className = "despacho-item-pro";
+
+    div.innerHTML = `
+      <strong>${item.ot.os || "—"}</strong>
+      <span>${item.ot.equipo || "Equipo sin nombre"} | ${formatearFechaCorta(item.fecha)}</span>
+      <b class="${clase}">${badge}</b>
+    `;
+
+    cont.appendChild(div);
+  });
+}
+
+function renderGanttTaller(lista = listaOTs) {
+
+  const cont = document.getElementById("ganttTaller");
+  if (!cont) return;
+
+  cont.innerHTML = "";
+
+  const otsConGantt = lista
+    .filter(ot => ot.gantt?.fechaInicio && ot.gantt?.fechaTermino)
+    .filter(ot => obtenerEstadoOT(ot) !== "CERRADA")
+    .slice(0, 8);
+
+  if (otsConGantt.length === 0) {
+    cont.innerHTML = `<p class="sin-alertas">No hay Cartas Gantt activas.</p>`;
+    return;
+  }
+
+  const fechasInicio = otsConGantt.map(ot =>
+    new Date(ot.gantt.fechaInicio + "T00:00:00")
+  );
+
+  const fechasTermino = otsConGantt.map(ot =>
+    new Date(ot.gantt.fechaTermino + "T00:00:00")
+  );
+
+  const inicioGlobal = new Date(Math.min(...fechasInicio));
+  const terminoGlobal = new Date(Math.max(...fechasTermino));
+
+  const diasTotales = Math.max(
+    1,
+    Math.ceil((terminoGlobal - inicioGlobal) / (1000 * 60 * 60 * 24))
+  );
+
+  const wrapper = document.createElement("div");
+  wrapper.className = "gantt-taller-wrapper";
+
+  wrapper.innerHTML = `
+    <div class="gantt-taller-header">
+      <span>${formatearFechaCorta(inicioGlobal)}</span>
+      <span>${formatearFechaCorta(terminoGlobal)}</span>
+    </div>
+  `;
+
+  otsConGantt.forEach(ot => {
+
+    const estado = obtenerEstadoOT(ot);
+    const atrasada = estaOTAtrasada(ot);
+
+    const inicio = new Date(ot.gantt.fechaInicio + "T00:00:00");
+    const termino = new Date(ot.gantt.fechaTermino + "T00:00:00");
+
+    const diffInicio = Math.max(
+      0,
+      Math.ceil((inicio - inicioGlobal) / (1000 * 60 * 60 * 24))
+    );
+
+    const duracion = Math.max(
+      1,
+      Math.ceil((termino - inicio) / (1000 * 60 * 60 * 24))
+    );
+
+    let left = (diffInicio / diasTotales) * 100;
+    let width = (duracion / diasTotales) * 100;
+
+    if (left + width > 100) {
+      width = 100 - left;
+    }
+
+    width = Math.max(4, width);
+
+    const row = document.createElement("div");
+    row.className = `gantt-taller-row ${atrasada ? "atrasada" : ""}`;
+
+    row.innerHTML = `
+      <div class="gantt-taller-info">
+        <strong>${ot.os || "Sin OS"}</strong>
+        <span>${ot.equipo || "Equipo"}</span>
+      </div>
+
+      <div class="gantt-taller-track">
+        <div
+          class="gantt-taller-bar ${estado.toLowerCase()}"
+          style="left:${left}%; width:${width}%;">
+          ${estado}
+        </div>
+      </div>
+    `;
+
+    wrapper.appendChild(row);
+  });
+
+  cont.appendChild(wrapper);
+}
+
+function formatearFechaCorta(fecha) {
+  return fecha.toLocaleDateString("es-CL", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric"
+  }).replace(".", "");
 }
 
 // =======================
@@ -277,6 +728,10 @@ function filtrarOTs() {
 
   renderTabla(listaFiltrada);
   calcularKPIs(listaFiltrada);
+  renderEstadoTaller(listaFiltrada);
+  renderAlertasDashboard(listaFiltrada);
+  renderProximosDespachos(listaFiltrada);
+  renderGanttTaller(listaFiltrada);
 }
 
 window.filtrarOTs = filtrarOTs;

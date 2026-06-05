@@ -3151,3 +3151,933 @@ body {
 .gantt-board-row-pro:has(.gantt-board-bar.completado) {
   background: rgba(34,197,94,.055);
 }
+
+
+
+.estado-atrasada {
+  background: #dc2626 !important;
+  color: white !important;
+  box-shadow: 0 0 12px rgba(220,38,38,.55);
+}
+
+
+
+.estado-atrasada {
+  display: inline-block;
+  margin-left: 6px;
+  background: #dc2626 !important;
+  color: white !important;
+  padding: 5px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+
+
+
+.kpi-card.atrasadas {
+  background: linear-gradient(135deg, #ef4444, #991b1b) !important;
+}
+
+.fila-atrasada {
+  background: rgba(239, 68, 68, 0.12) !important;
+}
+
+.fila-atrasada:hover {
+  background: rgba(239, 68, 68, 0.22) !important;
+}
+
+
+
+/* =========================
+   DASHBOARD RESPONSIVE PRO
+========================= */
+
+@media (max-width: 1024px) {
+  .app {
+    flex-direction: column;
+  }
+
+  .sidebar {
+    width: 100% !important;
+    min-height: auto !important;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 18px !important;
+  }
+
+  .sidebar-logo {
+    padding: 0 !important;
+    margin: 0 !important;
+    border-bottom: none !important;
+  }
+
+  .sidebar-logo img {
+    width: 150px !important;
+  }
+
+  .sidebar ul {
+    display: flex;
+    gap: 10px;
+    margin: 0;
+  }
+
+  .main-content {
+    padding: 18px !important;
+  }
+
+  .header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .header-right {
+    width: 100%;
+  }
+
+  .user-box {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .kpis {
+    grid-template-columns: repeat(2, 1fr);
+    display: grid;
+  }
+}
+
+@media (max-width: 700px) {
+  .sidebar {
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .sidebar ul {
+    width: 100%;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .buscador input {
+    max-width: none !important;
+  }
+
+  .kpis {
+    grid-template-columns: 1fr;
+  }
+
+  .charts {
+    grid-template-columns: 1fr !important;
+  }
+
+  .card {
+    padding: 14px !important;
+  }
+
+  .tabla-ot thead {
+    display: none;
+  }
+
+  .tabla-ot,
+  .tabla-ot tbody,
+  .tabla-ot tr,
+  .tabla-ot td {
+    display: block;
+    width: 100%;
+  }
+
+  .tabla-ot tr {
+    margin-bottom: 16px;
+    padding: 16px;
+    border-radius: 18px;
+    background: rgba(15,23,42,.88);
+    border: 1px solid rgba(148,163,184,.18);
+    box-shadow: 0 16px 40px rgba(0,0,0,.28);
+  }
+
+  .tabla-ot td {
+    border-bottom: none !important;
+    padding: 8px 0 !important;
+    white-space: normal !important;
+  }
+
+  .tabla-ot td::before {
+    content: attr(data-label);
+    display: block;
+    color: #f59e0b;
+    font-size: 12px;
+    font-weight: 900;
+    margin-bottom: 4px;
+    text-transform: uppercase;
+  }
+
+  .tabla-ot td:last-child {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-top: 10px;
+  }
+
+  .progress-bar {
+    height: 10px;
+  }
+}
+
+
+
+
+/* =========================
+   DASHBOARD PRO UI
+========================= */
+
+.dashboard-hero {
+  margin-bottom: 22px;
+}
+
+.dashboard-title h1 {
+  margin: 0;
+  color: #ffffff;
+  font-size: 34px;
+  font-weight: 900;
+}
+
+.dashboard-title p {
+  margin: 6px 0 0;
+  color: #94a3b8;
+  font-size: 15px;
+}
+
+.kpis-pro {
+  display: grid !important;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 18px;
+  margin: 24px 0;
+}
+
+.kpis-pro .kpi-card {
+  min-height: 120px;
+  border-radius: 24px;
+  padding: 22px;
+  position: relative;
+  overflow: hidden;
+}
+
+.kpis-pro .kpi-card::after {
+  content: "";
+  position: absolute;
+  right: -30px;
+  top: -30px;
+  width: 110px;
+  height: 110px;
+  border-radius: 50%;
+  background: rgba(255,255,255,.12);
+}
+
+.kpis-pro .kpi-card h3 {
+  font-size: 34px;
+  margin: 4px 0;
+}
+
+.kpis-pro .kpi-card small {
+  color: rgba(255,255,255,.82);
+  font-size: 12px;
+}
+
+.kpi-card.atrasadas {
+  background: linear-gradient(135deg, #ef4444, #991b1b) !important;
+}
+
+.dashboard-grid-pro {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 22px;
+  margin-bottom: 22px;
+}
+
+.panel-pro {
+  background: rgba(15,23,42,.86);
+  border: 1px solid rgba(148,163,184,.20);
+  border-radius: 24px;
+  padding: 22px;
+  box-shadow: 0 25px 70px rgba(0,0,0,.32);
+  backdrop-filter: blur(14px);
+}
+
+.panel-header-pro {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.panel-header-pro h3 {
+  margin: 0;
+  color: #ffffff;
+  font-size: 20px;
+}
+
+.panel-header-pro span {
+  color: #f59e0b;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.estado-taller-list {
+  display: grid;
+  gap: 12px;
+}
+
+.estado-taller-list div {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: rgba(30,41,59,.78);
+  border: 1px solid rgba(148,163,184,.14);
+}
+
+.estado-taller-list span {
+  color: #cbd5e1;
+  font-weight: 700;
+}
+
+.estado-taller-list b {
+  color: #ffffff;
+  font-size: 22px;
+}
+
+.alertas-dashboard {
+  display: grid;
+  gap: 12px;
+}
+
+.alerta-dashboard-item {
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: rgba(127,29,29,.35);
+  border: 1px solid rgba(239,68,68,.35);
+  color: #fecaca;
+  font-weight: 700;
+}
+
+.lista-proximos-despachos {
+  display: grid;
+  gap: 12px;
+}
+
+.despacho-item-pro {
+  display: grid;
+  grid-template-columns: 120px 1fr auto;
+  gap: 12px;
+  align-items: center;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: rgba(30,41,59,.78);
+  border: 1px solid rgba(148,163,184,.14);
+}
+
+.despacho-item-pro strong {
+  color: #ffffff;
+}
+
+.despacho-item-pro span {
+  color: #cbd5e1;
+}
+
+.badge-despacho-ok {
+  background: rgba(34,197,94,.18);
+  color: #86efac;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-weight: 900;
+}
+
+.badge-despacho-riesgo {
+  background: rgba(245,158,11,.18);
+  color: #fcd34d;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-weight: 900;
+}
+
+.badge-despacho-atrasado {
+  background: rgba(239,68,68,.18);
+  color: #fca5a5;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-weight: 900;
+}
+
+.sin-alertas {
+  color: #94a3b8;
+}
+
+/* RESPONSIVE DASHBOARD PRO */
+
+@media (max-width: 1100px) {
+  .kpis-pro {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .dashboard-grid-pro {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 650px) {
+  .kpis-pro {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-title h1 {
+    font-size: 26px;
+  }
+
+  .panel-header-pro {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .despacho-item-pro {
+    grid-template-columns: 1fr;
+  }
+}
+
+
+/* =========================
+   FIX DASHBOARD MOBILE PRO
+========================= */
+
+@media (max-width: 700px) {
+
+  body {
+    overflow-x: hidden;
+  }
+
+  .app {
+    flex-direction: column !important;
+    width: 100%;
+  }
+
+  .sidebar {
+    width: 100% !important;
+    min-height: auto !important;
+    height: auto !important;
+    padding: 14px 12px !important;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .sidebar-logo img {
+    width: 120px !important;
+  }
+
+  .sidebar ul {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin: 0;
+  }
+
+  .sidebar li {
+    flex: 1;
+    text-align: center;
+    font-size: 12px;
+    padding: 10px !important;
+  }
+
+  .main-content {
+    width: 100%;
+    padding: 16px !important;
+    box-sizing: border-box;
+  }
+
+  .header {
+    display: block !important;
+  }
+
+  .header h2 {
+    font-size: 22px;
+    margin-bottom: 16px;
+  }
+
+  .user-box {
+    width: 100%;
+    box-sizing: border-box;
+    margin-bottom: 14px;
+  }
+
+  .buscador input {
+    width: 100% !important;
+    max-width: none !important;
+    height: 46px;
+    font-size: 14px;
+  }
+
+  .dashboard-title h1 {
+    font-size: 26px;
+    margin-top: 18px;
+  }
+
+  .dashboard-title p {
+    font-size: 14px;
+    line-height: 1.4;
+  }
+
+  .kpis-pro {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 14px !important;
+  }
+
+  .kpis-pro .kpi-card {
+    min-height: 115px;
+    padding: 18px !important;
+  }
+
+  .kpis-pro .kpi-card h3 {
+    font-size: 28px;
+  }
+
+  .kpi-icon {
+    font-size: 22px;
+  }
+
+  .dashboard-grid-pro {
+    grid-template-columns: 1fr !important;
+    gap: 16px;
+  }
+
+  .panel-pro,
+  .card,
+  .chart-card {
+    padding: 18px !important;
+    border-radius: 20px !important;
+    margin-bottom: 18px !important;
+  }
+
+  .panel-header-pro {
+    align-items: flex-start;
+    gap: 6px;
+  }
+
+  .panel-header-pro h3 {
+    font-size: 18px;
+  }
+
+  .panel-header-pro span {
+    font-size: 12px;
+  }
+
+  .charts {
+    grid-template-columns: 1fr !important;
+    gap: 18px !important;
+  }
+
+  .chart-card {
+    min-height: 280px;
+  }
+
+  .chart-card canvas {
+    max-height: 220px !important;
+  }
+}
+
+
+
+
+
+/* =========================
+   CARDS OT PRO
+========================= */
+
+.cards-ot-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 20px;
+}
+
+.ot-card-pro {
+  background: rgba(15,23,42,.92);
+  border: 1px solid rgba(148,163,184,.18);
+  border-radius: 24px;
+  padding: 22px;
+  transition: .25s;
+  box-shadow: 0 18px 45px rgba(0,0,0,.28);
+}
+
+.ot-card-pro:hover {
+  transform: translateY(-4px);
+  border-color: rgba(59,130,246,.45);
+}
+
+.ot-card-pro.atrasada {
+  border-color: rgba(239,68,68,.45);
+  box-shadow: 0 18px 45px rgba(127,29,29,.28);
+}
+
+.ot-card-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+  margin-bottom: 16px;
+}
+
+.ot-card-top h3 {
+  margin: 0;
+  color: white;
+  font-size: 24px;
+}
+
+.ot-card-top span {
+  color: #94a3b8;
+  font-size: 14px;
+}
+
+.estado-card {
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 900;
+  color: white;
+}
+
+.estado-card.ingreso {
+  background: #64748b;
+}
+
+.estado-card.evaluacion {
+  background: #f59e0b;
+}
+
+.estado-card.overhaul {
+  background: #2563eb;
+}
+
+.estado-card.pruebas {
+  background: #7c3aed;
+}
+
+.estado-card.despacho {
+  background: #0891b2;
+}
+
+.estado-card.cerrada {
+  background: #16a34a;
+}
+
+.ot-card-cliente {
+  color: #cbd5e1;
+  margin-bottom: 18px;
+  font-size: 14px;
+}
+
+.ot-card-progress {
+  margin-bottom: 18px;
+}
+
+.ot-card-progress small {
+  color: #94a3b8;
+}
+
+.ot-card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 18px;
+  color: #e2e8f0;
+  font-size: 14px;
+}
+
+.badge-atraso {
+  background: rgba(239,68,68,.18);
+  color: #fca5a5;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.ot-card-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.btn-card-open {
+  border: none;
+  background: linear-gradient(135deg,#2563eb,#1d4ed8);
+  color: white;
+  padding: 12px 18px;
+  border-radius: 14px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: .2s;
+}
+
+.btn-card-open:hover {
+  transform: scale(1.03);
+}
+
+
+
+/* =========================
+   MINI GANTT CARDS
+========================= */
+
+.mini-gantt {
+  margin-top: 18px;
+  margin-bottom: 18px;
+  display: grid;
+  gap: 10px;
+}
+
+.mini-gantt-row {
+  display: grid;
+  grid-template-columns: 95px 1fr;
+  gap: 10px;
+  align-items: center;
+}
+
+.mini-gantt-row span {
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .5px;
+}
+
+.mini-gantt-bar {
+  height: 10px;
+  background: rgba(51,65,85,.7);
+  border-radius: 999px;
+  overflow: hidden;
+  position: relative;
+}
+
+.mini-gantt-completo {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg,#22c55e,#16a34a);
+}
+
+.mini-gantt-activo {
+  width: 70%;
+  height: 100%;
+  background: linear-gradient(90deg,#3b82f6,#2563eb);
+  animation: miniPulse 2s infinite;
+}
+
+.mini-gantt-pendiente {
+  width: 0%;
+  height: 100%;
+}
+
+@keyframes miniPulse {
+
+  0% {
+    opacity: .7;
+  }
+
+  50% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: .7;
+  }
+}
+
+
+/* =========================
+   BADGES INTELIGENTES OT
+========================= */
+
+.ot-card-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0 18px;
+}
+
+.ot-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 7px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: .2px;
+}
+
+.badge-rojo {
+  background: rgba(239,68,68,.18);
+  color: #fca5a5;
+  border: 1px solid rgba(239,68,68,.35);
+}
+
+.badge-verde {
+  background: rgba(34,197,94,.16);
+  color: #86efac;
+  border: 1px solid rgba(34,197,94,.32);
+}
+
+.badge-naranjo {
+  background: rgba(249,115,22,.16);
+  color: #fdba74;
+  border: 1px solid rgba(249,115,22,.32);
+}
+
+.badge-morado {
+  background: rgba(168,85,247,.16);
+  color: #d8b4fe;
+  border: 1px solid rgba(168,85,247,.32);
+}
+
+.badge-cyan {
+  background: rgba(34,211,238,.16);
+  color: #67e8f9;
+  border: 1px solid rgba(34,211,238,.32);
+}
+
+.badge-amarillo {
+  background: rgba(245,158,11,.16);
+  color: #fde68a;
+  border: 1px solid rgba(245,158,11,.32);
+}
+
+
+
+/* =========================
+   GANTT GENERAL TALLER
+========================= */
+
+.gantt-taller-panel {
+  margin-bottom: 24px;
+}
+
+.gantt-taller {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.gantt-taller-wrapper {
+  min-width: 820px;
+  display: grid;
+  gap: 14px;
+}
+
+.gantt-taller-header {
+  display: flex;
+  justify-content: space-between;
+  color: #f59e0b;
+  font-size: 12px;
+  font-weight: 900;
+  padding: 0 4px 6px 190px;
+}
+
+.gantt-taller-row {
+  display: grid;
+  grid-template-columns: 180px 1fr;
+  gap: 14px;
+  align-items: center;
+}
+
+.gantt-taller-info {
+  background: rgba(30,41,59,.72);
+  border: 1px solid rgba(148,163,184,.14);
+  border-radius: 14px;
+  padding: 12px;
+}
+
+.gantt-taller-info strong {
+  display: block;
+  color: white;
+  font-size: 14px;
+}
+
+.gantt-taller-info span {
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+.gantt-taller-track {
+  position: relative;
+  height: 42px;
+  border-radius: 999px;
+  overflow: hidden;
+  background:
+    repeating-linear-gradient(
+      90deg,
+      rgba(148,163,184,.14) 0px,
+      rgba(148,163,184,.14) 1px,
+      transparent 1px,
+      transparent 70px
+    ),
+    rgba(15,23,42,.82);
+  border: 1px solid rgba(148,163,184,.12);
+}
+
+.gantt-taller-bar {
+  position: absolute;
+  top: 7px;
+  height: 28px;
+  border-radius: 999px;
+  color: white;
+  font-size: 11px;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 58px;
+  box-shadow: 0 8px 20px rgba(0,0,0,.35);
+}
+
+.gantt-taller-bar.ingreso {
+  background: linear-gradient(135deg, #64748b, #475569);
+}
+
+.gantt-taller-bar.evaluacion {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: #111827;
+}
+
+.gantt-taller-bar.overhaul {
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+}
+
+.gantt-taller-bar.pruebas {
+  background: linear-gradient(135deg, #7c3aed, #5b21b6);
+}
+
+.gantt-taller-bar.despacho {
+  background: linear-gradient(135deg, #0891b2, #0e7490);
+}
+
+.gantt-taller-row.atrasada .gantt-taller-info {
+  border-color: rgba(239,68,68,.45);
+  background: rgba(127,29,29,.28);
+}
+
+.gantt-taller-row.atrasada .gantt-taller-bar {
+  background: linear-gradient(135deg, #ef4444, #991b1b) !important;
+  color: white !important;
+}
+
+@media (max-width: 700px) {
+  .gantt-taller-wrapper {
+    min-width: 760px;
+  }
+
+  .gantt-taller-row {
+    grid-template-columns: 150px 1fr;
+  }
+
+  .gantt-taller-header {
+    padding-left: 160px;
+  }
+}

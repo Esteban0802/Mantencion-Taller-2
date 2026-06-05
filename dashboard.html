@@ -57,13 +57,23 @@
 </div>
 
       <!-- 🔥 KPI AQUÍ -->
- <div class="kpis">
+<div class="dashboard-hero">
+
+  <div class="dashboard-title">
+    <h1>Panel Operacional</h1>
+    <p>Control general de órdenes, atrasos, avances y estado del taller.</p>
+  </div>
+
+</div>
+
+<div class="kpis kpis-pro">
 
   <div class="kpi-card total">
     <div class="kpi-icon">📊</div>
     <div>
       <span>Total OT</span>
       <h3 id="kpiTotal">0</h3>
+      <small>Órdenes registradas</small>
     </div>
   </div>
 
@@ -72,6 +82,16 @@
     <div>
       <span>En Proceso</span>
       <h3 id="kpiProceso">0</h3>
+      <small>Actualmente activas</small>
+    </div>
+  </div>
+
+  <div class="kpi-card atrasadas">
+    <div class="kpi-icon">⚠️</div>
+    <div>
+      <span>Atrasadas</span>
+      <h3 id="kpiAtrasadas">0</h3>
+      <small>Fuera de plazo</small>
     </div>
   </div>
 
@@ -80,27 +100,20 @@
     <div>
       <span>Cerradas</span>
       <h3 id="kpiCerradas">0</h3>
+      <small>Finalizadas</small>
     </div>
   </div>
 
 </div>
 
- 
+<div class="card">
+  <div class="panel-header-pro">
+    <h3>📋 Órdenes de Servicio</h3>
+    <span>Vista operacional del taller</span>
+  </div>
 
-    <div class="card">
-      <table class="tabla-ot">
-        <thead>
-          <tr>
-            <th>Orden</th>
-            <th>Equipo</th>
-            <th>Serie</th>
-            <th>Estado</th>
-            <th>Acción</th>
-          </tr>
-        </thead>
-        <tbody id="tablaOT"></tbody>
-      </table>
-    </div>
+  <div id="cardsOT" class="cards-ot-grid"></div>
+</div>
 
     <div class="charts">
 
@@ -115,6 +128,64 @@
   </div>
 
 </div>
+
+
+<div class="dashboard-grid-pro">
+
+  <div class="panel-pro">
+    <div class="panel-header-pro">
+      <h3>📊 Estado del Taller</h3>
+      <span>Distribución actual</span>
+    </div>
+
+    <div class="estado-taller-list">
+      <div><span>Ingreso</span><b id="estadoIngreso">0</b></div>
+      <div><span>Evaluación</span><b id="estadoEvaluacion">0</b></div>
+      <div><span>Overhaul</span><b id="estadoOverhaul">0</b></div>
+      <div><span>Pruebas</span><b id="estadoPruebas">0</b></div>
+      <div><span>Despacho</span><b id="estadoDespacho">0</b></div>
+    </div>
+  </div>
+
+  <div class="panel-pro panel-alertas">
+    <div class="panel-header-pro">
+      <h3>⚠ Alertas del Taller</h3>
+      <span>Eventos importantes</span>
+    </div>
+
+    <div id="alertasDashboard" class="alertas-dashboard">
+      <p class="sin-alertas">Sin alertas activas.</p>
+    </div>
+  </div>
+
+</div>
+
+<div class="panel-pro proximos-despachos">
+  <div class="panel-header-pro">
+    <h3>📅 Próximos Despachos</h3>
+    <span>Según Carta Gantt</span>
+  </div>
+
+  <div id="listaProximosDespachos" class="lista-proximos-despachos">
+    <p class="sin-alertas">No hay despachos programados.</p>
+  </div>
+</div>
+
+<!-- 🔥 GANTT GENERAL DEL TALLER -->
+
+<div class="panel-pro gantt-taller-panel">
+  <div class="panel-header-pro">
+    <h3>📊 Carta Gantt General del Taller</h3>
+    <span>Planificación global</span>
+  </div>
+
+  <div id="ganttTaller" class="gantt-taller"></div>
+</div>
+
+<br/>
+ 
+
+    
 
   </main>
 
