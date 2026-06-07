@@ -190,6 +190,8 @@ function renderTabla(lista = listaOTs) {
 
     const card = document.createElement("div");
 
+    card.className = "ot-card";
+
     card.className = `
       ot-card-pro
       ${atrasada ? "atrasada" : ""}
@@ -314,17 +316,15 @@ function renderBadgesOT(o, estado, atrasada, diasAtraso) {
   const badges = [];
 
   if (atrasada) {
-    badges.push(`
-      <span class="ot-badge badge-rojo">
-        🔴 Atrasada ${diasAtraso} día(s)
-      </span>
-    `);
-  } else if (o.gantt?.fechaTermino) {
-    badges.push(`
-      <span class="ot-badge badge-verde">
-        🟢 En tiempo
-      </span>
-    `);
+    card.classList.add("atrasada");
+  }
+
+  if (estado === "PRUEBAS") {
+    card.classList.add("pruebas");
+  }
+
+  if (estado === "DESPACHO") {
+    card.classList.add("despacho");
   }
 
   if (o.gantt?.diasRepuestos > 0 && estado !== "CERRADA") {
@@ -352,15 +352,90 @@ function renderBadgesOT(o, estado, atrasada, diasAtraso) {
   }
 
   if (o.alertaJefe) {
+    const resumenObs = obtenerResumenObservacionesJefe(o)
+      .replace(/`/g, "'")
+      .replace(/"/g, "&quot;");
+
     badges.push(`
-      <span class="ot-badge badge-amarillo">
+      <button 
+        type="button"
+        class="ot-badge badge-amarillo badge-observacion-btn"
+        onclick="abrirPopoverObservacion(\`${resumenObs}\`)"
+      >
         ⚠ Observación
-      </span>
+      </button>
     `);
   }
 
   return badges.join("");
 }
+
+function obtenerResumenObservacionesJefe(ot) {
+
+  const observaciones = [];
+
+  const revisarItems = (etapa, lista) => {
+    if (!Array.isArray(lista)) return;
+
+    lista.forEach(item => {
+      (item.comentarios || []).forEach(c => {
+        if (c.rol === "jefe_taller" && c.atendido !== true) {
+          observaciones.push(`${etapa}: ${c.texto}`);
+        }
+      });
+    });
+  };
+
+  revisarItems("Ingreso", ot.ingreso);
+  revisarItems("Evaluación", ot.evaluacion);
+  revisarItems("Overhaul", ot.overhaul);
+  revisarItems("Pruebas Mecánicas", ot.pruebas?.mecanico);
+  revisarItems("Pruebas Eléctricas", ot.pruebas?.electrico);
+
+  (ot.despacho?.comentariosPreparacion || []).forEach(c => {
+    if (c.rol === "jefe_taller" && c.atendido !== true) {
+      observaciones.push(`Despacho Preparación: ${c.texto}`);
+    }
+  });
+
+  (ot.despacho?.comentariosFinal || []).forEach(c => {
+    if (c.rol === "jefe_taller" && c.atendido !== true) {
+      observaciones.push(`Despacho Final: ${c.texto}`);
+    }
+  });
+
+  return observaciones.length
+    ? observaciones.join(" | ")
+    : "Sin detalle de observación";
+}
+
+
+function abrirPopoverObservacion(texto) {
+
+  const modal = document.getElementById("popoverObservacion");
+  const cont = document.getElementById("popoverObservacionTexto");
+
+  if (!modal || !cont) return;
+
+  const items = texto.split("|").map(t => t.trim()).filter(Boolean);
+
+  cont.innerHTML = items.map(item => `
+    <div class="popover-obs-item">
+      ${item}
+    </div>
+  `).join("");
+
+  modal.style.display = "flex";
+}
+
+function cerrarPopoverObservacion() {
+  const modal = document.getElementById("popoverObservacion");
+  if (modal) modal.style.display = "none";
+}
+
+window.abrirPopoverObservacion = abrirPopoverObservacion;
+window.cerrarPopoverObservacion = cerrarPopoverObservacion;
+
 
 function pintarEstado(ot) {
 
@@ -389,6 +464,30 @@ function pintarEstado(ot) {
   `;
 }
 
+function animarNumero(id, valorFinal) {
+  const el = document.getElementById(id);
+  if (!el) return;
+
+  const valorActual = Number(el.textContent) || 0;
+  const duracion = 700;
+  const inicio = performance.now();
+
+  function actualizar(tiempo) {
+    const progreso = Math.min((tiempo - inicio) / duracion, 1);
+    const valor = Math.round(
+      valorActual + (valorFinal - valorActual) * progreso
+    );
+
+    el.textContent = valor;
+
+    if (progreso < 1) {
+      requestAnimationFrame(actualizar);
+    }
+  }
+
+  requestAnimationFrame(actualizar);
+}
+
 // =======================
 // KPI
 // =======================
@@ -407,11 +506,12 @@ function calcularKPIs(lista = listaOTs) {
     }
   });
 
-  document.getElementById("kpiTotal").textContent = total;
-  document.getElementById("kpiProceso").textContent = proceso;
-  document.getElementById("kpiCerradas").textContent = cerradas;
-  document.getElementById("kpiAtrasadas").textContent =
-  listaOTs.filter(o => estaOTAtrasada(o)).length;
+  const atrasadas = lista.filter(o => estaOTAtrasada(o)).length;
+
+  animarNumero("kpiTotal", total);
+  animarNumero("kpiProceso", proceso);
+  animarNumero("kpiAtrasadas", atrasadas);
+  animarNumero("kpiCerradas", cerradas);
 }
 
 function renderEstadoTaller(lista = listaOTs) {
@@ -607,7 +707,25 @@ function renderGanttTaller(lista = listaOTs) {
   const wrapper = document.createElement("div");
   wrapper.className = "gantt-taller-wrapper";
 
+  const hoy = new Date();
+    hoy.setHours(0,0,0,0);
+
+    const diffHoy = Math.ceil(
+      (hoy - inicioGlobal) / (1000 * 60 * 60 * 24)
+    );
+
+    let posicionHoy = (diffHoy / diasTotales) * 100;
+
+    if (posicionHoy < 0) posicionHoy = 0;
+    if (posicionHoy > 100) posicionHoy = 100;
+
   wrapper.innerHTML = `
+
+    <div class="gantt-hoy-line"
+        style="left:calc(194px + ${posicionHoy}%);">
+      <span>HOY</span>
+    </div>
+
     <div class="gantt-taller-header">
       <span>${formatearFechaCorta(inicioGlobal)}</span>
       <span>${formatearFechaCorta(terminoGlobal)}</span>
@@ -652,9 +770,20 @@ function renderGanttTaller(lista = listaOTs) {
 
       <div class="gantt-taller-track">
         <div
-          class="gantt-taller-bar ${estado.toLowerCase()}"
-          style="left:${left}%; width:${width}%;">
-          ${estado}
+          class="gantt-taller-bar ${atrasada ? "atrasada" : estado.toLowerCase()}"
+          style="left:${left}%; width:${width}%"
+
+          data-gantt='${JSON.stringify({
+              os: ot.os || "Sin OS",
+              equipo: ot.equipo || "Sin equipo",
+              estado,
+              inicio: formatearFechaCorta(inicio),
+              termino: formatearFechaCorta(termino),
+              progreso: calcularProgreso(ot)
+            }).replace(/'/g, "&#39;")}'
+            onclick="abrirPopoverGanttDesdeElemento(this)"
+        >
+          ${atrasada ? "ATRASADA" : estado}
         </div>
       </div>
     `;
@@ -664,6 +793,82 @@ function renderGanttTaller(lista = listaOTs) {
 
   cont.appendChild(wrapper);
 }
+
+
+function abrirPopoverGantt(data) {
+
+  const modal = document.getElementById("popoverGantt");
+  const cont = document.getElementById("popoverGanttInfo");
+
+  if (!modal || !cont) return;
+
+  cont.innerHTML = `
+
+    <div class="gantt-pop-grid">
+
+      <div>
+        <span>OS</span>
+        <strong>${data.os}</strong>
+      </div>
+
+      <div>
+        <span>Equipo</span>
+        <strong>${data.equipo}</strong>
+      </div>
+
+      <div>
+        <span>Estado</span>
+        <strong>${data.estado}</strong>
+      </div>
+
+      <div>
+        <span>Inicio</span>
+        <strong>${data.inicio}</strong>
+      </div>
+
+      <div>
+        <span>Término</span>
+        <strong>${data.termino}</strong>
+      </div>
+
+      <div>
+        <span>Progreso</span>
+        <strong>${data.progreso}%</strong>
+      </div>
+
+    </div>
+  `;
+
+  modal.style.display = "flex";
+}
+
+
+function abrirPopoverGanttDesdeElemento(el) {
+  try {
+    const data = JSON.parse(
+      el.getAttribute("data-gantt")
+    );
+
+    abrirPopoverGantt(data);
+
+  } catch (error) {
+    console.error("Error leyendo datos del Gantt:", error);
+  }
+}
+
+window.abrirPopoverGanttDesdeElemento = abrirPopoverGanttDesdeElemento;
+
+function cerrarPopoverGantt() {
+
+  const modal = document.getElementById("popoverGantt");
+
+  if (modal) {
+    modal.style.display = "none";
+  }
+}
+
+window.abrirPopoverGantt = abrirPopoverGantt;
+window.cerrarPopoverGantt = cerrarPopoverGantt;
 
 function formatearFechaCorta(fecha) {
   return fecha.toLocaleDateString("es-CL", {

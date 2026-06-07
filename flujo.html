@@ -27,15 +27,91 @@
 
 <div class="container">
 
-  <!-- TABS -->
-  <div class="tabs">
-    <button class="tab active" data-tab="crear">Crear OS</button>
-    <button class="tab disabled" data-tab="ingreso">Ingreso</button>
-    <button class="tab disabled" data-tab="evaluacion">Evaluación</button>
-    <button class="tab disabled" data-tab="overhaul">Overhaul</button>
-    <button class="tab disabled" data-tab="pruebas">Pruebas</button>
-    <button class="tab disabled" data-tab="despacho">Despacho</button>
+  <!-- HEADER OS ACTIVA PRO -->
+<div id="headerOTPro" class="header-ot-pro" style="display:none;">
+
+  <div class="header-ot-main">
+    <div>
+      <span class="header-ot-label">Orden de Servicio</span>
+      <h1 id="headerOTNumero">OS-000</h1>
+    </div>
+
+    <div id="headerOTEstado" class="header-ot-estado">
+      INGRESO
+    </div>
   </div>
+
+  <div class="header-ot-grid">
+
+    <div>
+      <span>Equipo</span>
+      <strong id="headerOTEquipo">—</strong>
+    </div>
+
+    <div>
+      <span>Cliente</span>
+      <strong id="headerOTCliente">—</strong>
+    </div>
+
+    <div>
+      <span>Serie</span>
+      <strong id="headerOTSerie">—</strong>
+    </div>
+
+    <div>
+      <span>Entrega estimada</span>
+      <strong id="headerOTEntrega">Sin fecha</strong>
+    </div>
+
+  </div>
+
+  <div class="header-ot-progress">
+    <div class="header-ot-progress-info">
+      <span>Progreso general</span>
+      <strong id="headerOTProgresoTexto">0%</strong>
+    </div>
+
+    <div class="header-ot-progress-bar">
+      <div id="headerOTProgresoBarra"></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- TIMELINE TABS PRO -->
+<div class="tabs tabs-timeline-pro">
+
+  <button class="tab active" data-tab="crear">
+    <span class="tab-dot">1</span>
+    <span class="tab-text">Crear OS</span>
+  </button>
+
+  <button class="tab disabled" data-tab="ingreso">
+    <span class="tab-dot">2</span>
+    <span class="tab-text">Ingreso</span>
+  </button>
+
+  <button class="tab disabled" data-tab="evaluacion">
+    <span class="tab-dot">3</span>
+    <span class="tab-text">Evaluación</span>
+  </button>
+
+  <button class="tab disabled" data-tab="overhaul">
+    <span class="tab-dot">4</span>
+    <span class="tab-text">Overhaul</span>
+  </button>
+
+  <button class="tab disabled" data-tab="pruebas">
+    <span class="tab-dot">5</span>
+    <span class="tab-text">Pruebas</span>
+  </button>
+
+  <button class="tab disabled" data-tab="despacho">
+    <span class="tab-dot">6</span>
+    <span class="tab-text">Despacho</span>
+  </button>
+
+</div>
 
   <!---CREAR OS-->
   <div id="crear" class="content active">

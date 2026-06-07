@@ -171,6 +171,8 @@
   </div>
 </div>
 
+<br/>
+
 <!-- 🔥 GANTT GENERAL DEL TALLER -->
 
 <div class="panel-pro gantt-taller-panel">
@@ -205,6 +207,39 @@
     </div>
 
     <div id="listaAlertasJefe"></div>
+
+  </div>
+
+</div>
+
+<div id="popoverObservacion" class="popover-observacion">
+  <div class="popover-observacion-content">
+    <div class="popover-observacion-header">
+      <h3>⚠ Observaciones del Jefe</h3>
+      <button onclick="cerrarPopoverObservacion()">×</button>
+    </div>
+
+    <div id="popoverObservacionTexto"></div>
+  </div>
+</div>
+
+<!-- 🔥 POPOVER GANTT -->
+
+<div id="popoverGantt" class="popover-gantt">
+
+  <div class="popover-gantt-content">
+
+    <div class="popover-gantt-header">
+
+      <h3>📊 Información OT</h3>
+
+      <button onclick="cerrarPopoverGantt()">
+        ×
+      </button>
+
+    </div>
+
+    <div id="popoverGanttInfo"></div>
 
   </div>
 

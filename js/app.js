@@ -211,11 +211,14 @@ window.guardarDatosOS = guardarDatosOS;
 
 function habilitarTab(nombre) {
   const tab = document.querySelector(`[data-tab="${nombre}"]`);
+
   if (!tab) {
     console.warn("Tab no encontrada:", nombre);
     return;
   }
+
   tab.classList.remove("disabled");
+  tab.classList.add("enabled");
 }
 
 function habilitarTabsPlanificacionJefe() {
@@ -625,6 +628,8 @@ async function guardarCambiosOT() {
     });
 
     console.log("OT actualizada en Firebase ✅");
+
+    renderHeaderOTPro();
 
   } catch (error) {
     console.error("Error guardando OT:", error);
@@ -1591,6 +1596,8 @@ if (btnGantt) {
       : "📊 Crear Carta Gantt";
 }
 
+renderHeaderOTPro();
+
 aplicarModoSoloLectura();
 aplicarPermisosRol();
 renderUsuarioActivo();
@@ -1598,14 +1605,28 @@ renderUsuarioActivo();
 
 function cambiarTab(nombre) {
 
-  document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
-  document.querySelectorAll(".content").forEach(c => c.classList.remove("active"));
+  document.querySelectorAll(".tab").forEach(t => {
+    t.classList.remove("active");
+  });
+
+  document.querySelectorAll(".content").forEach(c => {
+    c.classList.remove("active");
+  });
 
   const tab = document.querySelector(`[data-tab="${nombre}"]`);
   const content = document.getElementById(nombre);
 
-  if (tab) tab.classList.add("active");
-  if (content) content.classList.add("active");
+  if (tab) {
+    tab.classList.add("active");
+
+    if (!tab.classList.contains("disabled")) {
+      tab.classList.add("enabled");
+    }
+  }
+
+  if (content) {
+    content.classList.add("active");
+  }
 }
 
 function irACrearOS() {
@@ -4766,6 +4787,61 @@ function renderUsuarioActivo() {
   if (rol) {
     rol.textContent = usuario.rol || "Sin rol";
   }
+}
+
+function calcularProgresoOTFlujo(ot) {
+  const estado = obtenerEstadoOT(ot);
+
+  switch (estado) {
+    case "EVALUACION": return 25;
+    case "OVERHAUL": return 50;
+    case "PRUEBAS": return 75;
+    case "DESPACHO": return 90;
+    case "CERRADA": return 100;
+    default: return 10;
+  }
+}
+
+function renderHeaderOTPro() {
+
+  if (!ot) return;
+
+  const header = document.getElementById("headerOTPro");
+  if (!header) return;
+
+  const estado = obtenerEstadoOT(ot);
+  const progreso = calcularProgresoOTFlujo(ot);
+
+  const numero = document.getElementById("headerOTNumero");
+  const equipo = document.getElementById("headerOTEquipo");
+  const cliente = document.getElementById("headerOTCliente");
+  const serie = document.getElementById("headerOTSerie");
+  const estadoEl = document.getElementById("headerOTEstado");
+  const entrega = document.getElementById("headerOTEntrega");
+  const progresoTexto = document.getElementById("headerOTProgresoTexto");
+  const progresoBarra = document.getElementById("headerOTProgresoBarra");
+
+  if (numero) numero.textContent = ot.os || "Sin OS";
+  if (equipo) equipo.textContent = ot.equipo || "—";
+  if (cliente) cliente.textContent = ot.cliente || "—";
+  if (serie) serie.textContent = ot.serie || "—";
+
+  if (estadoEl) {
+    estadoEl.textContent = estado;
+    estadoEl.className = `header-ot-estado ${estado.toLowerCase()}`;
+  }
+
+  if (entrega) {
+    entrega.textContent = ot.gantt?.fechaTermino
+      ? new Date(ot.gantt.fechaTermino + "T00:00:00")
+          .toLocaleDateString("es-CL")
+      : "Sin fecha";
+  }
+
+  if (progresoTexto) progresoTexto.textContent = `${progreso}%`;
+  if (progresoBarra) progresoBarra.style.width = `${progreso}%`;
+
+  header.style.display = "block";
 }
 
 function cerrarSesion() {
