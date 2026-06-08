@@ -89,12 +89,38 @@ function escucharOTsTiempoReal() {
     return;
   }
 
-  const q = query(
-    collection(db, "ots"),
-    where("empresaId", "==", usuarioActivo.empresaId),
-    where("sucursalId", "==", usuarioActivo.sucursalId),
-    orderBy("fechaCreacion", "desc")
-  );
+  let q;
+
+  if (usuarioActivo.rol === "super_admin") {
+
+    q = query(
+      collection(db, "ots"),
+      orderBy("fechaCreacion", "desc")
+    );
+
+    console.log("Dashboard GLOBAL super_admin");
+
+  } else if (usuarioActivo.rol === "admin_empresa") {
+
+    q = query(
+      collection(db, "ots"),
+      where("empresaId", "==", usuarioActivo.empresaId),
+      orderBy("fechaCreacion", "desc")
+    );
+
+    console.log("Dashboard empresa:", usuarioActivo.empresaId);
+
+  } else {
+
+    q = query(
+      collection(db, "ots"),
+      where("empresaId", "==", usuarioActivo.empresaId),
+      where("sucursalId", "==", usuarioActivo.sucursalId),
+      orderBy("fechaCreacion", "desc")
+    );
+
+    console.log("Dashboard sucursal:", usuarioActivo.sucursalId);
+  }
 
   onSnapshot(q, (snapshot) => {
 
@@ -112,12 +138,6 @@ function escucharOTsTiempoReal() {
     renderAlertasDashboard(listaFiltrada);
     renderProximosDespachos(listaFiltrada);
     renderGanttTaller(listaFiltrada);
-
-    console.log(
-      "Dashboard actualizado por sucursal ✅",
-      usuarioActivo.sucursalId,
-      listaOTs
-    );
 
   }, (error) => {
     console.error("Error escuchando OTs:", error);
@@ -1047,14 +1067,18 @@ function renderUsuarioActivo() {
   }
 
   if (rol) {
-    if (usuarioActivo.rol === "jefe_taller") {
-      rol.textContent = "Jefe Taller";
-    } else if (usuarioActivo.rol === "usuario_taller") {
-      rol.textContent = "Usuario Taller";
-    } else {
-      rol.textContent = usuarioActivo.rol || "Sin rol";
-    }
+  if (usuarioActivo.rol === "super_admin") {
+    rol.textContent = "Super Admin";
+  } else if (usuarioActivo.rol === "admin_empresa") {
+    rol.textContent = "Admin Empresa";
+  } else if (usuarioActivo.rol === "jefe_taller") {
+    rol.textContent = "Jefe Taller";
+  } else if (usuarioActivo.rol === "usuario_taller") {
+    rol.textContent = "Usuario Taller";
+  } else {
+    rol.textContent = usuarioActivo.rol || "Sin rol";
   }
+}
 }
 
 function cerrarSesion() {

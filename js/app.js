@@ -48,6 +48,26 @@ function esUsuarioTaller() {
   return usuario && usuario.rol === "usuario_taller";
 }
 
+function puedeEliminarComentario(c) {
+
+  if (!c) return false;
+
+  // Jefe de Taller puede eliminar cualquier comentario
+  if (esJefeTaller()) return true;
+
+  // Usuario Taller NO puede borrar observaciones del Jefe
+  if (esUsuarioTaller() && c.rol === "jefe_taller") {
+    return false;
+  }
+
+  // Usuario Taller puede borrar comentarios de usuario_taller
+  if (esUsuarioTaller() && c.rol === "usuario_taller") {
+    return true;
+  }
+
+  return false;
+}
+
 // =======================
 // APLICAR PERMISOS VISUALES
 // =======================
@@ -234,6 +254,55 @@ function habilitarTabsPlanificacionJefe() {
   console.log("Tabs desbloqueadas para planificación Jefe de Taller ✅");
 }
 
+function itemCompleto(item) {
+
+  if (!item) return false;
+
+  const check =
+    item.ok === true;
+
+  const tieneFotos =
+    item.fotos &&
+    item.fotos.length > 0;
+
+  const tieneComentarios =
+    item.comentarios &&
+    item.comentarios.some(
+      c => c.rol !== "jefe_taller"
+    );
+
+  return (
+    check &&
+    tieneFotos &&
+    tieneComentarios
+  );
+}
+
+function calcularProgresoChecklist(lista) {
+
+  if (!lista || lista.length === 0) {
+    return {
+      total: 0,
+      completos: 0,
+      porcentaje: 0
+    };
+  }
+
+  const completos =
+    lista.filter(item => itemCompleto(item)).length;
+
+  const total = lista.length;
+
+  const porcentaje =
+    Math.round((completos / total) * 100);
+
+  return {
+    total,
+    completos,
+    porcentaje
+  };
+}
+
 // =======================
 // INGRESO (CARGAR EXCEL)
 // =======================
@@ -272,6 +341,43 @@ function cargarIngreso() {
   reader.readAsArrayBuffer(file);
 }
 
+function renderProgresoEtapa(id, lista) {
+
+  const cont = document.getElementById(id);
+
+  if (!cont) return;
+
+  const progreso =
+    calcularProgresoChecklist(lista);
+
+  cont.innerHTML = `
+    <div class="progreso-etapa-card">
+
+      <div class="progreso-etapa-header">
+
+        <span>
+          ${progreso.completos} de ${progreso.total} completados
+        </span>
+
+        <strong>
+          ${progreso.porcentaje}%
+        </strong>
+
+      </div>
+
+      <div class="progreso-etapa-barra">
+
+        <div 
+          class="progreso-etapa-fill"
+          style="width:${progreso.porcentaje}%;">
+        </div>
+
+      </div>
+
+    </div>
+  `;
+}
+
 // =======================
 // RENDER INGRESO
 // =======================
@@ -281,38 +387,90 @@ function renderIngreso() {
   if (!cont) return;
 
   cont.innerHTML = "";
+  renderProgresoEtapa(
+  "progresoIngreso",
+  ot.ingreso
+);
+  cont.className = "checklist-pro-grid";
 
   if (!ot.ingreso) return;
 
   ot.ingreso.forEach((item, i) => {
 
-      // 🔥 NORMALIZAR DATOS ANTIGUOS
+    // 🔥 NORMALIZAR DATOS ANTIGUOS
     if (!item.comentarios) item.comentarios = [];
     if (!item.fotos) item.fotos = [];
 
+    const completado = itemCompleto(item);
+    const cantidadFotos = item.fotos.length;
+    const cantidadComentarios = item.comentarios.length;
+
     const div = document.createElement("div");
-    div.className = "item";
+    div.className = `checklist-card ${completado ? "completed" : ""}`;
 
     div.innerHTML = `
-      <label>
-        <input type="checkbox" ${item.ok ? "checked" : ""} onchange="toggleIngreso(${i})">
-        ${item.item}
-      </label>
+      <div class="checklist-card-header">
 
-      <input 
-        type="file"
-        accept="image/*"
-        multiple
-        onchange="subirFotoIngreso(event, ${i})"
->
-      <div id="fotos-ingreso-${i}"></div>
+        <div class="checklist-card-title">
+          <input 
+            type="checkbox"
+            class="checklist-card-check"
+            ${item.ok ? "checked" : ""}
+            onchange="toggleIngreso(${i})"
+          >
 
-      <hr>
+          <h4>${item.item}</h4>
+        </div>
 
-      <input id="tecnico-${i}" placeholder="Técnico">
-      <input id="comentario-${i}" placeholder="Trabajo realizado">
+        <span class="checklist-status ${completado ? "done" : "pending"}">
+          ${completado ? "Completado" : "Pendiente"}
+        </span>
 
-      <button onclick="agregarComentarioItem(${i})">Agregar</button>
+      </div>
+
+      <div class="checklist-card-footer">
+
+        <span class="checklist-mini-badge">
+          📷 ${cantidadFotos} evidencia(s)
+        </span>
+
+        <span class="checklist-mini-badge">
+          💬 ${cantidadComentarios} comentario(s)
+        </span>
+
+      </div>
+
+      <div class="checklist-upload-box">
+        <label class="btn-upload-pro">
+          📷 Agregar evidencias
+          <input 
+            type="file"
+            accept="image/*"
+            multiple
+            onchange="subirFotoIngreso(event, ${i})"
+          >
+        </label>
+      </div>
+
+      <div id="fotos-ingreso-${i}" class="checklist-fotos-pro"></div>
+
+      <div class="checklist-comment-box">
+
+        <input 
+          id="tecnico-${i}" 
+          placeholder="Técnico"
+        >
+
+        <input 
+          id="comentario-${i}" 
+          placeholder="Trabajo realizado"
+        >
+
+        <button onclick="agregarComentarioItem(${i})">
+          Agregar Comentario
+        </button>
+
+      </div>
 
       <div id="comentarios-ingreso-${i}"></div>
     `;
@@ -328,13 +486,21 @@ function renderIngreso() {
 // CHECK
 // =======================
 function toggleIngreso(i) {
+
   if (OTBloqueada()) return;
 
   ot.ingreso[i].ok = !ot.ingreso[i].ok;
 
   actualizarEstadoGanttDesdeChecklist();
 
-  guardarCambiosOT();
+  agregarBitacora(
+  "Checklist actualizado",
+  `Ingreso: ${ot.ingreso[i].item}`
+);
+
+  autoguardarCambiosOT();
+
+  renderIngreso();
 
   if (ot.gantt?.actividades?.length) {
     renderCartaGantt();
@@ -362,11 +528,6 @@ async function subirFotoIngreso(e, i) {
 
       const imagenBlob = await comprimirImagenBlob(file);
 
-      console.log("Imagen optimizada:", {
-        originalKB: Math.round(file.size / 1024),
-        optimizadaKB: Math.round(imagenBlob.size / 1024)
-      });
-
       const imagenComprimida = new File(
         [imagenBlob],
         `ingreso_${Date.now()}.jpg`,
@@ -382,9 +543,14 @@ async function subirFotoIngreso(e, i) {
       ot.ingreso[i].fotos.push(urlFoto);
     }
 
+    agregarBitacora(
+  "Evidencia agregada",
+  `Ingreso: ${files.length} foto(s)`
+);
+
     await guardarCambiosOT();
 
-    mostrarFotosIngreso(i);
+    renderIngreso();
 
     e.target.value = "";
 
@@ -440,7 +606,7 @@ async function eliminarFotoIngreso(i, index) {
 
   await guardarCambiosOT();
 
-  mostrarFotosIngreso(i);
+  renderIngreso();
 }
 
 // =======================
@@ -458,27 +624,35 @@ function agregarComentarioItem(i) {
     return;
   }
 
+  if (!ot.ingreso[i].comentarios) {
+    ot.ingreso[i].comentarios = [];
+  }
+
   ot.ingreso[i].comentarios.push({
-  nombre,
-  texto,
-  fecha: new Date().toLocaleString(),
-  rol: usuario?.rol || "usuario_taller",
+    nombre,
+    texto,
+    fecha: new Date().toLocaleString(),
+    rol: usuario?.rol || "usuario_taller",
+    creadoPorUid: usuario?.uid || "",
+    creadoPorNombre: usuario?.nombre || nombre,
+    atendido: esJefeTaller() ? false : true,
+    respuestaUsuario: "",
+    atendidoPor: "",
+    fechaAtendido: ""
+  });
 
-  atendido: esJefeTaller() ? false : true,
-  respuestaUsuario: "",
-  atendidoPor: "",
-  fechaAtendido: ""
-});
+  if (esJefeTaller()) {
+    ot.alertaJefe = true;
+  }
 
-if (esJefeTaller()) {
-  ot.alertaJefe = true;
-}
+  agregarBitacora(
+  "Comentario agregado",
+  `Ingreso: ${ot.ingreso[i].item}`
+);
 
   guardarCambiosOT();
-  renderComentariosItem(i);
 
-  document.getElementById(`tecnico-${i}`).value = "";
-  document.getElementById(`comentario-${i}`).value = "";
+  renderIngreso();
 }
 
 function renderComentariosItem(i) {
@@ -526,7 +700,7 @@ function renderComentariosItem(i) {
   }
 
   ${
-  esJefeTaller()
+  puedeEliminarComentario(c)
     ? `<button 
         class="btn-delete-comment"
         onclick="eliminarComentarioIngreso(${i}, ${index})">
@@ -548,8 +722,60 @@ function eliminarComentarioIngreso(i, index) {
 
   ot.ingreso[i].comentarios.splice(index, 1);
 
+  actualizarAlertaJefe();
+
   guardarCambiosOT();
-  renderComentariosItem(i);
+
+  renderIngreso();
+}
+
+function deshabilitarTab(nombre) {
+  const tab = document.querySelector(`[data-tab="${nombre}"]`);
+  if (!tab) return;
+
+  tab.classList.add("disabled");
+  tab.classList.remove("enabled");
+  tab.classList.remove("active");
+}
+
+function configurarTabsSegunFlujo() {
+
+  if (!ot) return;
+
+  // Primero bloqueamos todas las etapas operativas
+  deshabilitarTab("evaluacion");
+  deshabilitarTab("overhaul");
+  deshabilitarTab("pruebas");
+  deshabilitarTab("despacho");
+
+  // Ingreso siempre habilitado cuando existe OT
+  habilitarTab("ingreso");
+
+  // Jefe Taller puede planificar/ver todas
+  if (esJefeTaller()) {
+    habilitarTab("evaluacion");
+    habilitarTab("overhaul");
+    habilitarTab("pruebas");
+    habilitarTab("despacho");
+    return;
+  }
+
+  // Usuario Taller sigue el flujo real
+  if (ot.ingresoAprobado) {
+    habilitarTab("evaluacion");
+  }
+
+  if (ot.evaluacionAprobada && ot.overhaulRequerido === true) {
+    habilitarTab("overhaul");
+  }
+
+  if (ot.overhaulRequerido === true && ot.overhaulAprobado) {
+    habilitarTab("pruebas");
+  }
+
+  if (ot.pruebasAprobado || ot.overhaulRequerido === false) {
+    habilitarTab("despacho");
+  }
 }
 
 // =======================
@@ -557,15 +783,29 @@ function eliminarComentarioIngreso(i, index) {
 // =======================
 function validarIngresoCompleto() {
 
-  if (!ot.ingreso.length) return alert("Carga checklist"), false;
+  if (!ot.ingreso || !ot.ingreso.length) {
+    alert("Carga checklist");
+    return false;
+  }
 
-  const ok = ot.ingreso.every(i => i.ok);
-  const fotos = ot.ingreso.every(i => i.fotos.length > 0);
+  const ok = ot.ingreso.every(i => i.ok === true);
+  const fotos = ot.ingreso.every(i => i.fotos && i.fotos.length > 0);
   const comentarios = ot.ingreso.every(i => i.comentarios && i.comentarios.length > 0);
 
-  if (!ok) return alert("Checklist incompleto"), false;
-  if (!fotos) return alert("Debes ingresar evidencia fotografica"), false;
-  if (!comentarios) return alert("Debes ingresar comentarios"), false;
+  if (!ok) {
+    alert("Checklist incompleto");
+    return false;
+  }
+
+  if (!fotos) {
+    alert("Debes ingresar evidencia fotográfica");
+    return false;
+  }
+
+  if (!comentarios) {
+    alert("Debes ingresar comentarios");
+    return false;
+  }
 
   return true;
 }
@@ -606,7 +846,7 @@ function guardarIngreso() {
 // =======================
 // GUARDAR
 // =======================
-async function guardarCambiosOT() {
+async function guardarCambiosOT(silencioso = false) {
 
   if (!ot) return;
 
@@ -621,20 +861,80 @@ async function guardarCambiosOT() {
 
     ot.estado = obtenerEstadoOT(ot);
 
-    await updateDoc(doc(db, "ots", id), {
-      ...ot,
-      estado: ot.estado,
-      fechaActualizacion: serverTimestamp()
-    });
+    const datosActualizar = JSON.parse(JSON.stringify(ot));
+
+    delete datosActualizar.id;
+
+    datosActualizar.fechaActualizacion =
+      serverTimestamp();
+
+    await updateDoc(
+      doc(db, "ots", id),
+      datosActualizar
+    );
 
     console.log("OT actualizada en Firebase ✅");
 
     renderHeaderOTPro();
 
+    mostrarEstadoAutoguardado("Cambios guardados", "ok");
+
   } catch (error) {
+
     console.error("Error guardando OT:", error);
+
     alert("Error al guardar cambios en Firebase");
+
+    mostrarEstadoAutoguardado("Error al guardar", "error");
   }
+}
+
+let timerAutoguardado = null;
+
+function mostrarEstadoAutoguardado(texto, tipo = "ok") {
+  const el = document.getElementById("estadoAutoguardado");
+  if (!el) return;
+
+  el.textContent = texto;
+  el.className = `estado-autoguardado ${tipo}`;
+
+  clearTimeout(window.hideAutoSave);
+
+window.hideAutoSave = setTimeout(() => {
+  el.style.opacity = "0";
+}, 2500);
+
+el.style.opacity = "1";
+}
+
+function agregarBitacora(accion, detalle = "") {
+
+  if (!ot) return;
+
+  if (!ot.bitacora) {
+    ot.bitacora = [];
+  }
+
+  ot.bitacora.push({
+    accion,
+    detalle,
+    usuario: usuario?.nombre || "Usuario",
+    rol: usuario?.rol || "Sin rol",
+    fecha: new Date().toLocaleString()
+  });
+}
+
+function autoguardarCambiosOT(delay = 700) {
+
+  if (!ot) return;
+
+  clearTimeout(timerAutoguardado);
+
+  mostrarEstadoAutoguardado("Guardando cambios...", "guardando");
+
+  timerAutoguardado = setTimeout(async () => {
+    await guardarCambiosOT(true);
+  }, delay);
 }
 
 function obtenerEstadoOT(ot) {
@@ -787,7 +1087,6 @@ async function subirFotoEvaluacion(e, i) {
   if (OTBloqueada()) return;
 
   const files = Array.from(e.target.files);
-
   if (!files.length) return;
 
   try {
@@ -799,11 +1098,6 @@ async function subirFotoEvaluacion(e, i) {
     for (const file of files) {
 
       const imagenBlob = await comprimirImagenBlob(file);
-
-      console.log("Imagen optimizada:", {
-        originalKB: Math.round(file.size / 1024),
-        optimizadaKB: Math.round(imagenBlob.size / 1024)
-      });
 
       const imagenComprimida = new File(
         [imagenBlob],
@@ -822,7 +1116,7 @@ async function subirFotoEvaluacion(e, i) {
 
     await guardarCambiosOT();
 
-    mostrarFotosEvaluacion(i);
+    renderEvaluacion();
 
     e.target.value = "";
 
@@ -838,6 +1132,11 @@ function renderEvaluacion() {
   if (!cont) return;
 
   cont.innerHTML = "";
+  renderProgresoEtapa(
+  "progresoEvaluacion",
+  ot.evaluacion
+);
+  cont.className = "checklist-pro-grid";
 
   if (!ot.evaluacion) return;
 
@@ -847,30 +1146,76 @@ function renderEvaluacion() {
     if (!item.fotos) item.fotos = [];
     if (!item.comentarios) item.comentarios = [];
 
+    const completado = itemCompleto(item);
+    const cantidadFotos = item.fotos.length;
+    const cantidadComentarios = item.comentarios.length;
+
     const div = document.createElement("div");
-    div.className = "item";
+    div.className = `checklist-card ${completado ? "completed" : ""}`;
 
     div.innerHTML = `
-      <label>
-        <input type="checkbox" ${item.ok ? "checked" : ""} onchange="toggleEvaluacion(${i})">
-        ${item.item}
-      </label>
+      <div class="checklist-card-header">
 
-      <input 
-        type="file"
-        accept="image/*"
-        multiple    
-        onchange="subirFotoEvaluacion(event, ${i})"
-      >
+        <div class="checklist-card-title">
+          <input 
+            type="checkbox"
+            class="checklist-card-check"
+            ${item.ok ? "checked" : ""}
+            onchange="toggleEvaluacion(${i})"
+          >
 
-      <div id="fotos-evaluacion-${i}"></div>
+          <h4>${item.item}</h4>
+        </div>
 
-      <hr>
+        <span class="checklist-status ${completado ? "done" : "pending"}">
+          ${completado ? "Completado" : "Pendiente"}
+        </span>
 
-      <input id="tecnico-eval-${i}" placeholder="Técnico">
-      <input id="comentario-eval-${i}" placeholder="Trabajo realizado">
+      </div>
 
-      <button onclick="agregarComentarioEvaluacion(${i})">Agregar</button>
+      <div class="checklist-card-footer">
+
+        <span class="checklist-mini-badge">
+          📷 ${cantidadFotos} evidencia(s)
+        </span>
+
+        <span class="checklist-mini-badge">
+          💬 ${cantidadComentarios} comentario(s)
+        </span>
+
+      </div>
+
+      <div class="checklist-upload-box">
+        <label class="btn-upload-pro">
+          📷 Agregar evidencias
+          <input 
+            type="file"
+            accept="image/*"
+            multiple
+            onchange="subirFotoEvaluacion(event, ${i})"
+          >
+        </label>
+      </div>
+
+      <div id="fotos-evaluacion-${i}" class="checklist-fotos-pro"></div>
+
+      <div class="checklist-comment-box">
+
+        <input 
+          id="tecnico-eval-${i}" 
+          placeholder="Técnico"
+        >
+
+        <input 
+          id="comentario-eval-${i}" 
+          placeholder="Trabajo realizado"
+        >
+
+        <button onclick="agregarComentarioEvaluacion(${i})">
+          Agregar Comentario
+        </button>
+
+      </div>
 
       <div id="comentarios-evaluacion-${i}"></div>
     `;
@@ -883,13 +1228,16 @@ function renderEvaluacion() {
 }
 
 function toggleEvaluacion(i) {
+
   if (OTBloqueada()) return;
 
-  ot.ingreso[i].ok = !ot.ingreso[i].ok;
+  ot.evaluacion[i].ok = !ot.evaluacion[i].ok;
 
   actualizarEstadoGanttDesdeChecklist();
 
-  guardarCambiosOT();
+  autoguardarCambiosOT();
+
+  renderEvaluacion();
 
   if (ot.gantt?.actividades?.length) {
     renderCartaGantt();
@@ -943,7 +1291,7 @@ async function eliminarFotoEvaluacion(i, index) {
 
   await guardarCambiosOT();
 
-  mostrarFotosEvaluacion(i);
+  renderEvaluacion();
 }
 
 function agregarComentarioEvaluacion(i) {
@@ -958,27 +1306,30 @@ function agregarComentarioEvaluacion(i) {
     return;
   }
 
+  if (!ot.evaluacion[i].comentarios) {
+    ot.evaluacion[i].comentarios = [];
+  }
+
   ot.evaluacion[i].comentarios.push({
-  nombre,
-  texto,
-  fecha: new Date().toLocaleString(),
-  rol: usuario?.rol || "usuario_taller",
+    nombre,
+    texto,
+    fecha: new Date().toLocaleString(),
+    rol: usuario?.rol || "usuario_taller",
+    creadoPorUid: usuario?.uid || "",
+    creadoPorNombre: usuario?.nombre || nombre,
+    atendido: esJefeTaller() ? false : true,
+    respuestaUsuario: "",
+    atendidoPor: "",
+    fechaAtendido: ""
+  });
 
-  atendido: esJefeTaller() ? false : true,
-  respuestaUsuario: "",
-  atendidoPor: "",
-  fechaAtendido: ""
-});
-
-if (esJefeTaller()) {
-  ot.alertaJefe = true;
-}
+  if (esJefeTaller()) {
+    ot.alertaJefe = true;
+  }
 
   guardarCambiosOT();
-  renderComentariosEvaluacion(i);
 
-  document.getElementById(`tecnico-eval-${i}`).value = "";
-  document.getElementById(`comentario-eval-${i}`).value = "";
+  renderEvaluacion();
 }
 
 function renderComentariosEvaluacion(i) {
@@ -1023,7 +1374,7 @@ function renderComentariosEvaluacion(i) {
   }
 
   ${
-  esJefeTaller()
+  puedeEliminarComentario(c)
     ? `<button 
         class="btn-delete-comment"
         onclick="eliminarComentarioEvaluacion(${i}, ${index})">
@@ -1074,8 +1425,11 @@ function eliminarComentarioEvaluacion(i, index) {
 
   ot.evaluacion[i].comentarios.splice(index, 1);
 
+  actualizarAlertaJefe();
+
   guardarCambiosOT();
-  renderComentariosEvaluacion(i);
+
+  renderEvaluacion();
 }
 
 
@@ -1389,6 +1743,8 @@ async function eliminarComentarioDecisionEvaluacion() {
 
   ot.decisionEvaluacion.comentario = "";
 
+  actualizarAlertaJefe();
+
   await guardarCambiosOT();
   renderComentarioDecisionEvaluacion();
 }
@@ -1470,7 +1826,6 @@ window.onload = async () => {
 
   if (ot.evaluacion?.length > 0) {
     renderEvaluacion();
-    habilitarTab("evaluacion");
     renderDocsDecisionEvaluacionPreview();
     renderComentarioDecisionEvaluacion();
   }
@@ -1577,9 +1932,7 @@ window.onload = async () => {
     cambiarTab("despacho");
   }
 
-  if (esJefeTaller()) {
-  habilitarTabsPlanificacionJefe();
-}
+  configurarTabsSegunFlujo();
 
 if (ot.gantt) {
   renderCartaGantt();
@@ -1710,40 +2063,93 @@ function cargarOverhaul() {
 function renderOverhaul() {
 
   const cont = document.getElementById("listaOverhaul");
-
   if (!cont) return;
 
   cont.innerHTML = "";
+  renderProgresoEtapa(
+  "progresoOverhaul",
+  ot.overhaul
+);
+  cont.className = "checklist-pro-grid";
 
   if (!ot.overhaul) return;
 
   ot.overhaul.forEach((item, i) => {
 
+    // 🔥 NORMALIZAR DATOS ANTIGUOS
+    if (!item.comentarios) item.comentarios = [];
+    if (!item.fotos) item.fotos = [];
+
+    const completado = itemCompleto(item);  
+    const cantidadFotos = item.fotos.length;
+    const cantidadComentarios = item.comentarios.length;
+
     const div = document.createElement("div");
-    div.className = "item";
+    div.className = `checklist-card ${completado ? "completed" : ""}`;
 
     div.innerHTML = `
-      <label>
-        <input type="checkbox" onchange="toggleOverhaul(${i})" ${item.ok ? "checked" : ""}>
-        ${item.item}
-      </label>
+      <div class="checklist-card-header">
 
-      <input 
-        type="file"
-        accept="image/*"
-        multiple
-        onchange="subirFotoOverhaul(event, ${i})"
-      >
+        <div class="checklist-card-title">
+          <input 
+            type="checkbox"
+            class="checklist-card-check"
+            ${item.ok ? "checked" : ""}
+            onchange="toggleOverhaul(${i})"
+          >
 
+          <h4>${item.item}</h4>
+        </div>
 
-      <div id="fotos-overhaul-${i}"></div>
+        <span class="checklist-status ${completado ? "done" : "pending"}">
+          ${completado ? "Completado" : "Pendiente"}
+        </span>
 
-      <hr>
+      </div>
 
-      <input id="tec-overhaul-${i}" placeholder="Técnico">
-      <input id="com-overhaul-${i}" placeholder="Trabajo realizado">
+      <div class="checklist-card-footer">
 
-      <button onclick="agregarComentarioOverhaul(${i})">Agregar</button>
+        <span class="checklist-mini-badge">
+          📷 ${cantidadFotos} evidencia(s)
+        </span>
+
+        <span class="checklist-mini-badge">
+          💬 ${cantidadComentarios} comentario(s)
+        </span>
+
+      </div>
+
+      <div class="checklist-upload-box">
+        <label class="btn-upload-pro">
+          📷 Agregar evidencias
+          <input 
+            type="file"
+            accept="image/*"
+            multiple
+            onchange="subirFotoOverhaul(event, ${i})"
+          >
+        </label>
+      </div>
+
+      <div id="fotos-overhaul-${i}" class="checklist-fotos-pro"></div>
+
+      <div class="checklist-comment-box">
+
+        <input 
+          id="tec-overhaul-${i}" 
+          placeholder="Técnico"
+        >
+
+        <input 
+          id="com-overhaul-${i}" 
+          placeholder="Trabajo realizado"
+        >
+
+        <button onclick="agregarComentarioOverhaul(${i})">
+          Agregar Comentario
+        </button>
+
+      </div>
 
       <div id="comentarios-overhaul-${i}"></div>
     `;
@@ -1756,13 +2162,18 @@ function renderOverhaul() {
 }
 
 function toggleOverhaul(i) {
-   if (OTBloqueada()) return;
 
-  ot.ingreso[i].ok = !ot.ingreso[i].ok;
+  if (OTBloqueada()) return;
+
+  if (!ot.overhaul || !ot.overhaul[i]) return;
+
+  ot.overhaul[i].ok = !ot.overhaul[i].ok;
 
   actualizarEstadoGanttDesdeChecklist();
 
-  guardarCambiosOT();
+  autoguardarCambiosOT();
+
+  renderOverhaul();
 
   if (ot.gantt?.actividades?.length) {
     renderCartaGantt();
@@ -1774,7 +2185,6 @@ async function subirFotoOverhaul(e, i) {
   if (OTBloqueada()) return;
 
   const files = Array.from(e.target.files);
-
   if (!files.length) return;
 
   try {
@@ -1786,11 +2196,6 @@ async function subirFotoOverhaul(e, i) {
     for (const file of files) {
 
       const imagenBlob = await comprimirImagenBlob(file);
-
-      console.log("Imagen optimizada:", {
-        originalKB: Math.round(file.size / 1024),
-        optimizadaKB: Math.round(imagenBlob.size / 1024)
-      });
 
       const imagenComprimida = new File(
         [imagenBlob],
@@ -1809,7 +2214,7 @@ async function subirFotoOverhaul(e, i) {
 
     await guardarCambiosOT();
 
-    mostrarFotosOverhaul(i);
+    renderOverhaul();
 
     e.target.value = "";
 
@@ -1867,7 +2272,7 @@ async function eliminarFotoOverhaul(i, index) {
 
   await guardarCambiosOT();
 
-  mostrarFotosOverhaul(i);
+  renderOverhaul();
 }
 
 function agregarComentarioOverhaul(i) {
@@ -1887,27 +2292,25 @@ function agregarComentarioOverhaul(i) {
   }
 
   ot.overhaul[i].comentarios.push({
-  nombre,
-  texto,
-  fecha: new Date().toLocaleString(),
-  rol: usuario?.rol || "usuario_taller",
+    nombre,
+    texto,
+    fecha: new Date().toLocaleString(),
+    rol: usuario?.rol || "usuario_taller",
+    creadoPorUid: usuario?.uid || "",
+    creadoPorNombre: usuario?.nombre || nombre,
+    atendido: esJefeTaller() ? false : true,
+    respuestaUsuario: "",
+    atendidoPor: "",
+    fechaAtendido: ""
+  });
 
-  atendido: esJefeTaller() ? false : true,
-  respuestaUsuario: "",
-  atendidoPor: "",
-  fechaAtendido: ""
-});
-
-if (esJefeTaller()) {
-  ot.alertaJefe = true;
-}
+  if (esJefeTaller()) {
+    ot.alertaJefe = true;
+  }
 
   guardarCambiosOT();
 
-  renderComentariosOverhaul(i);
-
-  document.getElementById(`tec-overhaul-${i}`).value = "";
-  document.getElementById(`com-overhaul-${i}`).value = "";
+  renderOverhaul();
 }
 
 function renderComentariosOverhaul(i) {
@@ -1950,7 +2353,7 @@ function renderComentariosOverhaul(i) {
   }
 
   ${
-  esJefeTaller()
+  puedeEliminarComentario(c)
     ? `<button 
         class="btn-delete-comment"
         onclick="eliminarComentarioOverhaul(${i}, ${index})">
@@ -1972,8 +2375,11 @@ function eliminarComentarioOverhaul(i, index) {
 
   ot.overhaul[i].comentarios.splice(index, 1);
 
+  actualizarAlertaJefe(); 
+
   guardarCambiosOT();
-  renderComentariosOverhaul(i);
+
+  renderOverhaul();
 }
 
 // =======================
@@ -3000,40 +3406,103 @@ function renderChecklist(tipo) {
   if (!cont) return;
 
   cont.innerHTML = "";
+  if (tipo === "mecanico") {
+
+  renderProgresoEtapa(
+    "progresoMecanico",
+    ot.pruebas?.mecanico
+  );
+
+}
+
+if (tipo === "electrico") {
+
+  renderProgresoEtapa(
+    "progresoElectrico",
+    ot.pruebas?.electrico
+  );
+
+}
+  cont.className = "checklist-pro-grid";
 
   if (!ot.pruebas || !ot.pruebas[tipo]) return;
 
   ot.pruebas[tipo].forEach((item, i) => {
 
-    const fechaTexto = item.fecha 
-      ? new Date(item.fecha).toLocaleString()
-      : "Sin registro";
+    // 🔥 NORMALIZAR DATOS ANTIGUOS
+    if (!item.comentarios) item.comentarios = [];
+    if (!item.fotos) item.fotos = [];
+
+    const completado = itemCompleto(item);
+    const cantidadFotos = item.fotos.length;
+    const cantidadComentarios = item.comentarios.length;
 
     const div = document.createElement("div");
-    div.className = "item";
+    div.className = `checklist-card ${completado ? "completed" : ""}`;
 
     div.innerHTML = `
-      <label>
-        <input type="checkbox" onchange="togglePrueba('${tipo}', ${i})" ${item.ok ? "checked" : ""}>
-        ${item.item}
-      </label>
+      <div class="checklist-card-header">
 
+        <div class="checklist-card-title">
+          <input 
+            type="checkbox"
+            class="checklist-card-check"
+            ${item.ok ? "checked" : ""}
+            onchange="togglePrueba('${tipo}', ${i})"
+          >
 
-      <input 
-        type="file"
-        accept="image/*"
-        multiple
-        onchange="subirFotoPrueba(event, '${tipo}', ${i})"
-      >
+          <h4>${item.item}</h4>
+        </div>
 
-      <div id="fotos-${tipo}-${i}"></div>
+        <span class="checklist-status ${completado ? "done" : "pending"}">
+          ${completado ? "Completado" : "Pendiente"}
+        </span>
 
-      <hr>
+      </div>
 
-      <input id="tecnico-${tipo}-${i}" placeholder="Técnico">
-      <input id="comentario-${tipo}-${i}" placeholder="Trabajo realizado">
+      <div class="checklist-card-footer">
 
-      <button onclick="agregarComentarioPrueba('${tipo}', ${i})">Agregar</button>
+        <span class="checklist-mini-badge">
+          📷 ${cantidadFotos} evidencia(s)
+        </span>
+
+        <span class="checklist-mini-badge">
+          💬 ${cantidadComentarios} comentario(s)
+        </span>
+
+      </div>
+
+      <div class="checklist-upload-box">
+        <label class="btn-upload-pro">
+          📷 Agregar evidencias
+          <input 
+            type="file"
+            accept="image/*"
+            multiple
+            onchange="subirFotoPrueba(event, '${tipo}', ${i})"
+          >
+        </label>
+      </div>
+
+      <div id="fotos-${tipo}-${i}" class="checklist-fotos-pro"></div>
+
+      <div class="checklist-comment-box">
+
+        <input 
+          id="tecnico-${tipo}-${i}" 
+          placeholder="Técnico"
+        >
+
+        <input 
+          id="comentario-${tipo}-${i}" 
+          placeholder="Trabajo realizado"
+        >
+
+        <button onclick="agregarComentarioPrueba('${tipo}', ${i})">
+          Agregar Comentario
+        </button>
+
+      </div>
 
       <div id="comentarios-${tipo}-${i}"></div>
     `;
@@ -3046,13 +3515,17 @@ function renderChecklist(tipo) {
 }
 
 function togglePrueba(tipo, i) {
+
   if (OTBloqueada()) return;
 
-  ot.pruebas[tipo][i].ok = !ot.pruebas[tipo][i].ok;
+  ot.pruebas[tipo][i].ok =
+    !ot.pruebas[tipo][i].ok;
 
   actualizarEstadoGanttDesdeChecklist();
 
-  guardarCambiosOT();
+  autoguardarCambiosOT();
+
+  renderChecklist(tipo);
 
   if (ot.gantt?.actividades?.length) {
     renderCartaGantt();
@@ -3081,14 +3554,6 @@ async function subirFotoPrueba(e, tipo, i) {
 
       const imagenBlob = await comprimirImagenBlob(file);
 
-      console.log(
-        "Imagen optimizada:",
-        {
-          originalKB: Math.round(file.size / 1024),
-          optimizadaKB: Math.round(imagenBlob.size / 1024)
-        }
-      );
-
       const imagenComprimida = new File(
         [imagenBlob],
         `pruebas_${tipo}_${Date.now()}.jpg`,
@@ -3106,14 +3571,12 @@ async function subirFotoPrueba(e, tipo, i) {
 
     await guardarCambiosOT();
 
-    mostrarFotosPrueba(tipo, i);
+    renderChecklist(tipo);
 
     e.target.value = "";
 
   } catch (error) {
-
     console.error("Error subiendo foto prueba:", error);
-
     alert("Error al subir imágenes de pruebas");
   }
 }
@@ -3134,39 +3597,30 @@ function agregarComentarioPrueba(tipo, i) {
     ot.pruebas[tipo][i].comentarios = [];
   }
 
-  const fecha = new Date().toLocaleString();
-
   ot.pruebas[tipo][i].comentarios.push({
-  nombre,
-  texto,
-  fecha: new Date().toLocaleString(),
-  rol: usuario?.rol || "usuario_taller",
+    nombre,
+    texto,
+    fecha: new Date().toLocaleString(),
+    rol: usuario?.rol || "usuario_taller",
+    creadoPorUid: usuario?.uid || "",
+    creadoPorNombre: usuario?.nombre || nombre,
+    atendido: esJefeTaller() ? false : true,
+    respuestaUsuario: "",
+    atendidoPor: "",
+    fechaAtendido: ""
+  });
 
-  atendido: esJefeTaller() ? false : true,
-  respuestaUsuario: "",
-  atendidoPor: "",
-  fechaAtendido: ""
-});
+  if (esJefeTaller()) {
+    ot.alertaJefe = true;
+  }
 
-if (esJefeTaller()) {
-  ot.alertaJefe = true;
-}
-else if (esUsuarioTaller()) {
-  ot.alertaJefe = false;
-}
-
-  // 🔥 guardar fecha del item
   if (!ot.pruebas[tipo][i].fecha) {
-    ot.pruebas[tipo][i].fecha = new Date();
+    ot.pruebas[tipo][i].fecha = new Date().toLocaleString();
   }
 
   guardarCambiosOT();
 
-  renderComentariosPrueba(tipo, i);
-
-  // limpiar inputs
-  document.getElementById(`tecnico-${tipo}-${i}`).value = "";
-  document.getElementById(`comentario-${tipo}-${i}`).value = "";
+  renderChecklist(tipo);
 }
 
 function existenComentariosJefePendientes(ot) {
@@ -3273,45 +3727,46 @@ function renderComentariosPrueba(tipo, i) {
   comentarios.forEach((c, index) => {
 
     const div = document.createElement("div");
+
     div.className = c.rol === "jefe_taller"
-  ? "comentario-card comentario-jefe"
-  : "comentario-card";
+      ? "comentario-card comentario-jefe"
+      : "comentario-card";
 
     div.innerHTML = `
-  <strong>👨‍🔧 ${c.nombre}</strong>
-  <p class="comentario-fecha">${c.fecha}</p>
-  <p>${c.texto}</p>
+      <strong>👨‍🔧 ${c.nombre}</strong>
+      <p class="comentario-fecha">${c.fecha}</p>
+      <p>${c.texto}</p>
 
-  ${
-    c.rol === "jefe_taller" && c.atendido !== true && esUsuarioTaller()
-      ? `<button 
-          class="btn-success"
-          onclick="responderComentarioJefe('pruebas', ${i}, ${index}, '${tipo}')">
-          ✅ Responder observación
-        </button>`
-      : ""
-  }
+      ${
+        c.rol === "jefe_taller" && c.atendido !== true && esUsuarioTaller()
+          ? `<button 
+              class="btn-success"
+              onclick="responderComentarioJefe('pruebas', ${i}, ${index}, '${tipo}')">
+              ✅ Responder observación
+            </button>`
+          : ""
+      }
 
-  ${
-    c.rol === "jefe_taller" && c.atendido === true
-      ? `<div class="respuesta-observacion">
-          <strong>✅ Respondido por ${c.atendidoPor || "Usuario Taller"}</strong>
-          <p>${c.respuestaUsuario || ""}</p>
-          <small>${c.fechaAtendido || ""}</small>
-        </div>`
-      : ""
-  }
+      ${
+        c.rol === "jefe_taller" && c.atendido === true
+          ? `<div class="respuesta-observacion">
+              <strong>✅ Respondido por ${c.atendidoPor || "Usuario Taller"}</strong>
+              <p>${c.respuestaUsuario || ""}</p>
+              <small>${c.fechaAtendido || ""}</small>
+            </div>`
+          : ""
+      }
 
-  ${
-  esJefeTaller()
+      ${
+  puedeEliminarComentario(c)
     ? `<button 
         class="btn-delete-comment"
-        onclick="eliminarComentarioPrueba(${i}, ${index})">
+        onclick="eliminarComentarioPrueba('${tipo}', ${i}, ${index})">
         🗑
       </button>`
     : ""
 }
-`;
+    `;
 
     cont.appendChild(div);
   });
@@ -3324,11 +3779,18 @@ function eliminarComentarioPrueba(tipo, i, index) {
   const confirmar = confirm("¿Eliminar este registro?");
   if (!confirmar) return;
 
+  if (!ot.pruebas || !ot.pruebas[tipo] || !ot.pruebas[tipo][i]) {
+    alert("No se encontró el comentario");
+    return;
+  }
+
   ot.pruebas[tipo][i].comentarios.splice(index, 1);
+
+  actualizarAlertaJefe();
 
   guardarCambiosOT();
 
-  renderComentariosPrueba(tipo, i);
+  renderChecklist(tipo);
 }
 
 function mostrarFotosPrueba(tipo, i) {
@@ -3377,7 +3839,7 @@ async function eliminarFotoPrueba(tipo, i, index) {
 
   await guardarCambiosOT();
 
-  mostrarFotosPrueba(tipo, i);
+  renderChecklist(tipo);
 }
 
 // =======================
@@ -3546,31 +4008,46 @@ function renderDocsSeccion(tipo) {
     : "listaDocsFinal";
 
   const cont = document.getElementById(contId);
-
   if (!cont) return;
 
   cont.innerHTML = "";
+  cont.className = "docs-pro-grid";
 
   if (!ot.despacho || !ot.despacho[tipo]) return;
 
   ot.despacho[tipo].forEach((doc, index) => {
 
     const div = document.createElement("div");
-    div.className = "doc-item";
+    div.className = "doc-card-pro";
 
     div.innerHTML = `
-      <div class="doc-left">
-        <span class="doc-icon">📄</span>
-        <span class="doc-name">${doc.nombre}</span>
+      <div class="doc-card-left">
+
+        <div class="doc-card-icon">
+          📄
+        </div>
+
+        <div class="doc-card-info">
+          <h4>${doc.nombre || "Documento sin nombre"}</h4>
+          <span>Documento de ${tipo === "preparacion" ? "preparación" : "despacho final"}</span>
+        </div>
+
       </div>
 
-      <div class="doc-actions">
+      <div class="doc-card-actions">
+
         <button 
-          class="permitido-bloqueo"
+          class="btn-doc-view permitido-bloqueo"
           onclick="abrirDocSeccion(event, '${tipo}', ${index})">
-          👁
+          👁 Ver
         </button>
-        <button onclick="eliminarDocSeccion(event, '${tipo}', ${index})">🗑</button>
+
+        <button 
+          class="btn-doc-delete"
+          onclick="eliminarDocSeccion(event, '${tipo}', ${index})">
+          🗑 Eliminar
+        </button>
+
       </div>
     `;
 
@@ -3786,7 +4263,7 @@ function renderComentariosDespacho(tipo) {
       }
 
       ${
-  esJefeTaller()
+  puedeEliminarComentario(c)
     ? `<button 
         class="btn-delete-comment"
         onclick="eliminarComentarioDespacho('${tipo}', ${index})">
