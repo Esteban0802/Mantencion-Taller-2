@@ -36,6 +36,8 @@ console.log(storage);
 let ot = null;
 let listaOTs = [];
 
+let etapasGanttColapsadas = {};
+
 
 // =======================
 // VALIDAR ROLES
@@ -2802,6 +2804,7 @@ async function generarCartaGantt() {
   const fechaInicioInput = document.getElementById("ganttFechaInicio").value;
   const fechaTerminoInput = document.getElementById("ganttFechaTermino").value;
   const diasRepuestos = Number(document.getElementById("ganttDiasRepuestos").value || 0);
+  const fechaSolicitudRepuestos = document.getElementById("ganttFechaSolicitudRepuestos").value;
   const comentarioRepuestos = document.getElementById("ganttComentarioRepuestos").value.trim();
 
   if (!fechaInicioInput || !fechaTerminoInput) {
@@ -2903,17 +2906,29 @@ fechaCursor = sumarDias(fechaCursor, diasEvaluacion);
 // =========================
 if (diasRepuestos > 0) {
 
-  actividades.push(
-    crear(
-      "Repuestos",
-      comentarioRepuestos || "Espera repuestos",
-      fechaCursor,
-      diasRepuestos,
-      "Espera"
-    )
+  if (!fechaSolicitudRepuestos) {
+
+    alert("Debes ingresar la fecha solicitud repuestos");
+    return;
+  }
+
+  const inicioRepuestos = new Date(
+    fechaSolicitudRepuestos + "T00:00:00"
   );
 
-  fechaCursor = sumarDias(fechaCursor, diasRepuestos);
+  const terminoRepuestos = sumarDiasNaturales(
+    inicioRepuestos,
+    diasRepuestos - 1
+  );
+
+  actividades.push({
+    etapa: "Repuestos",
+    actividad: comentarioRepuestos || "Espera repuestos",
+    inicio: inicioRepuestos.toISOString(),
+    termino: terminoRepuestos.toISOString(),
+    duracion: diasRepuestos,
+    estado: "Espera"
+  });
 }
 
 // =========================
@@ -2962,6 +2977,7 @@ fechaCursor = sumarDias(fechaCursor, diasPruebasElectricas);
     fechaInicio: fechaInicioInput,
     fechaTermino: fechaTerminoInput,
     fechaDespachoEstimada: fechaTermino.toISOString(),
+    fechaSolicitudRepuestos,
     diasRepuestos,
     comentarioRepuestos,
     creadoPor: usuario?.nombre || "Jefe Taller",
@@ -2978,7 +2994,7 @@ fechaCursor = sumarDias(fechaCursor, diasPruebasElectricas);
   if (visual) visual.style.display = "flex";
 
 
-renderCartaGantt();
+renderCartaGanttProject();
 
 document.getElementById("modalGantt").style.display = "none";
 
@@ -3011,6 +3027,8 @@ function cargarGanttGuardado() {
   renderCartaGantt();
 }
 
+
+
 function renderCartaGantt() {
 
   const cont = document.getElementById("ganttResultado");
@@ -3025,13 +3043,29 @@ function renderCartaGantt() {
   const actividades = g.actividades;
 
   const fechaInicio = new Date(g.fechaInicio + "T00:00:00");
-  const fechaTermino = new Date(g.fechaTermino + "T00:00:00");
+const fechaTerminoReal = new Date(g.fechaTermino + "T00:00:00");
 
-  const diasTotales = Math.max(
+// Buscar la última fecha real de todas las actividades
+const ultimaFechaActividad = new Date(
+  Math.max(
+    fechaTerminoReal.getTime(),
+    ...actividades.map(act =>
+      new Date(act.termino).getTime()
+    )
+  )
+);
+
+// Fecha visual con margen extra real
+const fechaTerminoVisual = sumarDiasNaturales(
+  ultimaFechaActividad,
+  14
+);
+
+const diasTotales = Math.max(
   1,
   calcularDiasHabilesEntre(
     fechaInicio,
-    fechaTermino
+    fechaTerminoVisual
   )
 );
 
@@ -3046,8 +3080,8 @@ function renderCartaGantt() {
     Despacho: "cyan"
   };
 
-  const meses = generarMesesGantt(fechaInicio, fechaTermino);
-  const semanas = generarSemanasGantt(fechaInicio, fechaTermino);
+  const meses = generarMesesGantt(fechaInicio, fechaTerminoVisual);
+  const semanas = generarSemanasGantt(fechaInicio, fechaTerminoVisual);
   const anchoSemana = 86;
   const anchoTimeline = Math.max(760, semanas.length * anchoSemana);
 
@@ -3063,7 +3097,7 @@ function renderCartaGantt() {
 
         <div class="gantt-summary-card verde">
           <span>🏁 Fecha estimada despacho</span>
-          <strong>${formatearFecha(fechaTermino)}</strong>
+          <strong>${formatearFecha(fechaTerminoReal)}</strong>
         </div>
 
         <div class="gantt-summary-card morado">
@@ -3118,30 +3152,48 @@ function renderCartaGantt() {
           const inicio = new Date(act.inicio);
           const termino = new Date(act.termino);
 
-          const diffInicio =
-          calcularDiasHabilesEntre(
-            fechaInicio,
-            inicio
-          );
+          const MS_DIA = 1000 * 60 * 60 * 24;
 
-          const duracion = Math.max(1, act.duracion || 1);
+const totalDiasVisual = Math.max(
+  1,
+  Math.ceil((fechaTerminoVisual - fechaInicio) / MS_DIA)
+);
 
-          let left = (diffInicio / diasTotales) * 100;
+const diffInicio = Math.max(
+  0,
+  Math.ceil((inicio - fechaInicio) / MS_DIA)
+);
 
-              // Evita que una actividad quede fuera del timeline
-              if (left > 97) {
-                left = 97;
-              }
+const diffTermino = Math.max(
+  diffInicio + 1,
+  Math.ceil((termino - fechaInicio) / MS_DIA) + 1
+);
 
-              let width = (duracion / diasTotales) * 100;
+const duracionVisual = Math.max(
+  1,
+  diffTermino - diffInicio
+);
 
-              // Recorta si se pasa del final
-              if (left + width > 100) {
-                width = 100 - left;
-              }
+let left = (diffInicio / totalDiasVisual) * 100;
+let width = (duracionVisual / totalDiasVisual) * 100;
 
-              // Ancho mínimo visible
-              width = Math.max(3, width);
+// Si la actividad queda muy al final, no dejarla fuera de pantalla
+if (left > 94) {
+  left = 94;
+}
+
+// Evitar que la barra se corte al borde derecho
+if (left + width > 96) {
+  width = 96 - left;
+}
+
+// Ancho mínimo visible
+width = Math.max(2, width);
+
+const duracion = Math.max(
+  1,
+  act.duracion || duracionVisual
+);
 
 
           const completado = act.estado === "Completado";
@@ -3197,6 +3249,317 @@ function renderCartaGantt() {
 
     </div>
   `;
+}
+
+
+
+
+function renderCartaGanttProject() {
+
+  const cont = document.getElementById("ganttResultado");
+  if (!cont) return;
+
+  if (!ot?.gantt?.actividades?.length) {
+    cont.innerHTML = `<p class="sin-alertas">No existe Carta Gantt generada.</p>`;
+    return;
+  }
+
+  const g = ot.gantt;
+  const actividades = g.actividades;
+  const grupos = agruparActividadesPorEtapa(actividades);
+  const MS_DIA = 1000 * 60 * 60 * 24;
+
+  const fechasInicio = actividades.map(a => new Date(a.inicio));
+  const fechasTermino = actividades.map(a => new Date(a.termino));
+
+  const fechaInicioGlobal = new Date(
+    Math.min(...fechasInicio.map(f => f.getTime()))
+  );
+
+  const fechaTerminoGlobal = sumarDiasNaturales(
+    new Date(Math.max(...fechasTermino.map(f => f.getTime()))),
+    14
+  );
+
+  const totalDias = Math.max(
+    1,
+    Math.ceil((fechaTerminoGlobal - fechaInicioGlobal) / MS_DIA)
+  );
+
+  const anchoSemana = 130;
+  const totalSemanas = Math.ceil(totalDias / 7);
+  const anchoTimeline = Math.max(900, totalSemanas * anchoSemana);
+
+  const semanas = [];
+
+  for (let i = 0; i < totalSemanas; i++) {
+    const inicioSemana = sumarDiasNaturales(fechaInicioGlobal, i * 7);
+    const finSemana = sumarDiasNaturales(inicioSemana, 6);
+
+    semanas.push({
+      inicio: inicioSemana,
+      fin: finSemana,
+      label: `${inicioSemana.toLocaleDateString("es-CL", {
+        day: "2-digit",
+        month: "short"
+      }).replace(".", "")} - ${finSemana.toLocaleDateString("es-CL", {
+        day: "2-digit",
+        month: "short"
+      }).replace(".", "")}`
+    });
+  }
+
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+
+  const posicionHoy =
+    hoy >= fechaInicioGlobal && hoy <= fechaTerminoGlobal
+      ? Math.ceil((hoy - fechaInicioGlobal) / MS_DIA) / 7 * anchoSemana
+      : null;
+
+  const colores = {
+    Ingreso: "azul",
+    Evaluación: "azul",
+    Repuestos: "naranjo",
+    Overhaul: "verde",
+    "Pruebas Mecánicas": "morado",
+    "Pruebas Eléctricas": "morado",
+    Pruebas: "morado",
+    Despacho: "cyan"
+  };
+
+  cont.innerHTML = `
+    <div class="gantt-project">
+
+      <div class="gantt-project-header">
+        <div>
+          <h3>📊 Carta Gantt tipo Project</h3>
+          <p>Planificación por actividades, fechas y duración.</p>
+        </div>
+
+        <div class="gantt-project-actions">
+          <button type="button" onclick="renderCartaGantt()">Vista anterior</button>
+        </div>
+      </div>
+
+      <div class="gantt-project-summary">
+
+        <div>
+          <span>Inicio</span>
+          <strong>${formatearFecha(fechaInicioGlobal)}</strong>
+        </div>
+
+        <div>
+          <span>Término estimado</span>
+          <strong>${formatearFecha(new Date(g.fechaTermino + "T00:00:00"))}</strong>
+        </div>
+
+        <div>
+          <span>Actividades</span>
+          <strong>${actividades.length}</strong>
+        </div>
+
+        <div>
+          <span>Duración visual</span>
+          <strong>${totalDias} días</strong>
+        </div>
+
+      </div>
+
+      <div class="gantt-project-scroll">
+
+        <div class="gantt-project-table" style="--timeline-width:${anchoTimeline}px;">
+
+          <div class="gantt-project-row gantt-project-row-head">
+
+            <div class="gantt-project-info head">
+              <div>Etapa</div>
+              <div>Actividad</div>
+              <div>Inicio</div>
+              <div>Fin</div>
+              <div>Dur.</div>
+            </div>
+
+            <div class="gantt-project-timeline-head" style="width:${anchoTimeline}px;">
+
+              <div class="gantt-project-weeks">
+                ${semanas.map(s => `
+                  <span style="width:${anchoSemana}px">
+                    ${s.label}
+                  </span>
+                `).join("")}
+              </div>
+
+            </div>
+
+          </div>
+
+          <div class="gantt-project-body">
+
+            ${
+              posicionHoy !== null
+                ? `<div 
+                    class="gantt-project-hoy-line"
+                    style="left: calc(680px + ${posicionHoy}px);">
+                    <span>HOY</span>
+                  </div>`
+                : ""
+            }
+
+            ${grupos.map(grupo => {
+
+  return `
+
+    <div class="gantt-etapa-group">
+
+      <div 
+        class="gantt-etapa-title"
+        onclick="toggleEtapaGantt('${grupo.etapa}')"
+      >
+        <span>
+          ${etapasGanttColapsadas[grupo.etapa] ? "▶" : "▼"}
+        </span>
+
+        <strong>${grupo.etapa}</strong>
+
+        <small>${grupo.actividades.length} actividad(es)</small>
+      </div>
+
+      ${
+        etapasGanttColapsadas[grupo.etapa]
+          ? ""
+          : grupo.actividades.map((act) => {
+
+        const inicio = new Date(act.inicio);
+        const termino = new Date(act.termino);
+
+        const diffInicio = Math.max(
+          0,
+          Math.ceil((inicio - fechaInicioGlobal) / MS_DIA)
+        );
+
+        const diffTermino = Math.max(
+          diffInicio + 1,
+          Math.ceil((termino - fechaInicioGlobal) / MS_DIA) + 1
+        );
+
+        const diasActividad = Math.max(
+          1,
+          diffTermino - diffInicio
+        );
+
+        const left = (diffInicio / 7) * anchoSemana;
+
+        const width = Math.max(
+          48,
+          (diasActividad / 7) * anchoSemana
+        );
+
+        const completado = act.estado === "Completado";
+
+        const atrasada =
+          !completado &&
+          termino < hoy;
+
+        let color = colores[act.etapa] || "azul";
+
+        if (completado) color = "completado";
+        if (atrasada) color = "atrasado";
+
+        const duracion = Math.max(
+          1,
+          act.duracion || diasActividad
+        );
+
+        return `
+          <div class="gantt-project-row">
+
+            <div class="gantt-project-info">
+
+              <div class="gantt-etapa-empty"></div>
+
+              <div title="${act.actividad}">
+                ${act.actividad}
+              </div>
+
+              <div>${formatearFechaGanttCorta(inicio)}</div>
+
+              <div>${formatearFechaGanttCorta(termino)}</div>
+
+              <div>${duracion}d</div>
+
+            </div>
+
+            <div class="gantt-project-track" style="width:${anchoTimeline}px;">
+
+              <div
+                class="gantt-project-bar ${color}"
+                style="left:${left}px; width:${width}px;"
+              >
+                ${completado ? "✓" : atrasada ? "Atrasada" : duracion + "d"}
+              </div>
+
+            </div>
+
+          </div>
+        `;
+      }).join("")
+}
+
+    </div>
+
+  `;
+}).join("")}
+
+            }).join("")}
+
+          </div>
+
+        </div>
+
+      </div>
+
+    </div>
+  `;
+}
+
+
+function toggleEtapaGantt(etapa) {
+  etapasGanttColapsadas[etapa] =
+    !etapasGanttColapsadas[etapa];
+
+  renderCartaGanttProject();
+}
+
+
+function agruparActividadesPorEtapa(actividades) {
+
+  const grupos = [];
+
+  actividades.forEach(act => {
+    let grupo = grupos.find(g => g.etapa === act.etapa);
+
+    if (!grupo) {
+      grupo = {
+        etapa: act.etapa,
+        actividades: []
+      };
+
+      grupos.push(grupo);
+    }
+
+    grupo.actividades.push(act);
+  });
+
+  return grupos;
+}
+
+
+function formatearFechaGanttCorta(fecha) {
+  return fecha.toLocaleDateString("es-CL", {
+    day: "2-digit",
+    month: "2-digit"
+  });
 }
 
 
@@ -5544,3 +5907,6 @@ window.volverFormularioGantt = volverFormularioGantt;
 
 window.zoomGantt = zoomGantt;
 window.irHoyGantt = irHoyGantt;
+
+window.renderCartaGanttProject = renderCartaGanttProject;
+window.toggleEtapaGantt = toggleEtapaGantt;
