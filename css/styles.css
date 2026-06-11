@@ -5938,3 +5938,98 @@ box-shadow:
   font-size: 12px;
   margin-left: auto;
 }
+
+
+
+/* =========================
+   DETALLE ACTIVIDADES
+========================= */
+
+.gantt-project-track-detail {
+  display: flex;
+  align-items: center;
+}
+
+.gantt-detail-line {
+  width: 100%;
+  height: 1px;
+  background: rgba(148,163,184,.08);
+}
+
+
+
+
+.gantt-project-row-main .gantt-project-bar {
+  min-width: 120px;
+  padding: 0 14px;
+  white-space: nowrap;
+}
+
+.gantt-project-row-main .gantt-project-bar.repuestos {
+  background: linear-gradient(135deg,#f97316,#ea580c);
+}
+
+
+/* =========================
+   BARRA PARCIAL ETAPA GANTT
+========================= */
+
+.gantt-project-bar-etapa {
+  position: absolute;
+  top: 10px;
+  height: 32px;
+  border-radius: 999px;
+  overflow: hidden;
+
+  background: rgba(71,85,105,.75);
+  border: 1px solid rgba(148,163,184,.18);
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  min-width: 120px;
+  padding: 0 14px;
+
+  box-shadow:
+    0 10px 24px rgba(0,0,0,.35),
+    inset 0 1px 0 rgba(255,255,255,.12);
+}
+
+.gantt-project-bar-etapa span {
+  position: relative;
+  z-index: 2;
+  color: white;
+  font-size: 12px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.gantt-project-bar-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 999px;
+  transition: width .35s ease;
+}
+
+/* Estados */
+
+.gantt-project-bar-etapa.pendiente .gantt-project-bar-fill {
+  background: linear-gradient(135deg,#64748b,#475569);
+}
+
+.gantt-project-bar-etapa.proceso .gantt-project-bar-fill {
+  background: linear-gradient(135deg,#facc15,#eab308);
+}
+
+.gantt-project-bar-etapa.completado .gantt-project-bar-fill {
+  background: linear-gradient(135deg,#22c55e,#16a34a);
+}
+
+.gantt-project-bar-etapa.atrasado .gantt-project-bar-fill {
+  background: linear-gradient(135deg,#ef4444,#b91c1c);
+}
+
+.gantt-project-bar-etapa.repuestos .gantt-project-bar-fill {
+  background: linear-gradient(135deg,#f97316,#ea580c);
+}

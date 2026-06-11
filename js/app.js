@@ -1937,7 +1937,7 @@ window.onload = async () => {
   configurarTabsSegunFlujo();
 
 if (ot.gantt) {
-  renderCartaGantt();
+  renderCartaGanttProject();
 }
 
 const btnGantt =
@@ -2624,7 +2624,7 @@ function abrirModalGantt() {
   // 🔥 SI YA EXISTE GANTT
   if (ot.gantt && ot.gantt.actividades?.length) {
 
-    renderCartaGantt();
+    renderCartaGanttProject();
 
     modalVisual.style.display = "flex";
 
@@ -2844,34 +2844,63 @@ async function generarCartaGantt() {
 // =========================
 
 const totalDiasPlan =
-  Math.ceil(
-    (fechaTermino - new Date(fechaInicioInput + "T00:00:00")) /
-    (1000 * 60 * 60 * 24)
+  calcularDiasHabilesEntreIncluyendoFinal(
+    new Date(fechaInicioInput + "T00:00:00"),
+    fechaTermino
   );
 
-const diasIngreso = 4;
-const diasPruebasMecanicas = 3;
-const diasPruebasElectricas = 3;
+const cantidadIngreso =
+  ot.ingreso?.length || 0;
 
-const diasFijos =
-  diasIngreso +
-  diasRepuestos +
-  diasPruebasMecanicas +
-  diasPruebasElectricas;
+const cantidadEvaluacion =
+  ot.evaluacion?.length || 0;
 
-let diasRestantes =
-  totalDiasPlan - diasFijos;
+const cantidadOverhaul =
+  ot.overhaul?.length || 0;
 
-if (diasRestantes < 2) {
-  alert("El rango de fechas es muy corto para distribuir la planificación");
+const cantidadPruebasMecanicas =
+  ot.pruebas?.mecanico?.length || 0;
+
+const cantidadPruebasElectricas =
+  ot.pruebas?.electrico?.length || 0;
+
+const totalActividadesPlan =
+  cantidadIngreso +
+  cantidadEvaluacion +
+  cantidadOverhaul +
+  cantidadPruebasMecanicas +
+  cantidadPruebasElectricas;
+
+if (totalActividadesPlan === 0) {
+  alert("No existen actividades para generar la planificación");
   return;
 }
 
-const diasEvaluacion =
-  Math.max(1, Math.floor(diasRestantes * 0.45));
+let diasIngreso = Math.max(
+  1,
+  Math.round(totalDiasPlan * (cantidadIngreso / totalActividadesPlan))
+);
 
-const diasOverhaul =
-  Math.max(1, diasRestantes - diasEvaluacion);
+let diasEvaluacion = Math.max(
+  1,
+  Math.round(totalDiasPlan * (cantidadEvaluacion / totalActividadesPlan))
+);
+
+let diasOverhaul = Math.max(
+  1,
+  Math.round(totalDiasPlan * (cantidadOverhaul / totalActividadesPlan))
+);
+
+let diasPruebasMecanicas = Math.max(
+  1,
+  Math.round(totalDiasPlan * (cantidadPruebasMecanicas / totalActividadesPlan))
+);
+
+let diasPruebasElectricas = Math.max(
+  1,
+  Math.round(totalDiasPlan * (cantidadPruebasElectricas / totalActividadesPlan))
+);
+
 
 // =========================
 // INGRESO
@@ -2972,6 +3001,47 @@ const pruebasElec =
 
 actividades.push(...pruebasElec);
 fechaCursor = sumarDias(fechaCursor, diasPruebasElectricas);
+
+const ultimaActividad =
+  actividades
+    .filter(a => a.etapa !== "Repuestos")
+    .map(a => new Date(a.termino).getTime());
+
+const fechaFinalTrabajo = new Date(Math.max(...ultimaActividad));
+
+if (fechaFinalTrabajo > fechaTermino) {
+  alert(
+    "La planificación técnica supera la fecha término ingresada. Aumenta la fecha final o reduce actividades."
+  );
+  return;
+}
+
+// =========================
+// FORZAR ÚLTIMA ACTIVIDAD A FECHA TÉRMINO
+// =========================
+
+const actividadesTecnicas = actividades.filter(
+  a => a.etapa !== "Repuestos"
+);
+
+if (actividadesTecnicas.length > 0) {
+
+  const ultimaTecnica =
+    actividadesTecnicas[actividadesTecnicas.length - 1];
+
+  ultimaTecnica.termino = fechaTermino.toISOString();
+
+  const inicioUltima = new Date(ultimaTecnica.inicio);
+
+  ultimaTecnica.duracion =
+    Math.max(
+      1,
+      calcularDiasHabilesEntreIncluyendoFinal(
+        inicioUltima,
+        fechaTermino
+      )
+    );
+}
 
   ot.gantt = {
     fechaInicio: fechaInicioInput,
@@ -3267,23 +3337,25 @@ function renderCartaGanttProject() {
   const g = ot.gantt;
   const actividades = g.actividades;
   const grupos = agruparActividadesPorEtapa(actividades);
+  const etapasProject =
+  calcularEtapasGanttProject(actividades);
+  etapasProject.forEach(grupo => {
+    if (etapasGanttColapsadas[grupo.etapa] === undefined) {
+      etapasGanttColapsadas[grupo.etapa] = true;
+    }
+  });
   const MS_DIA = 1000 * 60 * 60 * 24;
 
-  const fechasInicio = actividades.map(a => new Date(a.inicio));
-  const fechasTermino = actividades.map(a => new Date(a.termino));
 
-  const fechaInicioGlobal = new Date(
-    Math.min(...fechasInicio.map(f => f.getTime()))
-  );
+  const fechaInicioGlobal =
+  new Date(g.fechaInicio + "T00:00:00");
 
-  const fechaTerminoGlobal = sumarDiasNaturales(
-    new Date(Math.max(...fechasTermino.map(f => f.getTime()))),
-    14
-  );
+  const fechaFinGlobal =
+  new Date(g.fechaTermino + "T00:00:00");
 
   const totalDias = Math.max(
     1,
-    Math.ceil((fechaTerminoGlobal - fechaInicioGlobal) / MS_DIA)
+    Math.ceil((fechaFinGlobal - fechaInicioGlobal) / MS_DIA) + 1
   );
 
   const anchoSemana = 130;
@@ -3313,7 +3385,7 @@ function renderCartaGanttProject() {
   hoy.setHours(0, 0, 0, 0);
 
   const posicionHoy =
-    hoy >= fechaInicioGlobal && hoy <= fechaTerminoGlobal
+    hoy >= fechaInicioGlobal && hoy <= fechaFinGlobal
       ? Math.ceil((hoy - fechaInicioGlobal) / MS_DIA) / 7 * anchoSemana
       : null;
 
@@ -3406,7 +3478,7 @@ function renderCartaGanttProject() {
                 : ""
             }
 
-            ${grupos.map(grupo => {
+            ${etapasProject.map(grupo => {
 
   return `
 
@@ -3424,6 +3496,95 @@ function renderCartaGanttProject() {
 
         <small>${grupo.actividades.length} actividad(es)</small>
       </div>
+
+      ${(() => {
+
+  const inicio = new Date(grupo.inicio);
+  const termino = new Date(grupo.termino);
+
+  const diffInicio = Math.max(
+    0,
+    Math.ceil((inicio - fechaInicioGlobal) / MS_DIA)
+  );
+
+  const diffTermino = Math.max(
+    diffInicio + 1,
+    Math.ceil((termino - fechaInicioGlobal) / MS_DIA) + 1
+  );
+
+  const diasEtapa = Math.max(
+    1,
+    diffTermino - diffInicio
+  );
+
+  const left = (diffInicio / 7) * anchoSemana;
+
+  const width = Math.max(
+    90,
+    (diasEtapa / 7) * anchoSemana
+  );
+
+  let color = "pendiente";
+  let textoBarra = `${grupo.porcentaje}% completado`;
+
+  if (grupo.etapa === "Repuestos") {
+    color = "repuestos";
+    textoBarra = `${grupo.actividades[0]?.duracion || 0} días corridos`;
+    grupo.porcentaje = 100;
+  } else if (grupo.porcentaje >= 100) {
+    color = "completado";
+  } else if (grupo.porcentaje > 0) {
+    color = "proceso";
+  }
+
+  return `
+
+    <div class="gantt-project-row gantt-project-row-main">
+
+      <div class="gantt-project-info gantt-project-info-main">
+
+        <div class="gantt-etapa-main-title">
+          ${grupo.etapa}
+        </div>
+
+        <div>
+          ${grupo.total} actividad(es)
+        </div>
+
+        <div>
+          ${formatearFechaGanttCorta(inicio)}
+        </div>
+
+        <div>
+          ${formatearFechaGanttCorta(termino)}
+        </div>
+
+        <div>
+          ${grupo.porcentaje}%
+        </div>
+
+      </div>
+
+      <div class="gantt-project-track" style="width:${anchoTimeline}px;">
+
+        <div
+          class="gantt-project-bar-etapa ${color}"
+          style="left:${left}px; width:${width}px;"
+        >
+          <div 
+            class="gantt-project-bar-fill"
+            style="width:${grupo.porcentaje}%;">
+          </div>
+
+          <span>${textoBarra}</span>
+        </div>
+
+      </div>
+
+    </div>
+
+  `;
+})()}
 
       ${
         etapasGanttColapsadas[grupo.etapa]
@@ -3490,14 +3651,10 @@ function renderCartaGanttProject() {
 
             </div>
 
-            <div class="gantt-project-track" style="width:${anchoTimeline}px;">
+            <div class="gantt-project-track gantt-project-track-detail"
+                style="width:${anchoTimeline}px;">
 
-              <div
-                class="gantt-project-bar ${color}"
-                style="left:${left}px; width:${width}px;"
-              >
-                ${completado ? "✓" : atrasada ? "Atrasada" : duracion + "d"}
-              </div>
+              <div class="gantt-detail-line"></div>
 
             </div>
 
@@ -3510,8 +3667,6 @@ function renderCartaGanttProject() {
 
   `;
 }).join("")}
-
-            }).join("")}
 
           </div>
 
@@ -3552,6 +3707,99 @@ function agruparActividadesPorEtapa(actividades) {
   });
 
   return grupos;
+}
+
+
+function calcularEtapasGanttProject(actividades) {
+
+  const grupos = agruparActividadesPorEtapa(actividades);
+
+  return grupos.map(grupo => {
+
+    const fechasInicio = grupo.actividades.map(a =>
+      new Date(a.inicio).getTime()
+    );
+
+    const fechasTermino = grupo.actividades.map(a =>
+      new Date(a.termino).getTime()
+    );
+
+    const inicio = new Date(Math.min(...fechasInicio));
+    const termino = new Date(Math.max(...fechasTermino));
+
+    const total = grupo.actividades.length;
+
+    const porcentaje =
+      calcularPorcentajeEtapaReal(grupo.etapa);
+
+    const completadas = Math.round(
+      (porcentaje / 100) * total
+    );
+
+    return {
+      etapa: grupo.etapa,
+      actividades: grupo.actividades,
+      inicio,
+      termino,
+      total,
+      completadas,
+      porcentaje
+    };
+  });
+}
+
+
+function calcularPorcentajeChecklist(lista) {
+
+  if (!Array.isArray(lista) || lista.length === 0) {
+    return 0;
+  }
+
+  const completados = lista.filter(item => {
+
+    const check = item.ok === true;
+    const fotos = Array.isArray(item.fotos) && item.fotos.length > 0;
+    const comentarios = Array.isArray(item.comentarios) && item.comentarios.length > 0;
+
+    return check && fotos && comentarios;
+
+  }).length;
+
+  return Math.round(
+    (completados / lista.length) * 100
+  );
+}
+
+
+function calcularPorcentajeEtapaReal(etapa) {
+
+  if (!ot) return 0;
+
+  if (etapa === "Ingreso") {
+    return calcularPorcentajeChecklist(ot.ingreso);
+  }
+
+  if (etapa === "Evaluación") {
+    return calcularPorcentajeChecklist(ot.evaluacion);
+  }
+
+  if (etapa === "Overhaul") {
+    return calcularPorcentajeChecklist(ot.overhaul);
+  }
+
+  if (etapa === "Pruebas Mecánicas") {
+    return calcularPorcentajeChecklist(ot.pruebas?.mecanico);
+  }
+
+  if (etapa === "Pruebas Eléctricas") {
+    return calcularPorcentajeChecklist(ot.pruebas?.electrico);
+  }
+
+  if (etapa === "Repuestos") {
+    return 0;
+  }
+
+  return 0;
 }
 
 
@@ -3697,6 +3945,23 @@ function calcularDiasHabilesEntre(fechaInicio, fechaFin) {
 
   while (actual < fechaFin) {
 
+    const dia = actual.getDay();
+
+    if (dia !== 0 && dia !== 6) {
+      contador++;
+    }
+
+    actual.setDate(actual.getDate() + 1);
+  }
+
+  return contador;
+}
+
+function calcularDiasHabilesEntreIncluyendoFinal(inicio, fin) {
+  let contador = 0;
+  const actual = new Date(inicio);
+
+  while (actual <= fin) {
     const dia = actual.getDay();
 
     if (dia !== 0 && dia !== 6) {
