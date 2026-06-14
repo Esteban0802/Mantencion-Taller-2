@@ -494,6 +494,7 @@ function toggleIngreso(i) {
   ot.ingreso[i].ok = !ot.ingreso[i].ok;
 
   actualizarEstadoGanttDesdeChecklist();
+  recalcularGanttAutomatico();
 
   agregarBitacora(
   "Checklist actualizado",
@@ -1236,6 +1237,7 @@ function toggleEvaluacion(i) {
   ot.evaluacion[i].ok = !ot.evaluacion[i].ok;
 
   actualizarEstadoGanttDesdeChecklist();
+  recalcularGanttAutomatico();
 
   autoguardarCambiosOT();
 
@@ -2172,6 +2174,7 @@ function toggleOverhaul(i) {
   ot.overhaul[i].ok = !ot.overhaul[i].ok;
 
   actualizarEstadoGanttDesdeChecklist();
+  recalcularGanttAutomatico();
 
   autoguardarCambiosOT();
 
@@ -2789,9 +2792,9 @@ function volverFormularioGantt() {
   cargarGanttGuardado();
 }
 
-async function generarCartaGantt() {
+async function generarCartaGantt(modo = "manual") {
 
-  if (!esJefeTaller()) {
+  if (!esJefeTaller() && modo === "manual") {
     alert("Solo Jefe de Taller puede generar Carta Gantt");
     return;
   }
@@ -2801,11 +2804,30 @@ async function generarCartaGantt() {
     return;
   }
 
-  const fechaInicioInput = document.getElementById("ganttFechaInicio").value;
-  const fechaTerminoInput = document.getElementById("ganttFechaTermino").value;
-  const diasRepuestos = Number(document.getElementById("ganttDiasRepuestos").value || 0);
-  const fechaSolicitudRepuestos = document.getElementById("ganttFechaSolicitudRepuestos").value;
-  const comentarioRepuestos = document.getElementById("ganttComentarioRepuestos").value.trim();
+  const fechaInicioInput =
+  modo === "manual"
+    ? document.getElementById("ganttFechaInicio").value
+    : ot.gantt?.fechaInicio;
+
+const fechaTerminoInput =
+  modo === "manual"
+    ? document.getElementById("ganttFechaTermino").value
+    : ot.gantt?.fechaTermino;
+
+const diasRepuestos =
+  modo === "manual"
+    ? Number(document.getElementById("ganttDiasRepuestos").value || 0)
+    : Number(ot.gantt?.diasRepuestos || 0);
+
+const fechaSolicitudRepuestos =
+  modo === "manual"
+    ? document.getElementById("ganttFechaSolicitudRepuestos").value
+    : ot.gantt?.fechaSolicitudRepuestos;
+
+const comentarioRepuestos =
+  modo === "manual"
+    ? document.getElementById("ganttComentarioRepuestos").value.trim()
+    : ot.gantt?.comentarioRepuestos || "";
 
   if (!fechaInicioInput || !fechaTerminoInput) {
     alert("Debes indicar fecha inicio y término");
@@ -3057,20 +3079,45 @@ if (actividadesTecnicas.length > 0) {
 
   await guardarCambiosOT();
 
+  if (modo === "manual") {
+
   const form = document.getElementById("modalGantt");
   const visual = document.getElementById("modalGanttVisual");
 
   if (form) form.style.display = "none";
   if (visual) visual.style.display = "flex";
 
-
-renderCartaGanttProject();
-
-document.getElementById("modalGantt").style.display = "none";
-
-document.getElementById("modalGanttVisual").style.display = "flex";
+  renderCartaGanttProject();
 
   alert("Carta Gantt guardada correctamente ✅");
+
+} else {
+
+  renderCartaGanttProject();
+
+}
+}
+
+
+let recalculandoGantt = false;
+
+async function recalcularGanttAutomatico() {
+
+  if (recalculandoGantt) return;
+  if (!ot?.gantt?.actividades?.length) return;
+
+  try {
+    recalculandoGantt = true;
+
+    await generarCartaGantt("automatico");
+
+    console.log("Carta Gantt recalculada automáticamente ✅");
+
+  } catch (error) {
+    console.error("Error recalculando Carta Gantt:", error);
+  } finally {
+    recalculandoGantt = false;
+  }
 }
 
 function cargarGanttGuardado() {
@@ -4150,6 +4197,7 @@ function togglePrueba(tipo, i) {
     !ot.pruebas[tipo][i].ok;
 
   actualizarEstadoGanttDesdeChecklist();
+  recalcularGanttAutomatico();
 
   autoguardarCambiosOT();
 
@@ -6175,3 +6223,5 @@ window.irHoyGantt = irHoyGantt;
 
 window.renderCartaGanttProject = renderCartaGanttProject;
 window.toggleEtapaGantt = toggleEtapaGantt;
+
+window.recalcularGanttAutomatico = recalcularGanttAutomatico;
