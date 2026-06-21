@@ -251,7 +251,7 @@
       class="btn-primary"
       onclick="abrirModalGantt()"
     >
-      📊 Carta Gantt
+      📅 Planificación
     </button>
 
   </div>
@@ -476,7 +476,7 @@
 
     <div class="modal-gantt-header">
       <div>
-        <h2>Carta Gantt Planificada</h2>
+        <h2>Carta Gantt</h2>
         <p>Ingresa los datos base para generar la planificación.</p>
       </div>
 
@@ -487,14 +487,84 @@
 
     <div class="gantt-form">
 
-      <div class="gantt-field">
-        <label>Fecha inicio planificación</label>
-        <input type="date" id="ganttFechaInicio">
-      </div>
+      <div class="gantt-field-full">
 
-      <div class="gantt-field">
-        <label>Fecha término estimada</label>
-        <input type="date" id="ganttFechaTermino">
+  <div class="gantt-fechas-generales">
+
+    <div class="gantt-field">
+      <label>Fecha inicio planificación</label>
+      <input type="date" id="ganttFechaInicio">
+    </div>
+
+    <div class="gantt-field">
+      <label>Fecha término estimada</label>
+      <input type="date" id="ganttFechaTermino">
+    </div>
+
+  </div>
+
+</div>
+
+
+      <div class="gantt-etapas-manuales">
+
+        <h4>📌 Planificación por etapa</h4>
+
+        <div class="gantt-etapa-card">
+
+          <label>Ingreso</label>
+
+          <div class="gantt-etapa-fechas">
+            <input type="date" id="ganttIngresoInicio">
+            <input type="date" id="ganttIngresoTermino">
+          </div>
+
+        </div>
+
+        <div class="gantt-etapa-card">
+
+          <label>Evaluación</label>
+
+          <div class="gantt-etapa-fechas">
+            <input type="date" id="ganttEvaluacionInicio">
+            <input type="date" id="ganttEvaluacionTermino">
+          </div>
+
+        </div>
+
+        <div class="gantt-etapa-card">
+
+          <label>Overhaul</label>
+
+          <div class="gantt-etapa-fechas">
+            <input type="date" id="ganttOverhaulInicio">
+            <input type="date" id="ganttOverhaulTermino">
+          </div>
+
+        </div>
+
+        <div class="gantt-etapa-card">
+
+          <label>Pruebas Mecánicas</label>
+
+          <div class="gantt-etapa-fechas">
+            <input type="date" id="ganttPruebasMecanicasInicio">
+            <input type="date" id="ganttPruebasMecanicasTermino">
+          </div>
+
+        </div>
+
+        <div class="gantt-etapa-card">
+
+          <label>Pruebas Eléctricas</label>
+
+          <div class="gantt-etapa-fechas">
+            <input type="date" id="ganttPruebasElectricasInicio">
+            <input type="date" id="ganttPruebasElectricasTermino">
+          </div>
+
+        </div>
+
       </div>
 
       <div class="gantt-field">
@@ -532,8 +602,8 @@
 
     <div class="modal-gantt-header">
       <div>
-        <h2>📊 Carta Gantt Planificada</h2>
-        <p>Planificación estimada desde la creación de la OS hasta despacho.</p>
+        <h2>📊 Carta Gantt</h2>
+        <p>Planificación del proyecto por etapas, fechas y duración.</p>
       </div>
 
       <div class="gantt-header-actions">

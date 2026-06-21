@@ -2792,6 +2792,8 @@ function volverFormularioGantt() {
   cargarGanttGuardado();
 }
 
+
+
 async function generarCartaGantt(modo = "manual") {
 
   if (!esJefeTaller() && modo === "manual") {
@@ -2834,11 +2836,29 @@ const comentarioRepuestos =
     return;
   }
 
-  let fechaCursor = new Date(fechaInicioInput + "T00:00:00");
-  const fechaTermino = new Date(fechaTerminoInput + "T00:00:00");
+  const fechaTermino =
+  new Date(
+    fechaTerminoInput + "T00:00:00"
+  );  
 
-  const diferenciaMs = fechaTermino - fechaCursor;
-  const diasTotales = Math.ceil(diferenciaMs / (1000 * 60 * 60 * 24));
+  const etapasManuales = [
+  leerEtapaManual("Ingreso", "ganttIngresoInicio", "ganttIngresoTermino"),
+  leerEtapaManual("Evaluación", "ganttEvaluacionInicio", "ganttEvaluacionTermino"),
+  leerEtapaManual("Overhaul", "ganttOverhaulInicio", "ganttOverhaulTermino"),
+  leerEtapaManual("Pruebas Mecánicas", "ganttPruebasMecanicasInicio", "ganttPruebasMecanicasTermino"),
+  leerEtapaManual("Pruebas Eléctricas", "ganttPruebasElectricasInicio", "ganttPruebasElectricasTermino")
+];
+
+if (etapasManuales.some(e => e === null)) {
+  alert("Debes completar las fechas de todas las etapas");
+  return;
+}
+
+  const diasTotales =
+    Math.ceil(
+      (fechaTermino - new Date(fechaInicioInput + "T00:00:00")) /
+      (1000 * 60 * 60 * 24)
+  );
 
   if (diasTotales <= 0) {
     alert("La fecha término debe ser mayor a la fecha inicio");
@@ -2861,96 +2881,98 @@ const comentarioRepuestos =
   };
 
 
-// =========================
-// DISTRIBUCIÓN DE DÍAS
-// =========================
+  const etapasPlanificadas = [];
 
-const totalDiasPlan =
-  calcularDiasHabilesEntreIncluyendoFinal(
-    new Date(fechaInicioInput + "T00:00:00"),
-    fechaTermino
-  );
+function agregarEtapaPlanificada(etapa, inicio, duracion, tipoDias = "habiles") {
+  const inicioEtapa = new Date(inicio);
 
-const cantidadIngreso =
-  ot.ingreso?.length || 0;
+  const terminoEtapa =
+    tipoDias === "corridos"
+      ? sumarDiasNaturales(inicioEtapa, duracion - 1)
+      : sumarDias(inicioEtapa, duracion - 1);
 
-const cantidadEvaluacion =
-  ot.evaluacion?.length || 0;
-
-const cantidadOverhaul =
-  ot.overhaul?.length || 0;
-
-const cantidadPruebasMecanicas =
-  ot.pruebas?.mecanico?.length || 0;
-
-const cantidadPruebasElectricas =
-  ot.pruebas?.electrico?.length || 0;
-
-const totalActividadesPlan =
-  cantidadIngreso +
-  cantidadEvaluacion +
-  cantidadOverhaul +
-  cantidadPruebasMecanicas +
-  cantidadPruebasElectricas;
-
-if (totalActividadesPlan === 0) {
-  alert("No existen actividades para generar la planificación");
-  return;
+  etapasPlanificadas.push({
+    etapa,
+    inicio: inicioEtapa.toISOString(),
+    termino: terminoEtapa.toISOString(),
+    duracion,
+    tipoDias
+  });
 }
-
-let diasIngreso = Math.max(
-  1,
-  Math.round(totalDiasPlan * (cantidadIngreso / totalActividadesPlan))
-);
-
-let diasEvaluacion = Math.max(
-  1,
-  Math.round(totalDiasPlan * (cantidadEvaluacion / totalActividadesPlan))
-);
-
-let diasOverhaul = Math.max(
-  1,
-  Math.round(totalDiasPlan * (cantidadOverhaul / totalActividadesPlan))
-);
-
-let diasPruebasMecanicas = Math.max(
-  1,
-  Math.round(totalDiasPlan * (cantidadPruebasMecanicas / totalActividadesPlan))
-);
-
-let diasPruebasElectricas = Math.max(
-  1,
-  Math.round(totalDiasPlan * (cantidadPruebasElectricas / totalActividadesPlan))
-);
-
 
 // =========================
 // INGRESO
 // =========================
+
+const etapaIngreso =
+  obtenerEtapaManual(
+    etapasManuales,
+    "Ingreso"
+  );
+
+const inicioIngreso =
+  new Date(
+    etapaIngreso.inicio + "T00:00:00"
+  );
+
+const diasIngreso =
+  diasEntreFechasHabiles(
+    etapaIngreso.inicio,
+    etapaIngreso.termino
+  );
+
+agregarEtapaPlanificada(
+  "Ingreso",
+  inicioIngreso,
+  diasIngreso
+);
+
 const ingresoActs =
   obtenerActividadesDesdeChecklistDistribuido(
     "Ingreso",
     ot.ingreso,
-    fechaCursor,
+    inicioIngreso,
     diasIngreso
   );
 
 actividades.push(...ingresoActs);
-fechaCursor = sumarDias(fechaCursor, diasIngreso);
 
 // =========================
 // EVALUACIÓN
 // =========================
+
+const etapaEvaluacion =
+  obtenerEtapaManual(
+    etapasManuales,
+    "Evaluación"
+  );
+
+const inicioEvaluacion =
+  new Date(
+    etapaEvaluacion.inicio + "T00:00:00"
+  );
+
+const diasEvaluacion =
+  diasEntreFechasHabiles(
+    etapaEvaluacion.inicio,
+    etapaEvaluacion.termino
+  );
+
+agregarEtapaPlanificada(
+  "Evaluación",
+  inicioEvaluacion,
+  diasEvaluacion
+);
+
 const evalActs =
   obtenerActividadesDesdeChecklistDistribuido(
     "Evaluación",
     ot.evaluacion,
-    fechaCursor,
+    inicioEvaluacion,
     diasEvaluacion
   );
 
 actividades.push(...evalActs);
-fechaCursor = sumarDias(fechaCursor, diasEvaluacion);
 
 // =========================
 // REPUESTOS
@@ -2985,97 +3007,159 @@ if (diasRepuestos > 0) {
 // =========================
 // OVERHAUL
 // =========================
+
+const etapaOverhaul =
+  obtenerEtapaManual(
+    etapasManuales,
+    "Overhaul"
+  );
+
+const inicioOverhaul =
+  new Date(
+    etapaOverhaul.inicio + "T00:00:00"
+  );
+
+const diasOverhaul =
+  diasEntreFechasHabiles(
+    etapaOverhaul.inicio,
+    etapaOverhaul.termino
+  );
+
+agregarEtapaPlanificada(
+  "Overhaul",
+  inicioOverhaul,
+  diasOverhaul
+);
+
 const overhaulActs =
   obtenerActividadesDesdeChecklistDistribuido(
     "Overhaul",
     ot.overhaul,
-    fechaCursor,
+    inicioOverhaul,
     diasOverhaul
   );
 
 actividades.push(...overhaulActs);
-fechaCursor = sumarDias(fechaCursor, diasOverhaul);
 
 // =========================
 // PRUEBAS MECÁNICAS
 // =========================
+
+const etapaPruebasMecanicas =
+  obtenerEtapaManual(
+    etapasManuales,
+    "Pruebas Mecánicas"
+  );
+
+const inicioPruebasMecanicas =
+  new Date(
+    etapaPruebasMecanicas.inicio + "T00:00:00"
+  );
+
+const diasPruebasMecanicas =
+  diasEntreFechasHabiles(
+    etapaPruebasMecanicas.inicio,
+    etapaPruebasMecanicas.termino
+  );
+
+agregarEtapaPlanificada(
+  "Pruebas Mecánicas",
+  inicioPruebasMecanicas,
+  diasPruebasMecanicas
+);
+
 const pruebasMec =
   obtenerActividadesDesdeChecklistDistribuido(
     "Pruebas Mecánicas",
     ot.pruebas?.mecanico,
-    fechaCursor,
+    inicioPruebasMecanicas,
     diasPruebasMecanicas
   );
 
 actividades.push(...pruebasMec);
-fechaCursor = sumarDias(fechaCursor, diasPruebasMecanicas);
 
 // =========================
 // PRUEBAS ELÉCTRICAS
 // =========================
+
+const etapaPruebasElectricas =
+  obtenerEtapaManual(
+    etapasManuales,
+    "Pruebas Eléctricas"
+  );
+
+const inicioPruebasElectricas =
+  new Date(
+    etapaPruebasElectricas.inicio + "T00:00:00"
+  );
+
+const diasPruebasElectricas =
+  diasEntreFechasHabiles(
+    etapaPruebasElectricas.inicio,
+    etapaPruebasElectricas.termino
+  );
+
+agregarEtapaPlanificada(
+  "Pruebas Eléctricas",
+  inicioPruebasElectricas,
+  diasPruebasElectricas
+);
+
 const pruebasElec =
   obtenerActividadesDesdeChecklistDistribuido(
     "Pruebas Eléctricas",
     ot.pruebas?.electrico,
-    fechaCursor,
+    inicioPruebasElectricas,
     diasPruebasElectricas
   );
 
 actividades.push(...pruebasElec);
-fechaCursor = sumarDias(fechaCursor, diasPruebasElectricas);
 
 const ultimaActividad =
   actividades
     .filter(a => a.etapa !== "Repuestos")
     .map(a => new Date(a.termino).getTime());
 
-const fechaFinalTrabajo = new Date(Math.max(...ultimaActividad));
+//const fechaFinalTrabajo = new Date(Math.max(...ultimaActividad));
 
-if (fechaFinalTrabajo > fechaTermino) {
-  alert(
-    "La planificación técnica supera la fecha término ingresada. Aumenta la fecha final o reduce actividades."
-  );
-  return;
-}
+//if (fechaFinalTrabajo > fechaTermino) {
+  //alert(
+    //"La planificación técnica supera la fecha término ingresada. Aumenta la fecha final o reduce actividades."
+  //);
+  //return;
+//}
 
-// =========================
-// FORZAR ÚLTIMA ACTIVIDAD A FECHA TÉRMINO
-// =========================
 
-const actividadesTecnicas = actividades.filter(
-  a => a.etapa !== "Repuestos"
-);
+// 🔥 Ajustar también la etapa visual planificada
+const ultimaEtapaTecnica = [...etapasPlanificadas]
+  .reverse()
+  .find(e => e.etapa !== "Repuestos");
 
-if (actividadesTecnicas.length > 0) {
+if (ultimaEtapaTecnica) {
+  ultimaEtapaTecnica.termino = fechaTermino.toISOString();
 
-  const ultimaTecnica =
-    actividadesTecnicas[actividadesTecnicas.length - 1];
-
-  ultimaTecnica.termino = fechaTermino.toISOString();
-
-  const inicioUltima = new Date(ultimaTecnica.inicio);
-
-  ultimaTecnica.duracion =
+  ultimaEtapaTecnica.duracion =
     Math.max(
       1,
       calcularDiasHabilesEntreIncluyendoFinal(
-        inicioUltima,
+        new Date(ultimaEtapaTecnica.inicio),
         fechaTermino
       )
     );
 }
 
   ot.gantt = {
-    fechaInicio: fechaInicioInput,
-    fechaTermino: fechaTerminoInput,
-    fechaDespachoEstimada: fechaTermino.toISOString(),
-    fechaSolicitudRepuestos,
-    diasRepuestos,
-    comentarioRepuestos,
-    creadoPor: usuario?.nombre || "Jefe Taller",
-    fechaCreacion: new Date().toLocaleString(),
-    actividades
-  };
+  fechaInicio: fechaInicioInput,
+  fechaTermino: fechaTerminoInput,
+  fechaDespachoEstimada: fechaTermino.toISOString(),
+  fechaSolicitudRepuestos,
+  diasRepuestos,
+  comentarioRepuestos,
+  creadoPor: usuario?.nombre || "Jefe Taller",
+  fechaCreacion: new Date().toLocaleString(),
+  actividades,
+  etapas: etapasPlanificadas
+};
 
   await guardarCambiosOT();
 
@@ -3096,6 +3180,32 @@ if (actividadesTecnicas.length > 0) {
   renderCartaGanttProject();
 
 }
+}
+
+function leerEtapaManual(nombre, idInicio, idTermino) {
+  const inicio = document.getElementById(idInicio)?.value;
+  const termino = document.getElementById(idTermino)?.value;
+
+  if (!inicio || !termino) {
+    return null;
+  }
+
+  return {
+    etapa: nombre,
+    inicio,
+    termino
+  };
+}
+
+function obtenerEtapaManual(etapasManuales, nombre) {
+  return etapasManuales.find(e => e.etapa === nombre);
+}
+
+function diasEntreFechasHabiles(inicioStr, terminoStr) {
+  return calcularDiasHabilesEntreIncluyendoFinal(
+    new Date(inicioStr + "T00:00:00"),
+    new Date(terminoStr + "T00:00:00")
+  );
 }
 
 
@@ -3384,8 +3494,24 @@ function renderCartaGanttProject() {
   const g = ot.gantt;
   const actividades = g.actividades;
   const grupos = agruparActividadesPorEtapa(actividades);
-  const etapasProject =
-  calcularEtapasGanttProject(actividades);
+  
+  let etapasProject =
+    calcularEtapasGanttProject(actividades);
+
+    if (Array.isArray(g.etapas)) {
+      etapasProject = etapasProject.map(etapa => {
+        const plan = g.etapas.find(e => e.etapa === etapa.etapa);
+
+        if (!plan) return etapa;
+
+        return {
+          ...etapa,
+          inicio: new Date(plan.inicio),
+          termino: new Date(plan.termino),
+          duracion: plan.duracion
+        };
+      });
+}
   etapasProject.forEach(grupo => {
     if (etapasGanttColapsadas[grupo.etapa] === undefined) {
       etapasGanttColapsadas[grupo.etapa] = true;
@@ -3405,9 +3531,10 @@ function renderCartaGanttProject() {
     Math.ceil((fechaFinGlobal - fechaInicioGlobal) / MS_DIA) + 1
   );
 
-  const anchoSemana = 130;
+  const anchoDia = 24;
   const totalSemanas = Math.ceil(totalDias / 7);
-  const anchoTimeline = Math.max(900, totalSemanas * anchoSemana);
+  const anchoSemana = anchoDia * 7;
+  const anchoTimeline = Math.max(900, totalDias * anchoDia + 120);
 
   const semanas = [];
 
@@ -3432,9 +3559,9 @@ function renderCartaGanttProject() {
   hoy.setHours(0, 0, 0, 0);
 
   const posicionHoy =
-    hoy >= fechaInicioGlobal && hoy <= fechaFinGlobal
-      ? Math.ceil((hoy - fechaInicioGlobal) / MS_DIA) / 7 * anchoSemana
-      : null;
+  hoy >= fechaInicioGlobal && hoy <= fechaFinGlobal
+    ? Math.ceil((hoy - fechaInicioGlobal) / MS_DIA) * anchoDia
+    : null;
 
   const colores = {
     Ingreso: "azul",
@@ -3449,17 +3576,6 @@ function renderCartaGanttProject() {
 
   cont.innerHTML = `
     <div class="gantt-project">
-
-      <div class="gantt-project-header">
-        <div>
-          <h3>📊 Carta Gantt tipo Project</h3>
-          <p>Planificación por actividades, fechas y duración.</p>
-        </div>
-
-        <div class="gantt-project-actions">
-          <button type="button" onclick="renderCartaGantt()">Vista anterior</button>
-        </div>
-      </div>
 
       <div class="gantt-project-summary">
 
@@ -3546,30 +3662,40 @@ function renderCartaGanttProject() {
 
       ${(() => {
 
-  const inicio = new Date(grupo.inicio);
-  const termino = new Date(grupo.termino);
+  let inicio = new Date(grupo.inicio);
+let termino = new Date(grupo.termino);
 
-  const diffInicio = Math.max(
-    0,
-    Math.ceil((inicio - fechaInicioGlobal) / MS_DIA)
+// No permitir que la barra salga del rango visual del proyecto
+if (inicio < fechaInicioGlobal) {
+  inicio = new Date(fechaInicioGlobal);
+}
+
+if (termino > fechaFinGlobal) {
+  termino = new Date(fechaFinGlobal);
+}
+
+  const diasDesdeInicio =
+  Math.ceil(
+    (inicio - fechaInicioGlobal) / MS_DIA
   );
 
-  const diffTermino = Math.max(
-    diffInicio + 1,
-    Math.ceil((termino - fechaInicioGlobal) / MS_DIA) + 1
-  );
+const diasDuracion =
+  Math.ceil(
+    (termino - inicio) / MS_DIA
+  ) + 1;
 
-  const diasEtapa = Math.max(
-    1,
-    diffTermino - diffInicio
-  );
+const left = diasDesdeInicio * anchoDia;
 
-  const left = (diffInicio / 7) * anchoSemana;
+let width = diasDuracion * anchoDia;
 
-  const width = Math.max(
-    90,
-    (diasEtapa / 7) * anchoSemana
-  );
+// ancho mínimo pequeño solo para que se vea
+width = Math.max(18, width);
+
+if (left + width > anchoTimeline - 80) {
+  width = anchoTimeline - left - 80;
+}
+
+width = Math.max(18, width);
 
   let color = "pendiente";
   let textoBarra = `${grupo.porcentaje}% completado`;
@@ -3654,13 +3780,6 @@ function renderCartaGanttProject() {
         const diasActividad = Math.max(
           1,
           diffTermino - diffInicio
-        );
-
-        const left = (diffInicio / 7) * anchoSemana;
-
-        const width = Math.max(
-          48,
-          (diasActividad / 7) * anchoSemana
         );
 
         const completado = act.estado === "Completado";
