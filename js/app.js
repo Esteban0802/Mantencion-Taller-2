@@ -3844,6 +3844,310 @@ width = Math.max(18, width);
   `;
 }
 
+function descargarGanttExcel() {
+  if (!ot?.gantt?.actividades?.length) {
+    alert("No existe Carta Gantt para exportar");
+    return;
+  }
+
+  const inicioProyecto = new Date(ot.gantt.fechaInicio + "T00:00:00");
+  const terminoProyecto = new Date(ot.gantt.fechaTermino + "T00:00:00");
+
+  const semanas = [];
+  let cursor = new Date(inicioProyecto);
+
+  while (cursor <= terminoProyecto) {
+    const inicioSemana = new Date(cursor);
+    const finSemana = new Date(cursor);
+    finSemana.setDate(finSemana.getDate() + 6);
+
+    semanas.push({
+      inicio: inicioSemana,
+      fin: finSemana,
+      label:
+        inicioSemana.toLocaleDateString("es-CL", {
+          day: "2-digit",
+          month: "short"
+        }).replace(".", "") +
+        " - " +
+        finSemana.toLocaleDateString("es-CL", {
+          day: "2-digit",
+          month: "short"
+        }).replace(".", "")
+    });
+
+    cursor.setDate(cursor.getDate() + 7);
+  }
+
+  let etapasProject =
+    calcularEtapasGanttProject(ot.gantt.actividades);
+
+  if (Array.isArray(ot.gantt.etapas)) {
+    etapasProject = etapasProject.map(etapa => {
+      const plan = ot.gantt.etapas.find(e => e.etapa === etapa.etapa);
+
+      if (!plan) return etapa;
+
+      return {
+        ...etapa,
+        inicio: new Date(plan.inicio),
+        termino: new Date(plan.termino),
+        duracion: plan.duracion
+      };
+    });
+  }
+
+  const encabezados = [
+    "Etapa",
+    "Inicio",
+    "Término",
+    "Duración",
+    "Actividades",
+    "Avance",
+    ...semanas.map(s => s.label)
+  ];
+
+  const filas = etapasProject.map(etapa => {
+    const inicio = new Date(etapa.inicio);
+    const termino = new Date(etapa.termino);
+
+    const fila = [
+      etapa.etapa || "",
+      formatearFecha(inicio),
+      formatearFecha(termino),
+      etapa.duracion || "",
+      etapa.total || etapa.actividades?.length || 0,
+      `${etapa.porcentaje || 0}%`
+    ];
+
+    semanas.forEach(s => {
+      const cruza =
+        inicio <= s.fin &&
+        termino >= s.inicio;
+
+      fila.push(cruza ? 1 : "");
+    });
+
+    return fila;
+  });
+
+  const data = [encabezados, ...filas];
+
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(data);
+
+  const coloresEtapa = {
+  "Ingreso": "4472C4",
+  "Evaluación": "5B9BD5",
+  "Repuestos": "ED7D31",
+  "Overhaul": "70AD47",
+  "Pruebas Mecánicas": "7030A0",
+  "Pruebas Eléctricas": "8E44AD",
+  "Despacho": "00B0F0"
+};
+
+for (let r = 1; r < data.length; r++) {
+
+  const etapa = data[r][0];
+  const color = coloresEtapa[etapa] || "808080";
+
+  for (let c = 6; c < data[r].length; c++) {
+
+    const cellRef =
+      XLSX.utils.encode_cell({ r, c });
+
+    const cell = ws[cellRef];
+
+    if (!cell || cell.v !== 1) continue;
+
+    cell.v = "";
+
+    cell.s = {
+      fill: {
+        fgColor: { rgb: color }
+      }
+    };
+  }
+}
+
+  ws["!cols"] = [
+    { wch: 22 },
+    { wch: 12 },
+    { wch: 12 },
+    { wch: 10 },
+    { wch: 12 },
+    { wch: 10 },
+    ...semanas.map(() => ({ wch: 14 }))
+  ];
+
+  XLSX.utils.book_append_sheet(wb, ws, "Carta Gantt");
+
+  XLSX.writeFile(
+    wb,
+    `Carta_Gantt_${ot.os || "Proyecto"}.xlsx`
+  );
+}
+
+window.descargarGanttExcel = descargarGanttExcel;
+
+
+
+function descargarGanttPDFProfesional() {
+  if (!ot?.gantt?.actividades?.length) {
+    alert("No existe Carta Gantt para exportar");
+    return;
+  }
+
+  const { jsPDF } = window.jspdf;
+
+  const pdf = new jsPDF({
+    orientation: "landscape",
+    unit: "mm",
+    format: "a4"
+  });
+
+  const inicioProyecto = new Date(ot.gantt.fechaInicio + "T00:00:00");
+  const terminoProyecto = new Date(ot.gantt.fechaTermino + "T00:00:00");
+
+  let etapasProject = calcularEtapasGanttProject(ot.gantt.actividades);
+
+  if (Array.isArray(ot.gantt.etapas)) {
+    etapasProject = etapasProject.map(etapa => {
+      const plan = ot.gantt.etapas.find(e => e.etapa === etapa.etapa);
+      if (!plan) return etapa;
+
+      return {
+        ...etapa,
+        inicio: new Date(plan.inicio),
+        termino: new Date(plan.termino),
+        duracion: plan.duracion
+      };
+    });
+  }
+
+  pdf.setFillColor(15, 23, 42);
+  pdf.rect(0, 0, 297, 210, "F");
+
+  pdf.setTextColor(255, 255, 255);
+  pdf.setFontSize(18);
+  pdf.text("OVERTRACK - Carta Gantt", 14, 16);
+
+  pdf.setFontSize(10);
+  pdf.setTextColor(203, 213, 225);
+  pdf.text(`OS: ${ot.os || "-"}`, 14, 24);
+  pdf.text(`Equipo: ${ot.equipo || "-"}`, 55, 24);
+  pdf.text(`Cliente: ${ot.cliente || "-"}`, 105, 24);
+  pdf.text(`Inicio: ${formatearFecha(inicioProyecto)}`, 190, 24);
+  pdf.text(`Término: ${formatearFecha(terminoProyecto)}`, 235, 24);
+
+  const body = etapasProject.map(e => [
+    e.etapa,
+    formatearFecha(new Date(e.inicio)),
+    formatearFecha(new Date(e.termino)),
+    e.duracion || "",
+    e.total || e.actividades?.length || 0,
+    `${e.porcentaje || 0}%`
+  ]);
+
+  pdf.autoTable({
+    startY: 34,
+    head: [["Etapa", "Inicio", "Término", "Duración", "Actividades", "Avance"]],
+    body,
+    theme: "grid",
+    styles: {
+      fillColor: [15, 23, 42],
+      textColor: [255, 255, 255],
+      lineColor: [51, 65, 85],
+      lineWidth: 0.2,
+      fontSize: 9,
+      cellPadding: 3
+    },
+    headStyles: {
+      fillColor: [249, 115, 22],
+      textColor: [17, 24, 39],
+      fontStyle: "bold"
+    },
+    alternateRowStyles: {
+      fillColor: [30, 41, 59]
+    }
+  });
+
+  // ===============================
+// PÁGINA 2: CARTA GANTT VISUAL
+// ===============================
+
+pdf.addPage();
+
+pdf.setFillColor(15, 23, 42);
+pdf.rect(0, 0, 297, 210, "F");
+
+pdf.setTextColor(255, 255, 255);
+pdf.setFontSize(18);
+pdf.text("Carta Gantt Visual por Etapas", 14, 16);
+
+pdf.setFontSize(10);
+pdf.setTextColor(203, 213, 225);
+pdf.text(`OS: ${ot.os || "-"}`, 14, 24);
+pdf.text(`Cliente: ${ot.cliente || "-"}`, 55, 24);
+pdf.text(`Equipo: ${ot.equipo || "-"}`, 115, 24);
+
+const coloresEtapa = {
+  "Ingreso": [68, 114, 196],
+  "Evaluación": [91, 155, 213],
+  "Repuestos": [237, 125, 49],
+  "Overhaul": [112, 173, 71],
+  "Pruebas Mecánicas": [112, 48, 160],
+  "Pruebas Eléctricas": [142, 68, 173],
+  "Despacho": [0, 176, 240]
+};
+
+const xNombre = 14;
+const xTimeline = 65;
+const yInicio = 42;
+const altoFila = 14;
+const anchoTimeline = 205;
+
+const totalMs = terminoProyecto - inicioProyecto;
+
+pdf.setTextColor(249, 115, 22);
+pdf.setFontSize(9);
+pdf.text(formatearFecha(inicioProyecto), xTimeline, 34);
+pdf.text(formatearFecha(terminoProyecto), xTimeline + anchoTimeline - 25, 34);
+
+etapasProject.forEach((etapa, index) => {
+  const y = yInicio + index * altoFila;
+
+  const inicio = new Date(etapa.inicio);
+  const termino = new Date(etapa.termino);
+
+  const offsetMs = inicio - inicioProyecto;
+  const duracionMs = termino - inicio;
+
+  const left = Math.max(0, (offsetMs / totalMs) * anchoTimeline);
+  const width = Math.max(4, (duracionMs / totalMs) * anchoTimeline);
+
+  const color = coloresEtapa[etapa.etapa] || [100, 116, 139];
+
+  pdf.setTextColor(255, 255, 255);
+  pdf.setFontSize(9);
+  pdf.text(etapa.etapa, xNombre, y + 4);
+
+  pdf.setFillColor(30, 41, 59);
+  pdf.roundedRect(xTimeline, y, anchoTimeline, 7, 2, 2, "F");
+
+  pdf.setFillColor(color[0], color[1], color[2]);
+  pdf.roundedRect(xTimeline + left, y, width, 7, 2, 2, "F");
+
+  pdf.setTextColor(203, 213, 225);
+  pdf.setFontSize(7);
+  pdf.text(`${etapa.porcentaje || 0}%`, xTimeline + left + width + 2, y + 5);
+});
+
+  pdf.save(`Carta_Gantt_${ot.os || "Proyecto"}.pdf`);
+}
+
+window.descargarGanttPDFProfesional = descargarGanttPDFProfesional;
+
 
 function toggleEtapaGantt(etapa) {
   etapasGanttColapsadas[etapa] =
@@ -5271,11 +5575,16 @@ function validarOTCompleta() {
 }
 
 async function convertirImagenABase64(url) {
-
   try {
-    const imagenRef = ref(storage, url);
+    let storageRef;
 
-    const bytes = await getBytes(imagenRef);
+    if (url.startsWith("https://firebasestorage.googleapis.com")) {
+      storageRef = ref(storage, url);
+    } else {
+      storageRef = ref(storage, url);
+    }
+
+    const bytes = await getBytes(storageRef);
 
     const blob = new Blob([bytes], {
       type: "image/jpeg"
@@ -5291,7 +5600,7 @@ async function convertirImagenABase64(url) {
     });
 
   } catch (error) {
-    console.warn("No se pudo convertir imagen desde Storage:", error);
+    console.error("Error convirtiendo imagen a base64:", error);
     return null;
   }
 }
@@ -5304,7 +5613,21 @@ async function convertirImagenABase64(url) {
 // =======================
 // GENERAR PDF CON FOTOS
 // =======================
-async function generarPDF() {
+const configInformeEmpresa = {
+  nombre: "OVERTRACK",
+  subtitulo: "Sistema de Gestión de Mantenimiento",
+  logo: "./img/pdf/logo.png",
+  portada: "./img/pdf/portada.jpg",
+  colorPrincipal: [249, 115, 22],
+  colorFondo: [15, 23, 42],
+  colorTexto: [255, 255, 255],
+  colorTextoSuave: [203, 213, 225],
+  textoPortada: "Informe final de servicio técnico y mantenimiento.",
+  textoCierre: "Documento generado automáticamente por Overtrack."
+};
+
+
+async function generarPDFActual() {
 
   if (!ot) {
     alert("No hay OT cargada");
@@ -5915,6 +6238,746 @@ parrafo(
   doc.save(`Informe_${ot.os}.pdf`);
 }
 
+function obtenerFechaInicioGantt() {
+  if (ot?.gantt?.fechaInicio) {
+    return formatearFecha(new Date(ot.gantt.fechaInicio + "T00:00:00"));
+  }
+
+  if (ot?.fechaCreacion?.seconds) {
+    return formatearFecha(new Date(ot.fechaCreacion.seconds * 1000));
+  }
+
+  return "-";
+}
+
+function obtenerFechaTerminoGantt() {
+  if (ot?.gantt?.fechaTermino) {
+    return formatearFecha(new Date(ot.gantt.fechaTermino + "T00:00:00"));
+  }
+
+  return "-";
+}
+
+
+function obtenerResumenEjecutivoInforme() {
+  const etapas = [
+    ot.ingreso || [],
+    ot.evaluacion || [],
+    ot.overhaul || [],
+    ot.pruebas?.mecanico || [],
+    ot.pruebas?.electrico || [],
+    ot.despacho?.preparacion || [],
+    ot.despacho?.final || []
+  ];
+
+  const todasActividades = etapas.flat();
+
+  const totalActividades = todasActividades.length;
+
+  const actividadesCompletadas = todasActividades.filter(
+    item => item.ok === true || item.completado === true
+  ).length;
+
+  const totalComentarios = todasActividades.reduce((acc, item) => {
+    return acc + (item.comentarios?.length || 0);
+  }, 0);
+
+  const totalFotos = todasActividades.reduce((acc, item) => {
+    return acc + (item.fotos?.length || 0);
+  }, 0);
+
+  const avance =
+    totalActividades > 0
+      ? Math.round((actividadesCompletadas / totalActividades) * 100)
+      : 0;
+
+  const fechaInicio = obtenerFechaInicioGantt();
+  const fechaTermino = obtenerFechaTerminoGantt();
+
+  return {
+    totalActividades,
+    actividadesCompletadas,
+    totalComentarios,
+    totalFotos,
+    avance,
+    estado: ot.estado || "-",
+    fechaInicio,
+    fechaTermino
+  };
+}
+
+
+function obtenerEstadoEtapasInforme() {
+
+  return [
+    {
+      nombre: "Ingreso",
+      estado: ot.ingresoAprobado ? "Completada" : "Pendiente"
+    },
+    {
+      nombre: "Evaluación",
+      estado: ot.evaluacionAprobada ? "Completada" : "Pendiente"
+    },
+    {
+      nombre: "Overhaul",
+      estado: ot.overhaulAprobada
+        ? "Completada"
+        : (ot.estado === "OVERHAUL" ? "En Proceso" : "Pendiente")
+    },
+    {
+      nombre: "Pruebas Mecánicas",
+      estado: ot.pruebasAprobado
+        ? "Completada"
+        : (ot.estado === "PRUEBAS" ? "En Proceso" : "Pendiente")
+    },
+    {
+      nombre: "Pruebas Eléctricas",
+      estado: ot.pruebasAprobado
+        ? "Completada"
+        : (ot.estado === "PRUEBAS" ? "En Proceso" : "Pendiente")
+    },
+    {
+      nombre: "Despacho",
+      estado: ot.cerrada
+        ? "Completada"
+        : (ot.estado === "DESPACHO" ? "En Proceso" : "Pendiente")
+    }
+  ];
+}
+
+
+
+function crearPortadaInforme(doc, config) {
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+
+  // Fondo
+  doc.setFillColor(...config.colorFondo);
+  doc.rect(0, 0, pageWidth, pageHeight, "F");
+/*
+  // Logo
+  try {
+    doc.addImage(config.logo, "PNG", 18, 16, 42, 16);
+  } catch (e) {
+    console.warn("No se pudo cargar logo:", e);
+  }*/
+
+  // Texto superior derecho
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.setTextColor(...config.colorTextoSuave);
+
+  doc.text(
+    new Date().toLocaleDateString("es-CL"),
+    pageWidth - 18,
+    18,
+    { align: "right" }
+  );
+
+  doc.text(
+    `OS: ${ot?.os || "-"}`,
+    pageWidth - 18,
+    25,
+    { align: "right" }
+  );
+
+  // Línea decorativa
+  doc.setDrawColor(...config.colorPrincipal);
+  doc.setLineWidth(1.5);
+  doc.line(18, 42, pageWidth - 18, 42);
+
+  // Título
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(28);
+  doc.setTextColor(...config.colorTexto);
+
+  doc.text(
+    "INFORME FINAL",
+    pageWidth / 2,
+    82,
+    { align: "center" }
+  );
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(14);
+  doc.setTextColor(...config.colorPrincipal);
+
+  doc.text(
+    `ORDEN DE SERVICIO N° ${ot?.os || "-"}`,
+    pageWidth / 2,
+    92,
+    { align: "center" }
+  );
+
+  doc.setFontSize(14);
+  doc.setTextColor(...config.colorTextoSuave);
+
+  doc.text(
+    config.textoPortada,
+    pageWidth / 2,
+    108,
+    { align: "center" }
+  );
+
+  // Datos principales
+  const boxX = 28;
+  const boxY = 110;
+  const boxW = pageWidth - 56;
+  const boxH = 100;
+
+  doc.setFillColor(30, 41, 59);
+  doc.roundedRect(boxX, boxY, boxW, boxH, 4, 4, "F");
+
+  doc.setFontSize(11);
+  doc.setTextColor(...config.colorTextoSuave);
+
+  const datos = [
+  ["Cliente", ot?.cliente || "-"],
+  ["Equipo", ot?.equipo || "-"],
+  ["Serie", ot?.serie || "-"],
+  ["Orden de Servicio", ot?.os || "-"],
+  ["Estado", ot?.estado || "-"],
+  ["Fecha Inicio", obtenerFechaInicioGantt()],
+  ["Fecha Término", obtenerFechaTerminoGantt()]
+];
+
+  let y = boxY + 16;
+
+  datos.forEach(([label, valor]) => {
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(...config.colorPrincipal);
+    doc.text(label + ":", boxX + 14, y);
+
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(...config.colorTexto);
+    doc.text(String(valor), boxX + 62, y);
+
+    y += 11;
+  });
+
+  // Footer portada
+doc.setFontSize(10);
+doc.setTextColor(...config.colorTextoSuave);
+
+doc.text(
+  "Generado por OVERTRACK",
+  pageWidth / 2,
+  pageHeight - 24,
+  { align: "center" }
+);
+
+doc.text(
+  config.subtitulo,
+  pageWidth / 2,
+  pageHeight - 18,
+  { align: "center" }
+);
+}
+
+
+function obtenerResumenEvidenciasInforme() {
+  const etapas = [
+    { nombre: "Ingreso", lista: ot.ingreso || [] },
+    { nombre: "Evaluación", lista: ot.evaluacion || [] },
+    { nombre: "Overhaul", lista: ot.overhaul || [] },
+    { nombre: "Pruebas Mecánicas", lista: ot.pruebas?.mecanico || [] },
+    { nombre: "Pruebas Eléctricas", lista: ot.pruebas?.electrico || [] },
+    { nombre: "Despacho Preparación", lista: ot.despacho?.preparacion || [] },
+    { nombre: "Despacho Final", lista: ot.despacho?.final || [] }
+  ];
+
+  return etapas.map(etapa => {
+    const fotos = etapa.lista.reduce(
+      (acc, item) => acc + (item.fotos?.length || 0),
+      0
+    );
+
+    const comentarios = etapa.lista.reduce(
+      (acc, item) => acc + (item.comentarios?.length || 0),
+      0
+    );
+
+    const actividades = etapa.lista.length;
+
+    return {
+      etapa: etapa.nombre,
+      actividades,
+      fotos,
+      comentarios
+    };
+  });
+}
+
+window.obtenerResumenEvidenciasInforme = obtenerResumenEvidenciasInforme;
+
+
+function crearResumenEjecutivoInforme(doc, config) {
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+
+  const resumen = obtenerResumenEjecutivoInforme();
+
+  // Fondo
+  doc.setFillColor(...config.colorFondo);
+  doc.rect(0, 0, pageWidth, pageHeight, "F");
+
+  // Header
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(20);
+  doc.setTextColor(...config.colorTexto);
+
+  doc.text("RESUMEN EJECUTIVO", 18, 24);
+
+  doc.setDrawColor(...config.colorPrincipal);
+  doc.setLineWidth(1.2);
+  doc.line(18, 32, pageWidth - 18, 32);
+
+  // Datos base
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.setTextColor(...config.colorTextoSuave);
+
+  doc.text(`OS: ${ot?.os || "-"}`, 18, 42);
+  doc.text(`Cliente: ${ot?.cliente || "-"}`, 65, 42);
+  doc.text(`Equipo: ${ot?.equipo || "-"}`, 125, 42);
+  doc.text(`Estado: ${resumen.estado}`, 175, 42);
+
+  // Cards KPI
+  const cards = [
+    ["Actividades", resumen.totalActividades],
+    ["Completadas", resumen.actividadesCompletadas],
+    ["Comentarios", resumen.totalComentarios],
+    ["Fotografías", resumen.totalFotos],
+    ["Avance", `${resumen.avance}%`],
+    ["Estado", resumen.estado]
+  ];
+
+  const cardW = 54;
+  const cardH = 30;
+  const gap = 8;
+
+  let x = 18;
+  let y = 58;
+
+  cards.forEach((card, index) => {
+    if (index === 3) {
+      x = 18;
+      y += cardH + gap;
+    }
+
+    doc.setFillColor(30, 41, 59);
+    doc.roundedRect(x, y, cardW, cardH, 4, 4, "F");
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(...config.colorTextoSuave);
+    doc.text(card[0], x + 5, y + 9);
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(15);
+    doc.setTextColor(...config.colorTexto);
+    doc.text(String(card[1]), x + 5, y + 22);
+
+    x += cardW + gap;
+  });
+
+  // Barra de avance general
+  const barraX = 18;
+  const barraY = 138;
+  const barraW = pageWidth - 36;
+  const barraH = 12;
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(12);
+  doc.setTextColor(...config.colorTexto);
+
+  doc.text("Avance general del servicio", barraX, barraY - 6);
+
+  doc.setFillColor(30, 41, 59);
+  doc.roundedRect(barraX, barraY, barraW, barraH, 4, 4, "F");
+
+  const avanceW = Math.max(4, (resumen.avance / 100) * barraW);
+
+  doc.setFillColor(...config.colorPrincipal);
+  doc.roundedRect(barraX, barraY, avanceW, barraH, 4, 4, "F");
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(9);
+  doc.setTextColor(255, 255, 255);
+
+  doc.text(
+    `${resumen.avance}%`,
+    barraX + barraW / 2,
+    barraY + 8.5,
+    { align: "center" }
+  );
+
+  // Fechas
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.setTextColor(...config.colorTextoSuave);
+
+  doc.text(`Fecha inicio: ${resumen.fechaInicio}`, 18, 168);
+  doc.text(`Fecha término estimada: ${resumen.fechaTermino}`, 95, 168);
+
+  const etapas = obtenerEstadoEtapasInforme();
+
+doc.setFont("helvetica", "bold");
+doc.setFontSize(12);
+doc.setTextColor(...config.colorTexto);
+
+doc.text(
+  "Estado de las Etapas",
+  18,
+  188
+);
+
+let yEtapa = 200;
+
+etapas.forEach(etapa => {
+
+  let colorEstado = [148,163,184];
+
+  if (etapa.estado === "Completada") {
+    colorEstado = [34,197,94];
+  }
+
+  if (etapa.estado === "En Proceso") {
+    colorEstado = [249,115,22];
+  }
+
+  doc.setFillColor(...colorEstado);
+  doc.circle(20, yEtapa - 1.5, 1.5, "F");
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  doc.setTextColor(...config.colorTexto);
+
+  doc.text(etapa.nombre, 26, yEtapa);
+
+  doc.setTextColor(...colorEstado);
+
+  doc.text(
+    etapa.estado,
+    95,
+    yEtapa
+  );
+
+  yEtapa += 10;
+});
+
+  // Footer
+  doc.setFontSize(8);
+  doc.setTextColor(...config.colorTextoSuave);
+
+  doc.text(
+    config.textoCierre,
+    pageWidth / 2,
+    pageHeight - 14,
+    { align: "center" }
+  );
+}
+
+
+function obtenerFotosInforme() {
+  const etapas = [
+    { nombre: "Ingreso", lista: ot.ingreso || [] },
+    { nombre: "Evaluación", lista: ot.evaluacion || [] },
+    { nombre: "Overhaul", lista: ot.overhaul || [] },
+    { nombre: "Pruebas Mecánicas", lista: ot.pruebas?.mecanico || [] },
+    { nombre: "Pruebas Eléctricas", lista: ot.pruebas?.electrico || [] },
+    { nombre: "Despacho Preparación", lista: ot.despacho?.preparacion || [] },
+    { nombre: "Despacho Final", lista: ot.despacho?.final || [] }
+  ];
+
+  const fotos = [];
+
+  etapas.forEach(etapa => {
+    etapa.lista.forEach((item, index) => {
+      (item.fotos || []).forEach((foto, fotoIndex) => {
+        fotos.push({
+          etapa: etapa.nombre,
+          actividad: item.item || item.texto || `Actividad ${index + 1}`,
+          url: foto,
+          numero: fotoIndex + 1
+        });
+      });
+    });
+  });
+
+  return fotos;
+}
+
+
+
+function crearPaginaEvidenciasInforme(doc, config) {
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+
+  const evidencias = obtenerResumenEvidenciasInforme();
+
+  const totalActividades = evidencias.reduce(
+    (acc, e) => acc + e.actividades,
+    0
+  );
+
+  const totalFotos = evidencias.reduce(
+    (acc, e) => acc + e.fotos,
+    0
+  );
+
+  const totalComentarios = evidencias.reduce(
+    (acc, e) => acc + e.comentarios,
+    0
+  );
+
+  // Fondo
+  doc.setFillColor(...config.colorFondo);
+  doc.rect(0, 0, pageWidth, pageHeight, "F");
+
+  // Título
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(20);
+  doc.setTextColor(...config.colorTexto);
+  doc.text("EVIDENCIAS DEL SERVICIO", 18, 24);
+
+  doc.setDrawColor(...config.colorPrincipal);
+  doc.setLineWidth(1.2);
+  doc.line(18, 32, pageWidth - 18, 32);
+
+  // Subtítulo
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.setTextColor(...config.colorTextoSuave);
+
+  doc.text(
+    "Resumen de actividades, fotografías y comentarios registrados por etapa.",
+    18,
+    42
+  );
+
+  // Tabla
+  const body = evidencias.map(e => [
+    e.etapa,
+    e.actividades,
+    e.fotos,
+    e.comentarios
+  ]);
+
+  doc.autoTable({
+    startY: 54,
+    head: [[
+      "Etapa",
+      "Actividades",
+      "Fotografías",
+      "Comentarios"
+    ]],
+    body,
+    theme: "grid",
+    styles: {
+      fillColor: [15, 23, 42],
+      textColor: [255, 255, 255],
+      lineColor: [51, 65, 85],
+      lineWidth: 0.2,
+      fontSize: 9,
+      cellPadding: 3
+    },
+    headStyles: {
+      fillColor: config.colorPrincipal,
+      textColor: [17, 24, 39],
+      fontStyle: "bold"
+    },
+    alternateRowStyles: {
+      fillColor: [30, 41, 59]
+    }
+  });
+
+  const yTotales = doc.lastAutoTable.finalY + 16;
+
+  // Cards totales
+  const cards = [
+    ["Total Actividades", totalActividades],
+    ["Total Fotografías", totalFotos],
+    ["Total Comentarios", totalComentarios]
+  ];
+
+  const cardW = 54;
+  const cardH = 28;
+  const gap = 10;
+
+  let x = 18;
+
+  cards.forEach(card => {
+    doc.setFillColor(30, 41, 59);
+    doc.roundedRect(x, yTotales, cardW, cardH, 4, 4, "F");
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(...config.colorTextoSuave);
+    doc.text(card[0], x + 5, yTotales + 9);
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(15);
+    doc.setTextColor(...config.colorTexto);
+    doc.text(String(card[1]), x + 5, yTotales + 22);
+
+    x += cardW + gap;
+  });
+
+  // Footer
+  doc.setFontSize(8);
+  doc.setTextColor(...config.colorTextoSuave);
+
+  doc.text(
+    config.textoCierre,
+    pageWidth / 2,
+    pageHeight - 14,
+    { align: "center" }
+  );
+}
+
+
+
+async function crearGaleriaFotograficaInforme(doc, config) {
+  const fotos = obtenerFotosInforme();
+
+  if (!fotos.length) return;
+
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+
+  doc.addPage();
+
+  doc.setFillColor(...config.colorFondo);
+  doc.rect(0, 0, pageWidth, pageHeight, "F");
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(20);
+  doc.setTextColor(...config.colorTexto);
+  doc.text("GALERÍA FOTOGRÁFICA", 18, 24);
+
+  doc.setDrawColor(...config.colorPrincipal);
+  doc.setLineWidth(1.2);
+  doc.line(18, 32, pageWidth - 18, 32);
+
+  let y = 46;
+
+  const imgW = 80;
+  const imgH = 58;
+  const gapX = 12;
+  const gapY = 22;
+
+  const col1 = 18;
+  const col2 = col1 + imgW + gapX;
+
+  for (let i = 0; i < fotos.length; i++) {
+    const foto = fotos[i];
+
+    const columna = i % 2;
+    const x = columna === 0 ? col1 : col2;
+
+    if (columna === 0 && i > 0) {
+      y += imgH + gapY;
+    }
+
+    if (y + imgH + 18 > pageHeight - 18) {
+      doc.addPage();
+
+      doc.setFillColor(...config.colorFondo);
+      doc.rect(0, 0, pageWidth, pageHeight, "F");
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(18);
+      doc.setTextColor(...config.colorTexto);
+      doc.text("GALERÍA FOTOGRÁFICA", 18, 24);
+
+      doc.setDrawColor(...config.colorPrincipal);
+      doc.line(18, 32, pageWidth - 18, 32);
+
+      y = 46;
+    }
+
+    try {
+      const fotoBase64 =
+        foto.url.startsWith("http")
+          ? await convertirImagenABase64(foto.url)
+          : foto.url;
+
+      if (!fotoBase64) continue;
+
+      doc.setDrawColor(51, 65, 85);
+      doc.setFillColor(30, 41, 59);
+      doc.roundedRect(x - 2, y - 2, imgW + 4, imgH + 18, 3, 3, "F");
+
+      doc.addImage(
+        fotoBase64,
+        "JPEG",
+        x,
+        y,
+        imgW,
+        imgH
+      );
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(7);
+      doc.setTextColor(...config.colorPrincipal);
+      doc.text(foto.etapa, x, y + imgH + 6);
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(6);
+      doc.setTextColor(...config.colorTextoSuave);
+
+      const textoActividad = doc.splitTextToSize(
+        foto.actividad,
+        imgW
+      );
+
+      doc.text(
+        textoActividad.slice(0, 2),
+        x,
+        y + imgH + 12
+      );
+
+    } catch (error) {
+      console.warn("No se pudo agregar foto al informe:", error);
+    }
+  }
+
+  doc.setFontSize(8);
+  doc.setTextColor(...config.colorTextoSuave);
+
+  doc.text(
+    config.textoCierre,
+    pageWidth / 2,
+    pageHeight - 10,
+    { align: "center" }
+  );
+}
+
+
+async function generarInformeFinalPDF() {
+  if (!ot) {
+    alert("No hay OS cargada");
+    return;
+  }
+
+  const { jsPDF } = window.jspdf;
+
+  const doc = new jsPDF("p", "mm", "a4");
+
+  crearPortadaInforme(doc, configInformeEmpresa);
+
+doc.addPage();
+crearResumenEjecutivoInforme(doc, configInformeEmpresa);
+
+doc.addPage();
+crearPaginaEvidenciasInforme(doc, configInformeEmpresa);
+
+await crearGaleriaFotograficaInforme(doc, configInformeEmpresa);
+
+doc.save(`Informe_Final_${ot.os || "OS"}.pdf`);
+}
+
 
 
 
@@ -6272,8 +7335,6 @@ window.subirDocsSeccion = subirDocsSeccion;
 window.guardarDespacho = guardarDespacho;
 window.cerrarOT = cerrarOT;
 
-window.generarPDF = generarPDF;
-
 window.cerrarModal = cerrarModal;
 window.cerrarImagen = cerrarImagen;
 
@@ -6344,3 +7405,7 @@ window.renderCartaGanttProject = renderCartaGanttProject;
 window.toggleEtapaGantt = toggleEtapaGantt;
 
 window.recalcularGanttAutomatico = recalcularGanttAutomatico;
+
+window.generarPDF = generarInformeFinalPDF;
+
+window.obtenerResumenEjecutivoInforme = obtenerResumenEjecutivoInforme;

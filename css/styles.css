@@ -4778,8 +4778,6 @@ box-shadow:
   }
 }
 
-
-
 .docs-pro-grid {
   display: grid;
   gap: 14px;
@@ -4883,7 +4881,6 @@ box-shadow:
   }
 }
 
-
 .comentario-card {
   background: rgba(15, 23, 42, 0.95);
   border: 1px solid rgba(148, 163, 184, 0.18);
@@ -4930,9 +4927,6 @@ box-shadow:
   cursor: pointer;
 }
 
-
-
-
 .progreso-etapa-card{
   background: rgba(15,23,42,.92);
   border: 1px solid rgba(148,163,184,.18);
@@ -4969,8 +4963,6 @@ box-shadow:
   transition:.3s;
 }
 
-
-
 .estado-autoguardado {
   margin: 10px 0 18px;
   padding: 10px 14px;
@@ -5000,8 +4992,6 @@ box-shadow:
   transition: opacity .3s ease;
 }
 
-
-
 .bitacora-card {
   margin-top: 24px;
 }
@@ -5026,9 +5016,6 @@ box-shadow:
 .bitacora-item small {
   color: #94a3b8;
 }
-
-
-
 
 .gantt-board-pro {
   overflow-x: auto !important;
@@ -5056,9 +5043,6 @@ box-shadow:
 .gantt-board-bar {
   min-width: 46px;
 }
-
-
-
 
 /* =========================
    GANTT PROJECT VIEW
@@ -5117,26 +5101,6 @@ box-shadow:
   font-size: 18px;
 }
 
-
-
-
-/* FIX SCROLL GANTT PROJECT */
-
-
-
-
-
-.gantt-project-body {
-  position: relative;
-  width: max-content !important;
-  min-height: auto !important;
-}
-
-
-
-
-
-
 .gantt-project-info {
   display: grid;
   grid-template-columns: 100px 180px 65px 65px 45px;
@@ -5192,17 +5156,6 @@ box-shadow:
   border-right: 1px solid rgba(148,163,184,.08);
 }
 
-.gantt-project-track {
-  position: relative;
-  background-image:
-    linear-gradient(
-      to right,
-      rgba(148,163,184,.10) 1px,
-      transparent 1px
-    );
-  background-size: 34px 100%;
-}
-
 .gantt-project-bar {
   position: absolute;
   top: 13px;
@@ -5246,8 +5199,6 @@ box-shadow:
   }
 }
 
-
-
 .gantt-project-weeks {
   display: flex;
   height: 54px;
@@ -5262,12 +5213,6 @@ box-shadow:
   font-size: 12px;
   font-weight: 900;
   border-right: 1px solid rgba(148,163,184,.14);
-}
-
-
-
-.gantt-project-track {
-  background-size: 130px 100% !important;
 }
 
 .gantt-project-hoy-line {
@@ -5321,8 +5266,6 @@ box-shadow:
   background: linear-gradient(135deg,#ef4444,#b91c1c);
 }
 
-
-
 /* =========================
    MEJORAS VISUALES PROJECT
 ========================= */
@@ -5333,17 +5276,7 @@ box-shadow:
 }
 
 /* TRACK */
-.gantt-project-track {
-  position: relative;
-  background-image:
-    linear-gradient(
-      to right,
-      rgba(148,163,184,.08) 1px,
-      transparent 1px
-    );
 
-  background-position: left top;
-}
 
 /* BARRAS */
 .gantt-project-bar {
@@ -5392,9 +5325,6 @@ box-shadow:
 .gantt-project-summary div {
   backdrop-filter: blur(8px);
 }
-
-
-
 
 /* =========================
    AGRUPACIÓN POR ETAPAS
@@ -5670,58 +5600,16 @@ box-shadow:
 }
 
 
-
-
 .gantt-project-body {
-  padding-bottom: 42px !important;
-}
-
-
-
-
-
-.gantt-project-track {
-  overflow: visible !important;
+  position: relative;
+  width: max-content !important;
+  min-height: auto !important;
+  padding-bottom: 24px !important;
 }
 
 .gantt-project-bar-etapa {
   max-width: calc(100% - 12px);
 }
-
-
-
-
-
-
-.gantt-project-body {
-  padding-bottom: 60px !important;
-}
-
-.gantt-project-track {
-  overflow: visible !important;
-}
-
-
-/* =========================
-   SCROLL HORIZONTAL GANTT PROJECT
-========================= */
-
-
-
-
-
-
-.gantt-project-timeline-head,
-.gantt-project-track {
-  flex-shrink: 0 !important;
-}
-
-
-/* =========================
-   SCROLL PROFESIONAL GANTT
-========================= */
-
-
 
 /* Chrome / Edge */
 .gantt-project-scroll::-webkit-scrollbar {
@@ -5755,8 +5643,6 @@ box-shadow:
 .gantt-project-scroll::-webkit-scrollbar-corner {
   background: #081327;
 }
-
-
 
 /* =========================
    MODALES CARTA GANTT
@@ -5828,14 +5714,28 @@ box-shadow:
   overflow: hidden !important;
 }
 
-
-
-
-
-
-
-.gantt-project-timeline-head,
 .gantt-project-track {
+  position: relative;
+  overflow: visible !important;
+  flex-shrink: 0 !important;
+
+  background-image:
+    linear-gradient(
+      to right,
+      rgba(148,163,184,.08) 1px,
+      transparent 1px
+    );
+
+  background-size: 168px 100%;
+  background-position: left top;
+}
+
+.gantt-project-track-detail {
+  display: flex;
+  align-items: center;
+}
+
+.gantt-project-timeline-head {
   flex-shrink: 0 !important;
 }
 
@@ -5845,8 +5745,6 @@ box-shadow:
   padding-bottom: 12px !important;
   padding-right: 20px !important;
 }
-
-
 
 .gantt-project-row {
   display: grid;
