@@ -336,15 +336,11 @@ function renderBadgesOT(o, estado, atrasada, diasAtraso) {
   const badges = [];
 
   if (atrasada) {
-    card.classList.add("atrasada");
-  }
-
-  if (estado === "PRUEBAS") {
-    card.classList.add("pruebas");
-  }
-
-  if (estado === "DESPACHO") {
-    card.classList.add("despacho");
+    badges.push(`
+      <span class="ot-badge badge-rojo">
+        ⏱ ${diasAtraso || 0} día(s) atraso
+      </span>
+    `);
   }
 
   if (o.gantt?.diasRepuestos > 0 && estado !== "CERRADA") {

@@ -2624,15 +2624,16 @@ function abrirModalGantt() {
   const modalForm = document.getElementById("modalGantt");
   const modalVisual = document.getElementById("modalGanttVisual");
 
-  // 🔥 SI YA EXISTE GANTT
-  if (ot.gantt && ot.gantt.actividades?.length) {
+if (ot.gantt && ot.gantt.actividades?.length) {
+  cargarFormularioGantt();
+  cargarFechasGanttEnFormulario();
 
-    renderCartaGanttProject();
+  renderCartaGanttProject();
 
-    modalVisual.style.display = "flex";
+  modalVisual.style.display = "flex";
 
-    return;
-  }
+  return;
+}
 
   // 🔥 PRIMER INGRESO
   cargarFormularioGantt();
@@ -2642,20 +2643,83 @@ function abrirModalGantt() {
 
 function cargarFormularioGantt() {
 
-  if (!ot.gantt) return;
+  if (!ot?.gantt) return;
 
-  document.getElementById("fechaInicioGantt").value =
-    ot.gantt.fechaInicio || "";
+  const setValue = (id, valor) => {
+    const el = document.getElementById(id);
 
-  document.getElementById("fechaTerminoGantt").value =
-    ot.gantt.fechaTermino || "";
+    if (el) {
+      el.value = valor ?? "";
+    }
+  };
 
-  document.getElementById("diasRepuestos").value =
-    ot.gantt.diasRepuestos || 0;
-
-  document.getElementById("comentarioRepuestos").value =
-    ot.gantt.comentarioRepuestos || "";
+  setValue("ganttFechaInicio", ot.gantt.fechaInicio);
+  setValue("ganttFechaTermino", ot.gantt.fechaTermino);
+  setValue("ganttFechaSolicitudRepuestos", ot.gantt.fechaSolicitudRepuestos);
+  setValue("ganttDiasRepuestos", ot.gantt.diasRepuestos || 0);
+  setValue("ganttComentarioRepuestos", ot.gantt.comentarioRepuestos || "");
 }
+
+
+function cargarFechasGanttEnFormulario() {
+
+  if (!ot?.gantt) return;
+
+  const setValue = (id, value) => {
+    const input = document.getElementById(id);
+
+    if (input && value) {
+      input.value = String(value).slice(0, 10);
+    }
+  };
+
+  if (Array.isArray(ot.gantt.etapas)) {
+
+    const getEtapa = nombre =>
+      ot.gantt.etapas.find(e => e.etapa === nombre);
+
+    const cargarEtapa = (nombre, idInicio, idTermino) => {
+
+      const etapa = getEtapa(nombre);
+
+      if (!etapa) return;
+
+      setValue(idInicio, etapa.inicio);
+      setValue(idTermino, etapa.termino);
+    };
+
+    cargarEtapa(
+      "Ingreso",
+      "ganttIngresoInicio",
+      "ganttIngresoTermino"
+    );
+
+    cargarEtapa(
+      "Evaluación",
+      "ganttEvaluacionInicio",
+      "ganttEvaluacionTermino"
+    );
+
+    cargarEtapa(
+      "Overhaul",
+      "ganttOverhaulInicio",
+      "ganttOverhaulTermino"
+    );
+
+    cargarEtapa(
+      "Pruebas Mecánicas",
+      "ganttPruebasMecanicasInicio",
+      "ganttPruebasMecanicasTermino"
+    );
+
+    cargarEtapa(
+      "Pruebas Eléctricas",
+      "ganttPruebasElectricasInicio",
+      "ganttPruebasElectricasTermino"
+    );
+  }
+}
+
 
 function cerrarModalGantt() {
   const modal = document.getElementById("modalGantt");
@@ -2783,13 +2847,15 @@ function cerrarModalGanttVisual() {
 }
 
 function volverFormularioGantt() {
+
   const visual = document.getElementById("modalGanttVisual");
   const form = document.getElementById("modalGantt");
 
   if (visual) visual.style.display = "none";
   if (form) form.style.display = "flex";
 
-  cargarGanttGuardado();
+  cargarFormularioGantt();
+  cargarFechasGanttEnFormulario();
 }
 
 
@@ -5623,7 +5689,9 @@ const configInformeEmpresa = {
   colorTexto: [255, 255, 255],
   colorTextoSuave: [203, 213, 225],
   textoPortada: "Informe final de servicio técnico y mantenimiento.",
-  textoCierre: "Documento generado automáticamente por Overtrack."
+  textoCierre: "Documento generado automáticamente por Overtrack.",
+  textoResumenTecnico:
+  "Se deja constancia del avance del servicio realizado sobre el equipo indicado. Las actividades ejecutadas, evidencias fotográficas y observaciones técnicas quedan registradas en el presente informe como respaldo del proceso de mantenimiento."
 };
 
 
@@ -6347,6 +6415,53 @@ function obtenerEstadoEtapasInforme() {
 
 
 
+function generarConclusionTecnicaInforme() {
+  const resumen = obtenerResumenEjecutivoInforme();
+  const estado = obtenerEstadoOT(ot);
+
+  const base = `
+Durante el proceso de mantenimiento del equipo ${ot?.equipo || "-"}, asociado a la Orden de Servicio N° ${ot?.os || "-"}, se han registrado ${resumen.totalActividades} actividades, ${resumen.totalFotos} evidencia(s) fotográfica(s) y ${resumen.totalComentarios} comentario(s) técnico(s), alcanzando un avance general de ${resumen.avance}%.
+`;
+
+  const textosPorEstado = {
+    INGRESO: `
+Actualmente el servicio se encuentra en etapa de Ingreso. En esta fase se registra la recepción inicial del equipo, sus condiciones de llegada, antecedentes principales y evidencias asociadas al ingreso al taller.
+`,
+
+    EVALUACION: `
+Actualmente el servicio se encuentra en etapa de Evaluación. Se está desarrollando el diagnóstico técnico del equipo, registrando observaciones, evidencias fotográficas y antecedentes necesarios para definir el alcance de la intervención.
+`,
+
+    EVALUACIÓN: `
+Actualmente el servicio se encuentra en etapa de Evaluación. Se está desarrollando el diagnóstico técnico del equipo, registrando observaciones, evidencias fotográficas y antecedentes necesarios para definir el alcance de la intervención.
+`,
+
+    OVERHAUL: `
+Actualmente el servicio se encuentra en etapa de Overhaul. Las etapas previas han permitido levantar antecedentes técnicos y el equipo se encuentra en proceso de intervención conforme a la planificación establecida.
+`,
+
+    PRUEBAS: `
+Actualmente el servicio se encuentra en etapa de Pruebas. Las actividades de intervención se encuentran finalizadas o en proceso de validación, ejecutándose pruebas mecánicas y eléctricas para verificar el correcto funcionamiento del equipo.
+`,
+
+    DESPACHO: `
+Actualmente el servicio se encuentra en etapa de Despacho. El equipo se encuentra en proceso de preparación final para entrega al cliente, posterior a las actividades de intervención y validación técnica.
+`,
+
+    CERRADA: `
+El servicio de mantenimiento ha sido completado satisfactoriamente. Las etapas definidas fueron ejecutadas y registradas en el sistema, incluyendo evidencias fotográficas, observaciones técnicas y validaciones correspondientes.
+`
+  };
+
+  const textoEstado =
+    textosPorEstado[estado] ||
+    `Actualmente el servicio se encuentra en estado ${estado}. La información contenida en este informe corresponde al avance registrado hasta la fecha de emisión.`;
+
+  return `${base}\n${textoEstado}\nEl presente informe constituye respaldo técnico del servicio realizado y permite mantener trazabilidad del proceso.`;
+}
+
+
+
 function crearPortadaInforme(doc, config) {
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
@@ -6679,6 +6794,88 @@ etapas.forEach(etapa => {
 }
 
 
+
+
+
+
+function crearResumenTecnicoInforme(doc, config) {
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+
+  doc.setFillColor(...config.colorFondo);
+  doc.rect(0, 0, pageWidth, pageHeight, "F");
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(20);
+  doc.setTextColor(...config.colorTexto);
+  doc.text("RESUMEN TÉCNICO DEL SERVICIO", 18, 24);
+
+  doc.setDrawColor(...config.colorPrincipal);
+  doc.setLineWidth(1.2);
+  doc.line(18, 32, pageWidth - 18, 32);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  doc.setTextColor(...config.colorTextoSuave);
+
+  const texto = doc.splitTextToSize(
+    config.textoResumenTecnico || "Sin resumen técnico registrado.",
+    pageWidth - 36
+  );
+
+  doc.text(texto, 18, 48);
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(12);
+  doc.setTextColor(...config.colorTexto);
+  doc.text("Datos principales del servicio", 18, 92);
+
+  const datos = [
+    ["Cliente", ot?.cliente || "-"],
+    ["Equipo", ot?.equipo || "-"],
+    ["Serie", ot?.serie || "-"],
+    ["Orden de Servicio", ot?.os || "-"],
+    ["Estado actual", ot?.estado || "-"],
+    ["Fecha inicio", obtenerFechaInicioGantt()],
+    ["Fecha término estimada", obtenerFechaTerminoGantt()]
+  ];
+
+  doc.autoTable({
+    startY: 102,
+    head: [["Campo", "Detalle"]],
+    body: datos,
+    theme: "grid",
+    styles: {
+      fillColor: [15, 23, 42],
+      textColor: [255, 255, 255],
+      lineColor: [51, 65, 85],
+      lineWidth: 0.2,
+      fontSize: 9,
+      cellPadding: 3
+    },
+    headStyles: {
+      fillColor: config.colorPrincipal,
+      textColor: [17, 24, 39],
+      fontStyle: "bold"
+    },
+    alternateRowStyles: {
+      fillColor: [30, 41, 59]
+    }
+  });
+
+  doc.setFontSize(8);
+  doc.setTextColor(...config.colorTextoSuave);
+
+  doc.text(
+    config.textoCierre,
+    pageWidth / 2,
+    pageHeight - 14,
+    { align: "center" }
+  );
+}
+
+
+
 function obtenerFotosInforme() {
   const etapas = [
     { nombre: "Ingreso", lista: ot.ingreso || [] },
@@ -6955,6 +7152,48 @@ async function crearGaleriaFotograficaInforme(doc, config) {
 }
 
 
+
+function crearConclusionTecnicaInforme(doc, config) {
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+
+  doc.addPage();
+
+  doc.setFillColor(...config.colorFondo);
+  doc.rect(0, 0, pageWidth, pageHeight, "F");
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(20);
+  doc.setTextColor(...config.colorTexto);
+  doc.text("CONCLUSIÓN TÉCNICA", 18, 24);
+
+  doc.setDrawColor(...config.colorPrincipal);
+  doc.setLineWidth(1.2);
+  doc.line(18, 32, pageWidth - 18, 32);
+
+  const conclusion = generarConclusionTecnicaInforme();
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  doc.setTextColor(...config.colorTextoSuave);
+
+  const texto = doc.splitTextToSize(conclusion, pageWidth - 36);
+  doc.text(texto, 18, 50);
+
+  doc.setFontSize(8);
+  doc.setTextColor(...config.colorTextoSuave);
+
+  doc.text(
+    config.textoCierre,
+    pageWidth / 2,
+    pageHeight - 14,
+    { align: "center" }
+  );
+}
+
+
+
+
 async function generarInformeFinalPDF() {
   if (!ot) {
     alert("No hay OS cargada");
@@ -6967,15 +7206,20 @@ async function generarInformeFinalPDF() {
 
   crearPortadaInforme(doc, configInformeEmpresa);
 
-doc.addPage();
-crearResumenEjecutivoInforme(doc, configInformeEmpresa);
+  doc.addPage();
+  crearResumenEjecutivoInforme(doc, configInformeEmpresa);
 
-doc.addPage();
-crearPaginaEvidenciasInforme(doc, configInformeEmpresa);
+  doc.addPage();
+  crearResumenTecnicoInforme(doc, configInformeEmpresa);
 
-await crearGaleriaFotograficaInforme(doc, configInformeEmpresa);
+  doc.addPage();
+  crearPaginaEvidenciasInforme(doc, configInformeEmpresa);
 
-doc.save(`Informe_Final_${ot.os || "OS"}.pdf`);
+  await crearGaleriaFotograficaInforme(doc, configInformeEmpresa);
+
+  crearConclusionTecnicaInforme(doc, configInformeEmpresa);
+
+  doc.save(`Informe_Final_${ot.os || "OS"}.pdf`);
 }
 
 
