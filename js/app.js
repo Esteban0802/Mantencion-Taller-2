@@ -6462,6 +6462,141 @@ El servicio de mantenimiento ha sido completado satisfactoriamente. Las etapas d
 
 
 
+const PDF_LAYOUT = {
+  margenX: 18,
+  headerAlto: 32,
+  tituloY: 42,
+  lineaTituloY: 48,
+  contenidoY: 60,
+  footerY: 282,
+  colorCard: [30, 41, 59],
+  colorTabla: [15, 23, 42],
+  colorLinea: [51, 65, 85]
+};
+
+
+
+
+function crearPaginaBaseInforme(doc, config, titulo) {
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+
+  // Fondo
+  doc.setFillColor(...config.colorFondo);
+  doc.rect(0, 0, pageWidth, pageHeight, "F");
+
+  // Título de sección
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(18);
+  doc.setTextColor(...config.colorTexto);
+  doc.text(titulo, PDF_LAYOUT.margenX, PDF_LAYOUT.tituloY);
+
+  // Línea naranja
+  doc.setDrawColor(...config.colorPrincipal);
+  doc.setLineWidth(1);
+  doc.line(
+    PDF_LAYOUT.margenX,
+    PDF_LAYOUT.lineaTituloY,
+    pageWidth - PDF_LAYOUT.margenX,
+    PDF_LAYOUT.lineaTituloY
+  );
+
+  return PDF_LAYOUT.contenidoY;
+}
+
+
+function agregarHeaderInforme(doc, config, pageNumber, totalPages) {
+  const pageWidth = doc.internal.pageSize.getWidth();
+
+  // Fondo del encabezado
+  doc.setFillColor(...config.colorFondo);
+  doc.rect(0, 0, pageWidth, 28, "F");
+
+  // Marca
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.setTextColor(...config.colorTexto);
+  doc.text(config.nombre || "OVERTRACK", 18, 10);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7);
+  doc.setTextColor(...config.colorTextoSuave);
+  doc.text(config.subtitulo || "Sistema de Gestión de Mantenimiento", 18, 16);
+
+  // Datos dinámicos de la OS
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(7);
+  doc.setTextColor(...config.colorTexto);
+
+  doc.text(`OS: ${ot?.os || "-"}`, 95, 10);
+  doc.text(`Cliente: ${ot?.cliente || "-"}`, 95, 16);
+  doc.text(`Equipo: ${ot?.equipo || "-"}`, 95, 22);
+
+  // Número de página
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(8);
+  doc.setTextColor(...config.colorPrincipal);
+
+  doc.text(
+    `Página ${pageNumber} de ${totalPages}`,
+    pageWidth - 18,
+    16,
+    { align: "right" }
+  );
+}
+
+
+
+
+function agregarFooterInforme(doc, config, pageNumber, totalPages) {
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+
+  doc.setDrawColor(...config.colorPrincipal);
+  doc.setLineWidth(0.35);
+  doc.line(18, pageHeight - 18, pageWidth - 18, pageHeight - 18);
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(7);
+  doc.setTextColor(...config.colorTexto);
+  doc.text(config.nombre || "OVERTRACK", 18, pageHeight - 11);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7);
+  doc.setTextColor(...config.colorTextoSuave);
+
+  doc.text("Informe Final de Servicio", 55, pageHeight - 11);
+  doc.text("Versión 1.0", 110, pageHeight - 11);
+  doc.text(new Date().toLocaleDateString("es-CL"), 145, pageHeight - 11);
+
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(...config.colorPrincipal);
+
+  doc.text(
+    `Página ${pageNumber} de ${totalPages}`,
+    pageWidth - 18,
+    pageHeight - 11,
+    { align: "right" }
+  );
+}
+
+
+
+
+function aplicarHeadersInforme(doc, config) {
+  const totalPages = doc.getNumberOfPages();
+
+  for (let i = 2; i <= totalPages; i++) {
+    doc.setPage(i);
+
+    agregarHeaderInforme(doc, config, i, totalPages);
+    agregarFooterInforme(doc, config, i, totalPages);
+  }
+}
+
+
+
+
 function crearPortadaInforme(doc, config) {
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
@@ -6628,34 +6763,25 @@ window.obtenerResumenEvidenciasInforme = obtenerResumenEvidenciasInforme;
 
 function crearResumenEjecutivoInforme(doc, config) {
   const pageWidth = doc.internal.pageSize.getWidth();
-  const pageHeight = doc.internal.pageSize.getHeight();
 
   const resumen = obtenerResumenEjecutivoInforme();
 
-  // Fondo
-  doc.setFillColor(...config.colorFondo);
-  doc.rect(0, 0, pageWidth, pageHeight, "F");
+  const inicioY = crearPaginaBaseInforme(
+    doc,
+    config,
+    "RESUMEN EJECUTIVO"
+  );
 
-  // Header
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(20);
-  doc.setTextColor(...config.colorTexto);
-
-  doc.text("RESUMEN EJECUTIVO", 18, 24);
-
-  doc.setDrawColor(...config.colorPrincipal);
-  doc.setLineWidth(1.2);
-  doc.line(18, 32, pageWidth - 18, 32);
-
-  // Datos base
+  // Estado actual
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
   doc.setTextColor(...config.colorTextoSuave);
 
-  doc.text(`OS: ${ot?.os || "-"}`, 18, 42);
-  doc.text(`Cliente: ${ot?.cliente || "-"}`, 65, 42);
-  doc.text(`Equipo: ${ot?.equipo || "-"}`, 125, 42);
-  doc.text(`Estado: ${resumen.estado}`, 175, 42);
+  doc.text(
+    `Estado actual del servicio: ${resumen.estado}`,
+    PDF_LAYOUT.margenX,
+    inicioY
+  );
 
   // Cards KPI
   const cards = [
@@ -6671,16 +6797,16 @@ function crearResumenEjecutivoInforme(doc, config) {
   const cardH = 30;
   const gap = 8;
 
-  let x = 18;
-  let y = 58;
+  let x = PDF_LAYOUT.margenX;
+  let y = inicioY + 12;
 
   cards.forEach((card, index) => {
     if (index === 3) {
-      x = 18;
+      x = PDF_LAYOUT.margenX;
       y += cardH + gap;
     }
 
-    doc.setFillColor(30, 41, 59);
+    doc.setFillColor(...PDF_LAYOUT.colorCard);
     doc.roundedRect(x, y, cardW, cardH, 4, 4, "F");
 
     doc.setFont("helvetica", "normal");
@@ -6697,18 +6823,17 @@ function crearResumenEjecutivoInforme(doc, config) {
   });
 
   // Barra de avance general
-  const barraX = 18;
-  const barraY = 138;
-  const barraW = pageWidth - 36;
+  const barraX = PDF_LAYOUT.margenX;
+  const barraY = y + cardH + 28;
+  const barraW = pageWidth - PDF_LAYOUT.margenX * 2;
   const barraH = 12;
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(12);
   doc.setTextColor(...config.colorTexto);
-
   doc.text("Avance general del servicio", barraX, barraY - 6);
 
-  doc.setFillColor(30, 41, 59);
+  doc.setFillColor(...PDF_LAYOUT.colorCard);
   doc.roundedRect(barraX, barraY, barraW, barraH, 4, 4, "F");
 
   const avanceW = Math.max(4, (resumen.avance / 100) * barraW);
@@ -6728,69 +6853,50 @@ function crearResumenEjecutivoInforme(doc, config) {
   );
 
   // Fechas
+  const fechasY = barraY + 30;
+
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
   doc.setTextColor(...config.colorTextoSuave);
 
-  doc.text(`Fecha inicio: ${resumen.fechaInicio}`, 18, 168);
-  doc.text(`Fecha término estimada: ${resumen.fechaTermino}`, 95, 168);
+  doc.text(`Fecha inicio: ${resumen.fechaInicio}`, PDF_LAYOUT.margenX, fechasY);
+  doc.text(`Fecha término estimada: ${resumen.fechaTermino}`, 95, fechasY);
 
+  // Estado de etapas
   const etapas = obtenerEstadoEtapasInforme();
 
-doc.setFont("helvetica", "bold");
-doc.setFontSize(12);
-doc.setTextColor(...config.colorTexto);
-
-doc.text(
-  "Estado de las Etapas",
-  18,
-  188
-);
-
-let yEtapa = 200;
-
-etapas.forEach(etapa => {
-
-  let colorEstado = [148,163,184];
-
-  if (etapa.estado === "Completada") {
-    colorEstado = [34,197,94];
-  }
-
-  if (etapa.estado === "En Proceso") {
-    colorEstado = [249,115,22];
-  }
-
-  doc.setFillColor(...colorEstado);
-  doc.circle(20, yEtapa - 1.5, 1.5, "F");
-
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(10);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(12);
   doc.setTextColor(...config.colorTexto);
 
-  doc.text(etapa.nombre, 26, yEtapa);
+  doc.text("Estado de las Etapas", PDF_LAYOUT.margenX, fechasY + 20);
 
-  doc.setTextColor(...colorEstado);
+  let yEtapa = fechasY + 22;
 
-  doc.text(
-    etapa.estado,
-    95,
-    yEtapa
-  );
+  etapas.forEach(etapa => {
+    let colorEstado = [148, 163, 184];
 
-  yEtapa += 10;
-});
+    if (etapa.estado === "Completada") {
+      colorEstado = [34, 197, 94];
+    }
 
-  // Footer
-  doc.setFontSize(8);
-  doc.setTextColor(...config.colorTextoSuave);
+    if (etapa.estado === "En Proceso") {
+      colorEstado = [249, 115, 22];
+    }
 
-  doc.text(
-    config.textoCierre,
-    pageWidth / 2,
-    pageHeight - 14,
-    { align: "center" }
-  );
+    doc.setFillColor(...colorEstado);
+    doc.circle(PDF_LAYOUT.margenX + 2, yEtapa - 1.5, 1.5, "F");
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.setTextColor(...config.colorTexto);
+    doc.text(etapa.nombre, PDF_LAYOUT.margenX + 8, yEtapa);
+
+    doc.setTextColor(...colorEstado);
+    doc.text(etapa.estado, 95, yEtapa);
+
+    yEtapa += 10;
+  });
 }
 
 
@@ -6802,17 +6908,11 @@ function crearResumenTecnicoInforme(doc, config) {
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
 
-  doc.setFillColor(...config.colorFondo);
-  doc.rect(0, 0, pageWidth, pageHeight, "F");
-
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(20);
-  doc.setTextColor(...config.colorTexto);
-  doc.text("RESUMEN TÉCNICO DEL SERVICIO", 18, 24);
-
-  doc.setDrawColor(...config.colorPrincipal);
-  doc.setLineWidth(1.2);
-  doc.line(18, 32, pageWidth - 18, 32);
+  const inicioY = crearPaginaBaseInforme(
+  doc,
+  config,
+  "RESUMEN TÉCNICO DEL SERVICIO"
+);
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(10);
@@ -6823,12 +6923,12 @@ function crearResumenTecnicoInforme(doc, config) {
     pageWidth - 36
   );
 
-  doc.text(texto, 18, 48);
+  doc.text(texto, 18, inicioY);
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(12);
   doc.setTextColor(...config.colorTexto);
-  doc.text("Datos principales del servicio", 18, 92);
+  doc.text("Datos principales del servicio", 18, inicioY + 34);
 
   const datos = [
     ["Cliente", ot?.cliente || "-"],
@@ -6841,7 +6941,7 @@ function crearResumenTecnicoInforme(doc, config) {
   ];
 
   doc.autoTable({
-    startY: 102,
+    startY: inicioY + 44,
     head: [["Campo", "Detalle"]],
     body: datos,
     theme: "grid",
@@ -6866,12 +6966,6 @@ function crearResumenTecnicoInforme(doc, config) {
   doc.setFontSize(8);
   doc.setTextColor(...config.colorTextoSuave);
 
-  doc.text(
-    config.textoCierre,
-    pageWidth / 2,
-    pageHeight - 14,
-    { align: "center" }
-  );
 }
 
 
@@ -6890,13 +6984,31 @@ function obtenerFotosInforme() {
   const fotos = [];
 
   etapas.forEach(etapa => {
+    const totalItems = etapa.lista.length;
+
     etapa.lista.forEach((item, index) => {
+      const comentario =
+        item.comentarios?.length
+          ? item.comentarios[item.comentarios.length - 1]?.texto
+          : "";
+
+      const fecha =
+        item.comentarios?.length
+          ? item.comentarios[item.comentarios.length - 1]?.fecha
+          : new Date().toLocaleDateString("es-CL");
+
       (item.fotos || []).forEach((foto, fotoIndex) => {
         fotos.push({
           etapa: etapa.nombre,
-          actividad: item.item || item.texto || `Actividad ${index + 1}`,
+          actividad: item.item || item.texto || `Ítem ${index + 1}`,
           url: foto,
-          numero: fotoIndex + 1
+          numero: fotoIndex + 1,
+          evidenciaNumero: fotos.length + 1,
+          itemNumero: index + 1,
+          totalItems,
+          completada: !!item.ok,
+          fecha,
+          comentario
         });
       });
     });
@@ -6906,11 +7018,163 @@ function obtenerFotosInforme() {
 }
 
 
+function obtenerColorEtapaPDF(etapa) {
+  const nombre = String(etapa || "").toLowerCase();
+
+  if (nombre.includes("ingreso")) return [59, 130, 246];
+  if (nombre.includes("evaluación") || nombre.includes("evaluacion")) return [245, 158, 11];
+  if (nombre.includes("overhaul")) return [168, 85, 247];
+  if (nombre.includes("pruebas")) return [249, 115, 22];
+  if (nombre.includes("despacho")) return [34, 197, 94];
+
+  return [249, 115, 22];
+}
+
+function formatearFechaSoloDia(fecha) {
+  if (!fecha) return "-";
+
+  // Si ya viene como texto tipo "22-06-2026, 3:36:39 p. m."
+  if (typeof fecha === "string") {
+    return fecha.split(",")[0].trim();
+  }
+
+  try {
+    return new Date(fecha).toLocaleDateString("es-CL");
+  } catch (error) {
+    return "-";
+  }
+}
+
+
+
+function limitarLineasPDF(doc, texto, ancho, maxLineas) {
+  const lineas = doc.splitTextToSize(texto || "", ancho);
+
+  if (lineas.length <= maxLineas) {
+    return lineas;
+  }
+
+  const recortadas = lineas.slice(0, maxLineas);
+  recortadas[maxLineas - 1] = recortadas[maxLineas - 1] + "...";
+
+  return recortadas;
+}
+
+
+
+
+function dibujarCardFotografica(doc, config, fotoBase64, foto, x, y) {
+  const cardW = 84;
+  const cardH = 94;
+
+  const imgX = x + 4;
+  const imgY = y + 12;
+  const imgW = 76;
+  const imgH = 38;
+
+  const colorEtapa = obtenerColorEtapaPDF(foto.etapa);
+
+  // Card
+  doc.setFillColor(...PDF_LAYOUT.colorCard);
+  doc.roundedRect(x, y, cardW, cardH, 4, 4, "F");
+
+  // Banda etapa
+  doc.setFillColor(...colorEtapa);
+  doc.roundedRect(x + 4, y + 4, 34, 8, 2, 2, "F");
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(7);
+  doc.setTextColor(255, 255, 255);
+  doc.text(foto.etapa.toUpperCase(), x + 6, y + 9.5);
+
+  // Badge foto
+  doc.setFillColor(15, 23, 42);
+  doc.roundedRect(x + cardW - 20, y + 4, 16, 8, 2, 2, "F");
+
+  doc.setFontSize(7);
+  doc.setTextColor(...config.colorTexto);
+  doc.text(
+    String(foto.evidenciaNumero || foto.numero || "").padStart(2, "0"),
+    x + cardW - 12,
+    y + 9.5,
+    { align: "center" }
+  );
+
+  // Imagen
+  doc.addImage(
+    fotoBase64,
+    "JPEG",
+    imgX,
+    imgY,
+    imgW,
+    imgH
+  );
+
+  // Separador
+  doc.setDrawColor(51, 65, 85);
+  doc.setLineWidth(0.25);
+  doc.line(x + 4, y + 55, x + cardW - 4, y + 55);
+
+  // Ítem
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(7.3);
+  doc.setTextColor(...config.colorTexto);
+  doc.text(
+    `Ítem de Inspección ${foto.itemNumero} de ${foto.totalItems}`,
+    x + 4,
+    y + 61
+  );
+
+  // Estado
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7);
+  doc.setTextColor(...config.colorTextoSuave);
+
+  doc.text(
+    foto.completada ? "✓ Completada" : "Pendiente",
+    x + 4,
+    y + 68
+  );
+
+  // Fecha sin hora
+  doc.text(
+    `Fecha: ${formatearFechaSoloDia(foto.fecha)}`,
+    x + 4,
+    y + 74
+  );
+
+  // Observación
+  const comentario =
+    foto.comentario ||
+    foto.actividad ||
+    "Sin observación registrada.";
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(6.8);
+  doc.setTextColor(...colorEtapa);
+  doc.text("Observación Técnica:", x + 4, y + 81);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(6.5);
+  doc.setTextColor(...config.colorTextoSuave);
+
+  const lineasComentario = limitarLineasPDF(
+    doc,
+    comentario,
+    cardW - 8,
+    3
+  );
+
+  doc.text(
+    lineasComentario,
+    x + 4,
+    y + 87
+  );
+}
+
+
 
 function crearPaginaEvidenciasInforme(doc, config) {
-  const pageWidth = doc.internal.pageSize.getWidth();
-  const pageHeight = doc.internal.pageSize.getHeight();
-
   const evidencias = obtenerResumenEvidenciasInforme();
 
   const totalActividades = evidencias.reduce(
@@ -6928,19 +7192,11 @@ function crearPaginaEvidenciasInforme(doc, config) {
     0
   );
 
-  // Fondo
-  doc.setFillColor(...config.colorFondo);
-  doc.rect(0, 0, pageWidth, pageHeight, "F");
-
-  // Título
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(20);
-  doc.setTextColor(...config.colorTexto);
-  doc.text("EVIDENCIAS DEL SERVICIO", 18, 24);
-
-  doc.setDrawColor(...config.colorPrincipal);
-  doc.setLineWidth(1.2);
-  doc.line(18, 32, pageWidth - 18, 32);
+  const inicioY = crearPaginaBaseInforme(
+    doc,
+    config,
+    "EVIDENCIAS DEL SERVICIO"
+  );
 
   // Subtítulo
   doc.setFont("helvetica", "normal");
@@ -6949,8 +7205,8 @@ function crearPaginaEvidenciasInforme(doc, config) {
 
   doc.text(
     "Resumen de actividades, fotografías y comentarios registrados por etapa.",
-    18,
-    42
+    PDF_LAYOUT.margenX,
+    inicioY
   );
 
   // Tabla
@@ -6962,7 +7218,7 @@ function crearPaginaEvidenciasInforme(doc, config) {
   ]);
 
   doc.autoTable({
-    startY: 54,
+    startY: inicioY + 12,
     head: [[
       "Etapa",
       "Actividades",
@@ -6972,9 +7228,9 @@ function crearPaginaEvidenciasInforme(doc, config) {
     body,
     theme: "grid",
     styles: {
-      fillColor: [15, 23, 42],
+      fillColor: PDF_LAYOUT.colorTabla,
       textColor: [255, 255, 255],
-      lineColor: [51, 65, 85],
+      lineColor: PDF_LAYOUT.colorLinea,
       lineWidth: 0.2,
       fontSize: 9,
       cellPadding: 3
@@ -6985,7 +7241,11 @@ function crearPaginaEvidenciasInforme(doc, config) {
       fontStyle: "bold"
     },
     alternateRowStyles: {
-      fillColor: [30, 41, 59]
+      fillColor: PDF_LAYOUT.colorCard
+    },
+    margin: {
+      left: PDF_LAYOUT.margenX,
+      right: PDF_LAYOUT.margenX
     }
   });
 
@@ -7002,10 +7262,10 @@ function crearPaginaEvidenciasInforme(doc, config) {
   const cardH = 28;
   const gap = 10;
 
-  let x = 18;
+  let x = PDF_LAYOUT.margenX;
 
   cards.forEach(card => {
-    doc.setFillColor(30, 41, 59);
+    doc.setFillColor(...PDF_LAYOUT.colorCard);
     doc.roundedRect(x, yTotales, cardW, cardH, 4, 4, "F");
 
     doc.setFont("helvetica", "normal");
@@ -7020,17 +7280,6 @@ function crearPaginaEvidenciasInforme(doc, config) {
 
     x += cardW + gap;
   });
-
-  // Footer
-  doc.setFontSize(8);
-  doc.setTextColor(...config.colorTextoSuave);
-
-  doc.text(
-    config.textoCierre,
-    pageWidth / 2,
-    pageHeight - 14,
-    { align: "center" }
-  );
 }
 
 
@@ -7040,58 +7289,43 @@ async function crearGaleriaFotograficaInforme(doc, config) {
 
   if (!fotos.length) return;
 
-  const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
 
   doc.addPage();
 
-  doc.setFillColor(...config.colorFondo);
-  doc.rect(0, 0, pageWidth, pageHeight, "F");
+  let inicioY = crearPaginaBaseInforme(
+    doc,
+    config,
+    "BITÁCORA FOTOGRÁFICA DEL SERVICIO"
+  );
 
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(20);
-  doc.setTextColor(...config.colorTexto);
-  doc.text("GALERÍA FOTOGRÁFICA", 18, 24);
-
-  doc.setDrawColor(...config.colorPrincipal);
-  doc.setLineWidth(1.2);
-  doc.line(18, 32, pageWidth - 18, 32);
-
-  let y = 46;
-
-  const imgW = 80;
-  const imgH = 58;
+  const cardW = 84;
+  const cardH = 94;
   const gapX = 12;
-  const gapY = 22;
+  const gapY = 8;
 
-  const col1 = 18;
-  const col2 = col1 + imgW + gapX;
+  const col1 = PDF_LAYOUT.margenX;
+  const col2 = col1 + cardW + gapX;
+
+  let y = inicioY;
+  let col = 0;
 
   for (let i = 0; i < fotos.length; i++) {
     const foto = fotos[i];
 
-    const columna = i % 2;
-    const x = columna === 0 ? col1 : col2;
+    const x = col === 0 ? col1 : col2;
 
-    if (columna === 0 && i > 0) {
-      y += imgH + gapY;
-    }
-
-    if (y + imgH + 18 > pageHeight - 18) {
+    if (y + cardH > pageHeight - 28) {
       doc.addPage();
 
-      doc.setFillColor(...config.colorFondo);
-      doc.rect(0, 0, pageWidth, pageHeight, "F");
+      inicioY = crearPaginaBaseInforme(
+        doc,
+        config,
+        "BITÁCORA FOTOGRÁFICA DEL SERVICIO"
+      );
 
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(18);
-      doc.setTextColor(...config.colorTexto);
-      doc.text("GALERÍA FOTOGRÁFICA", 18, 24);
-
-      doc.setDrawColor(...config.colorPrincipal);
-      doc.line(18, 32, pageWidth - 18, 32);
-
-      y = 46;
+      y = inicioY;
+      col = 0;
     }
 
     try {
@@ -7100,76 +7334,42 @@ async function crearGaleriaFotograficaInforme(doc, config) {
           ? await convertirImagenABase64(foto.url)
           : foto.url;
 
-      if (!fotoBase64) continue;
-
-      doc.setDrawColor(51, 65, 85);
-      doc.setFillColor(30, 41, 59);
-      doc.roundedRect(x - 2, y - 2, imgW + 4, imgH + 18, 3, 3, "F");
-
-      doc.addImage(
-        fotoBase64,
-        "JPEG",
-        x,
-        y,
-        imgW,
-        imgH
-      );
-
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(7);
-      doc.setTextColor(...config.colorPrincipal);
-      doc.text(foto.etapa, x, y + imgH + 6);
-
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(6);
-      doc.setTextColor(...config.colorTextoSuave);
-
-      const textoActividad = doc.splitTextToSize(
-        foto.actividad,
-        imgW
-      );
-
-      doc.text(
-        textoActividad.slice(0, 2),
-        x,
-        y + imgH + 12
-      );
+      if (fotoBase64) {
+        dibujarCardFotografica(
+          doc,
+          config,
+          fotoBase64,
+          foto,
+          x,
+          y
+        );
+      }
 
     } catch (error) {
       console.warn("No se pudo agregar foto al informe:", error);
     }
+
+    if (col === 0) {
+      col = 1;
+    } else {
+      col = 0;
+      y += cardH + gapY;
+    }
   }
-
-  doc.setFontSize(8);
-  doc.setTextColor(...config.colorTextoSuave);
-
-  doc.text(
-    config.textoCierre,
-    pageWidth / 2,
-    pageHeight - 10,
-    { align: "center" }
-  );
 }
 
 
 
 function crearConclusionTecnicaInforme(doc, config) {
   const pageWidth = doc.internal.pageSize.getWidth();
-  const pageHeight = doc.internal.pageSize.getHeight();
 
   doc.addPage();
 
-  doc.setFillColor(...config.colorFondo);
-  doc.rect(0, 0, pageWidth, pageHeight, "F");
-
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(20);
-  doc.setTextColor(...config.colorTexto);
-  doc.text("CONCLUSIÓN TÉCNICA", 18, 24);
-
-  doc.setDrawColor(...config.colorPrincipal);
-  doc.setLineWidth(1.2);
-  doc.line(18, 32, pageWidth - 18, 32);
+  const inicioY = crearPaginaBaseInforme(
+    doc,
+    config,
+    "CONCLUSIÓN TÉCNICA"
+  );
 
   const conclusion = generarConclusionTecnicaInforme();
 
@@ -7177,17 +7377,125 @@ function crearConclusionTecnicaInforme(doc, config) {
   doc.setFontSize(10);
   doc.setTextColor(...config.colorTextoSuave);
 
-  const texto = doc.splitTextToSize(conclusion, pageWidth - 36);
-  doc.text(texto, 18, 50);
-
-  doc.setFontSize(8);
-  doc.setTextColor(...config.colorTextoSuave);
+  const texto = doc.splitTextToSize(
+    conclusion,
+    pageWidth - PDF_LAYOUT.margenX * 2
+  );
 
   doc.text(
-    config.textoCierre,
-    pageWidth / 2,
-    pageHeight - 14,
-    { align: "center" }
+    texto,
+    PDF_LAYOUT.margenX,
+    inicioY
+  );
+}
+
+
+function crearPaginaFirmasInforme(doc, config) {
+  const pageWidth = doc.internal.pageSize.getWidth();
+
+  doc.addPage();
+
+  const inicioY = crearPaginaBaseInforme(
+    doc,
+    config,
+    "APROBACIONES Y CIERRE DEL SERVICIO"
+  );
+
+  // Datos superiores específicos
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.setTextColor(...config.colorTextoSuave);
+
+  doc.text(`Fecha emisión: ${new Date().toLocaleDateString("es-CL")}`, PDF_LAYOUT.margenX, inicioY);
+  doc.text(`Estado: ${obtenerEstadoOT(ot) || ot?.estado || "-"}`, 95, inicioY);
+
+  // Tarjeta certificación
+  const boxX = PDF_LAYOUT.margenX;
+  const boxY = inicioY + 14;
+  const boxW = pageWidth - PDF_LAYOUT.margenX * 2;
+  const boxH = 54;
+
+  doc.setFillColor(...PDF_LAYOUT.colorCard);
+  doc.roundedRect(boxX, boxY, boxW, boxH, 4, 4, "F");
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(11);
+  doc.setTextColor(...config.colorTexto);
+  doc.text("CERTIFICACIÓN DEL SERVICIO", boxX + 8, boxY + 12);
+
+  const textoCertificacion =
+    "Se certifica que la información contenida en el presente informe corresponde a las actividades registradas durante la ejecución de la Orden de Servicio. Este documento constituye respaldo técnico del trabajo realizado hasta la fecha de emisión.";
+
+  const lineasCertificacion = doc.splitTextToSize(textoCertificacion, boxW - 16);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.setTextColor(...config.colorTextoSuave);
+  doc.text(lineasCertificacion, boxX + 8, boxY + 24);
+
+  const dibujarFirma = (x, y, w, h, titulo, nombre, cargo, etiquetaFirma) => {
+    doc.setFillColor(...PDF_LAYOUT.colorCard);
+    doc.roundedRect(x, y, w, h, 5, 5, "F");
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
+    doc.setTextColor(...config.colorTexto);
+    doc.text(titulo, x + 7, y + 11);
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(...config.colorTextoSuave);
+
+    doc.text(`Nombre: ${nombre || "________________"}`, x + 7, y + 22);
+    doc.text(`Cargo: ${cargo || "________________"}`, x + 7, y + 30);
+    doc.text(`Fecha: ${new Date().toLocaleDateString("es-CL")}`, x + 7, y + 38);
+
+    doc.setDrawColor(...config.colorPrincipal);
+    doc.setLineWidth(0.7);
+    doc.line(x + 9, y + h - 16, x + w - 9, y + h - 16);
+
+    doc.setFontSize(7);
+    doc.setTextColor(...config.colorTextoSuave);
+    doc.text(etiquetaFirma || "Firma", x + w / 2, y + h - 10, {
+      align: "center"
+    });
+  };
+
+  const nombreUsuario = usuario?.nombre || "Jefe Taller";
+
+  // Firmas superiores
+  dibujarFirma(
+    PDF_LAYOUT.margenX,
+    inicioY + 86,
+    82,
+    62,
+    "Responsable Técnico",
+    nombreUsuario,
+    "Técnico responsable",
+    "Firma / Nombre"
+  );
+
+  dibujarFirma(
+    110,
+    inicioY + 86,
+    82,
+    62,
+    "Jefe de Taller",
+    nombreUsuario,
+    "Aprobación interna",
+    "Firma / Nombre"
+  );
+
+  // Firma cliente
+  dibujarFirma(
+    50,
+    inicioY + 158,
+    110,
+    48,
+    "Cliente",
+    ot?.cliente || "Cliente",
+    "Recepción conforme",
+    "Firma / Recepción conforme"
   );
 }
 
@@ -7218,6 +7526,10 @@ async function generarInformeFinalPDF() {
   await crearGaleriaFotograficaInforme(doc, configInformeEmpresa);
 
   crearConclusionTecnicaInforme(doc, configInformeEmpresa);
+
+  crearPaginaFirmasInforme(doc, configInformeEmpresa);
+
+  aplicarHeadersInforme(doc, configInformeEmpresa);
 
   doc.save(`Informe_Final_${ot.os || "OS"}.pdf`);
 }
