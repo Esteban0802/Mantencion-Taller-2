@@ -2,6 +2,18 @@ const usuario = JSON.parse(
   localStorage.getItem("usuarioActivo")
 );
 
+
+const NOMBRES_ETAPAS = {
+  ingreso: "Ingreso",
+  evaluacion: "Evaluación",
+  overhaul: "Mantención",
+  pruebasMecanicas: "Pruebas Mecánicas",
+  pruebasElectricas: "Pruebas Eléctricas",
+  despachoPreparacion: "Despacho Preparación",
+  despachoFinal: "Despacho Final"
+};
+
+
 if (!usuario) {
   window.location.replace("index.html");
 }
@@ -6387,10 +6399,10 @@ function obtenerEstadoEtapasInforme() {
       estado: ot.evaluacionAprobada ? "Completada" : "Pendiente"
     },
     {
-      nombre: "Overhaul",
-      estado: ot.overhaulAprobada
-        ? "Completada"
-        : (ot.estado === "OVERHAUL" ? "En Proceso" : "Pendiente")
+      nombre: "Mantención",
+      estado: ot.overhaulAprobado
+      ? "Completada"
+      : (ot.estado === "OVERHAUL" ? "En Proceso" : "Pendiente")
     },
     {
       nombre: "Pruebas Mecánicas",
@@ -6597,131 +6609,167 @@ function aplicarHeadersInforme(doc, config) {
 
 
 
-function crearPortadaInforme(doc, config) {
+async function crearPortadaInforme(doc, config) {
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
+
+  const estado = obtenerEstadoOT(ot) || ot?.estado || "-";
+  const fechaEmision = new Date().toLocaleDateString("es-CL");
 
   // Fondo
   doc.setFillColor(...config.colorFondo);
   doc.rect(0, 0, pageWidth, pageHeight, "F");
-/*
-  // Logo
-  try {
-    doc.addImage(config.logo, "PNG", 18, 16, 42, 16);
-  } catch (e) {
-    console.warn("No se pudo cargar logo:", e);
-  }*/
 
-  // Texto superior derecho
+  // Banda superior
+  doc.setFillColor(2, 6, 23);
+  doc.rect(0, 0, pageWidth, 42, "F");
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(18);
+  doc.setTextColor(...config.colorTexto);
+  doc.text(config.nombre || "OVERTRACK", 18, 18);
+
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(9);
+  doc.setFontSize(8);
   doc.setTextColor(...config.colorTextoSuave);
+  doc.text(config.subtitulo || "Sistema de Gestión de Mantenimiento", 18, 26);
 
-  doc.text(
-    new Date().toLocaleDateString("es-CL"),
-    pageWidth - 18,
-    18,
-    { align: "right" }
-  );
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(9);
+  doc.setTextColor(...config.colorPrincipal);
+  doc.text("INFORME FINAL DE SERVICIO", pageWidth - 18, 18, { align: "right" });
 
-  doc.text(
-    `OS: ${ot?.os || "-"}`,
-    pageWidth - 18,
-    25,
-    { align: "right" }
-  );
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(...config.colorTextoSuave);
+  doc.text(`Fecha emisión: ${fechaEmision}`, pageWidth - 18, 26, { align: "right" });
 
-  // Línea decorativa
   doc.setDrawColor(...config.colorPrincipal);
-  doc.setLineWidth(1.5);
+  doc.setLineWidth(1.2);
   doc.line(18, 42, pageWidth - 18, 42);
 
-  // Título
+  // Título principal
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(28);
+  doc.setFontSize(30);
   doc.setTextColor(...config.colorTexto);
+  doc.text("INFORME TÉCNICO", pageWidth / 2, 76, { align: "center" });
 
+  doc.setFontSize(16);
+  doc.setTextColor(...config.colorPrincipal);
+  doc.text(`ORDEN DE SERVICIO N° ${ot?.os || "-"}`, pageWidth / 2, 88, {
+    align: "center"
+  });
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  doc.setTextColor(...config.colorTextoSuave);
   doc.text(
-    "INFORME FINAL",
+    config.textoPortada || "Informe final de servicio técnico y mantenimiento.",
     pageWidth / 2,
-    82,
+    100,
     { align: "center" }
   );
+
+  const fotoPortada = await obtenerFotoPortadaInforme();
+
+if (fotoPortada) {
+
+    const imgW = 100;
+    const imgH = 60;
+
+    const imgX = (pageWidth - imgW) / 2;
+    const imgY = 110;
+
+    // Marco
+    doc.setFillColor(45,55,75);
+
+    doc.roundedRect(
+        imgX - 3,
+        imgY - 3,
+        imgW + 6,
+        imgH + 6,
+        4,
+        4,
+        "F"
+    );
+
+    doc.addImage(
+        fotoPortada,
+        "JPEG",
+        imgX,
+        imgY,
+        imgW,
+        imgH
+    );
+
+}
+
+  // Card datos principales
+  const boxX = 24;
+  const boxY = 176;
+  const boxW = pageWidth - 48;
+  const boxH = 86;
+
+  doc.setFillColor(...PDF_LAYOUT.colorCard);
+  doc.roundedRect(boxX, boxY, boxW, boxH, 6, 6, "F");
 
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(14);
-  doc.setTextColor(...config.colorPrincipal);
-
-  doc.text(
-    `ORDEN DE SERVICIO N° ${ot?.os || "-"}`,
-    pageWidth / 2,
-    92,
-    { align: "center" }
-  );
-
-  doc.setFontSize(14);
-  doc.setTextColor(...config.colorTextoSuave);
-
-  doc.text(
-    config.textoPortada,
-    pageWidth / 2,
-    108,
-    { align: "center" }
-  );
-
-  // Datos principales
-  const boxX = 28;
-  const boxY = 110;
-  const boxW = pageWidth - 56;
-  const boxH = 100;
-
-  doc.setFillColor(30, 41, 59);
-  doc.roundedRect(boxX, boxY, boxW, boxH, 4, 4, "F");
-
   doc.setFontSize(11);
-  doc.setTextColor(...config.colorTextoSuave);
+  doc.setTextColor(...config.colorTexto);
+  doc.text("DATOS PRINCIPALES DEL SERVICIO", boxX + 10, boxY + 14);
+
+  doc.setDrawColor(...config.colorPrincipal);
+  doc.setLineWidth(0.6);
+  doc.line(boxX + 10, boxY + 20, boxX + boxW - 10, boxY + 20);
 
   const datos = [
-  ["Cliente", ot?.cliente || "-"],
-  ["Equipo", ot?.equipo || "-"],
-  ["Serie", ot?.serie || "-"],
-  ["Orden de Servicio", ot?.os || "-"],
-  ["Estado", ot?.estado || "-"],
-  ["Fecha Inicio", obtenerFechaInicioGantt()],
-  ["Fecha Término", obtenerFechaTerminoGantt()]
-];
+    ["Cliente", ot?.cliente || "-"],
+    ["Equipo", ot?.equipo || "-"],
+    ["Serie", ot?.serie || "-"],
+    ["Orden de Servicio", ot?.os || "-"],
+    ["Fecha Inicio", obtenerFechaInicioGantt()],
+    ["Fecha Término", obtenerFechaTerminoGantt()]
+  ];
 
-  let y = boxY + 16;
+  let y = boxY + 34;
 
-  datos.forEach(([label, valor]) => {
+  datos.forEach(([label, valor], index) => {
+    const colX = index % 2 === 0 ? boxX + 10 : boxX + boxW / 2 + 6;
+
+    if (index % 2 === 0 && index > 0) {
+      y += 14;
+    }
+
     doc.setFont("helvetica", "bold");
+    doc.setFontSize(8);
     doc.setTextColor(...config.colorPrincipal);
-    doc.text(label + ":", boxX + 14, y);
+    doc.text(label.toUpperCase(), colX, y);
 
     doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
     doc.setTextColor(...config.colorTexto);
-    doc.text(String(valor), boxX + 62, y);
-
-    y += 11;
+    doc.text(String(valor), colX, y + 6);
   });
 
   // Footer portada
-doc.setFontSize(10);
-doc.setTextColor(...config.colorTextoSuave);
+  doc.setDrawColor(...config.colorPrincipal);
+  doc.setLineWidth(0.8);
+  doc.line(24, pageHeight - 32, pageWidth - 24, pageHeight - 32);
 
-doc.text(
-  "Generado por OVERTRACK",
-  pageWidth / 2,
-  pageHeight - 24,
-  { align: "center" }
-);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(9);
+  doc.setTextColor(...config.colorTexto);
+  doc.text("OVERTRACK", pageWidth / 2, pageHeight - 23, { align: "center" });
 
-doc.text(
-  config.subtitulo,
-  pageWidth / 2,
-  pageHeight - 18,
-  { align: "center" }
-);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(...config.colorTextoSuave);
+  doc.text(
+    config.subtitulo || "Sistema de Gestión de Mantenimiento",
+    pageWidth / 2,
+    pageHeight - 16,
+    { align: "center" }
+  );
 }
 
 
@@ -6729,7 +6777,7 @@ function obtenerResumenEvidenciasInforme() {
   const etapas = [
     { nombre: "Ingreso", lista: ot.ingreso || [] },
     { nombre: "Evaluación", lista: ot.evaluacion || [] },
-    { nombre: "Overhaul", lista: ot.overhaul || [] },
+    { nombre: "Mantención", lista: ot.overhaul || [] },
     { nombre: "Pruebas Mecánicas", lista: ot.pruebas?.mecanico || [] },
     { nombre: "Pruebas Eléctricas", lista: ot.pruebas?.electrico || [] },
     { nombre: "Despacho Preparación", lista: ot.despacho?.preparacion || [] },
@@ -6865,38 +6913,97 @@ function crearResumenEjecutivoInforme(doc, config) {
   // Estado de etapas
   const etapas = obtenerEstadoEtapasInforme();
 
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(12);
-  doc.setTextColor(...config.colorTexto);
+  // ===============================
+// ESTADO DE LAS ETAPAS
+// ===============================
 
-  doc.text("Estado de las Etapas", PDF_LAYOUT.margenX, fechasY + 20);
+const tituloEtapasY = fechasY + 18;
 
-  let yEtapa = fechasY + 22;
+doc.setFont("helvetica", "bold");
+doc.setFontSize(14);
+doc.setTextColor(...config.colorTexto);
+
+doc.text(
+    "Estado de las Etapas",
+    PDF_LAYOUT.margenX,
+    tituloEtapasY
+);
+
+// línea decorativa
+doc.setDrawColor(...config.colorPrincipal);
+doc.setLineWidth(0.5);
+
+doc.line(
+    PDF_LAYOUT.margenX,
+    tituloEtapasY + 3,
+    pageWidth - PDF_LAYOUT.margenX,
+    tituloEtapasY + 3
+);
+
+// separación entre título y contenido
+let yEtapa = tituloEtapasY + 12;  
 
   etapas.forEach(etapa => {
-    let colorEstado = [148, 163, 184];
 
-    if (etapa.estado === "Completada") {
-      colorEstado = [34, 197, 94];
-    }
+    let colorEstado = [148,163,184];
 
-    if (etapa.estado === "En Proceso") {
-      colorEstado = [249, 115, 22];
-    }
+    if (etapa.estado === "Completada")
+        colorEstado = [34,197,94];
 
+    if (etapa.estado === "En Proceso")
+        colorEstado = [249,115,22];
+
+    // indicador
     doc.setFillColor(...colorEstado);
-    doc.circle(PDF_LAYOUT.margenX + 2, yEtapa - 1.5, 1.5, "F");
 
-    doc.setFont("helvetica", "normal");
+    doc.circle(
+        PDF_LAYOUT.margenX + 2,
+        yEtapa - 2,
+        2,
+        "F"
+    );
+
+    // nombre etapa
+    doc.setFont("helvetica","bold");
     doc.setFontSize(10);
     doc.setTextColor(...config.colorTexto);
-    doc.text(etapa.nombre, PDF_LAYOUT.margenX + 8, yEtapa);
 
+    doc.text(
+        etapa.nombre,
+        PDF_LAYOUT.margenX + 10,
+        yEtapa
+    );
+
+    // estado alineado a la derecha
+    doc.setFont("helvetica","bold");
     doc.setTextColor(...colorEstado);
-    doc.text(etapa.estado, 95, yEtapa);
 
-    yEtapa += 10;
-  });
+    doc.text(
+        etapa.estado,
+        pageWidth - PDF_LAYOUT.margenX,
+        yEtapa,
+        {
+            align:"right"
+        }
+    );
+
+    yEtapa += 9;
+
+});
+}
+
+
+
+function nombreEtapaVisible(etapa) {
+  if (!etapa) return "";
+
+  const nombre = String(etapa);
+
+  if (nombre.toLowerCase().includes("overhaul")) {
+    return nombre.replace(/overhaul/gi, "Mantención");
+  }
+
+  return nombre;
 }
 
 
@@ -6999,7 +7106,7 @@ function obtenerFotosInforme() {
 
       (item.fotos || []).forEach((foto, fotoIndex) => {
         fotos.push({
-          etapa: etapa.nombre,
+          etapa: nombreEtapaVisible(etapa.nombre),
           actividad: item.item || item.texto || `Ítem ${index + 1}`,
           url: foto,
           numero: fotoIndex + 1,
@@ -7016,6 +7123,41 @@ function obtenerFotosInforme() {
 
   return fotos;
 }
+
+
+
+async function obtenerFotoPortadaInforme() {
+  const etapas = [
+    ot.ingreso || [],
+    ot.evaluacion || [],
+    ot.overhaul || [],
+    ot.pruebas?.mecanico || [],
+    ot.pruebas?.electrico || [],
+    ot.despacho?.preparacion || [],
+    ot.despacho?.final || []
+  ];
+
+  for (const lista of etapas) {
+    for (const item of lista) {
+      if (item.fotos && item.fotos.length > 0) {
+        const url = item.fotos[0];
+
+        if (!url) continue;
+
+        if (url.startsWith("http")) {
+          return await convertirImagenABase64(url);
+        }
+
+        return url;
+      }
+    }
+  }
+
+  return null;
+}
+
+
+
 
 
 function obtenerColorEtapaPDF(etapa) {
@@ -7512,7 +7654,7 @@ async function generarInformeFinalPDF() {
 
   const doc = new jsPDF("p", "mm", "a4");
 
-  crearPortadaInforme(doc, configInformeEmpresa);
+  await crearPortadaInforme(doc, configInformeEmpresa);
 
   doc.addPage();
   crearResumenEjecutivoInforme(doc, configInformeEmpresa);
