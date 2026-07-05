@@ -2713,7 +2713,7 @@ function cargarFechasGanttEnFormulario() {
     );
 
     cargarEtapa(
-      "Overhaul",
+      NOMBRES_ETAPAS.overhaul,
       "ganttOverhaulInicio",
       "ganttOverhaulTermino"
     );
@@ -2922,7 +2922,7 @@ const comentarioRepuestos =
   const etapasManuales = [
   leerEtapaManual("Ingreso", "ganttIngresoInicio", "ganttIngresoTermino"),
   leerEtapaManual("Evaluación", "ganttEvaluacionInicio", "ganttEvaluacionTermino"),
-  leerEtapaManual("Overhaul", "ganttOverhaulInicio", "ganttOverhaulTermino"),
+  leerEtapaManual(NOMBRES_ETAPAS.overhaul, "ganttOverhaulInicio", "ganttOverhaulTermino"),
   leerEtapaManual("Pruebas Mecánicas", "ganttPruebasMecanicasInicio", "ganttPruebasMecanicasTermino"),
   leerEtapaManual("Pruebas Eléctricas", "ganttPruebasElectricasInicio", "ganttPruebasElectricasTermino")
 ];
@@ -3087,10 +3087,10 @@ if (diasRepuestos > 0) {
 // =========================
 
 const etapaOverhaul =
-  obtenerEtapaManual(
+obtenerEtapaManual(
     etapasManuales,
-    "Overhaul"
-  );
+    NOMBRES_ETAPAS.overhaul
+);
 
 const inicioOverhaul =
   new Date(
@@ -3104,14 +3104,14 @@ const diasOverhaul =
   );
 
 agregarEtapaPlanificada(
-  "Overhaul",
+  NOMBRES_ETAPAS.overhaul,
   inicioOverhaul,
   diasOverhaul
 );
 
 const overhaulActs =
   obtenerActividadesDesdeChecklistDistribuido(
-    "Overhaul",
+    NOMBRES_ETAPAS.overhaul,
     ot.overhaul,
     inicioOverhaul,
     diasOverhaul
@@ -4018,7 +4018,7 @@ function descargarGanttExcel() {
   "Ingreso": "4472C4",
   "Evaluación": "5B9BD5",
   "Repuestos": "ED7D31",
-  "Overhaul": "70AD47",
+  [NOMBRES_ETAPAS.overhaul]: "70AD47",
   "Pruebas Mecánicas": "7030A0",
   "Pruebas Eléctricas": "8E44AD",
   "Despacho": "00B0F0"
@@ -4173,7 +4173,7 @@ const coloresEtapa = {
   "Ingreso": [68, 114, 196],
   "Evaluación": [91, 155, 213],
   "Repuestos": [237, 125, 49],
-  "Overhaul": [112, 173, 71],
+  [NOMBRES_ETAPAS.overhaul]: [112, 173, 71],
   "Pruebas Mecánicas": [112, 48, 160],
   "Pruebas Eléctricas": [142, 68, 173],
   "Despacho": [0, 176, 240]
@@ -4331,7 +4331,7 @@ function calcularPorcentajeEtapaReal(etapa) {
     return calcularPorcentajeChecklist(ot.evaluacion);
   }
 
-  if (etapa === "Overhaul") {
+  if (etapa === NOMBRES_ETAPAS.overhaul) {
     return calcularPorcentajeChecklist(ot.overhaul);
   }
 
@@ -6777,7 +6777,7 @@ function obtenerResumenEvidenciasInforme() {
   const etapas = [
     { nombre: "Ingreso", lista: ot.ingreso || [] },
     { nombre: "Evaluación", lista: ot.evaluacion || [] },
-    { nombre: "Mantención", lista: ot.overhaul || [] },
+    { nombre: NOMBRES_ETAPAS.overhaul, lista: ot.overhaul || [] },
     { nombre: "Pruebas Mecánicas", lista: ot.pruebas?.mecanico || [] },
     { nombre: "Pruebas Eléctricas", lista: ot.pruebas?.electrico || [] },
     { nombre: "Despacho Preparación", lista: ot.despacho?.preparacion || [] },
@@ -7081,7 +7081,7 @@ function obtenerFotosInforme() {
   const etapas = [
     { nombre: "Ingreso", lista: ot.ingreso || [] },
     { nombre: "Evaluación", lista: ot.evaluacion || [] },
-    { nombre: "Overhaul", lista: ot.overhaul || [] },
+    { nombre: NOMBRES_ETAPAS.overhaul, lista: ot.overhaul || [] },
     { nombre: "Pruebas Mecánicas", lista: ot.pruebas?.mecanico || [] },
     { nombre: "Pruebas Eléctricas", lista: ot.pruebas?.electrico || [] },
     { nombre: "Despacho Preparación", lista: ot.despacho?.preparacion || [] },

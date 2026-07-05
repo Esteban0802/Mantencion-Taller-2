@@ -194,7 +194,12 @@ function renderTabla(lista = listaOTs) {
   lista.forEach((o) => {
 
     const estado = obtenerEstadoOT(o);
+    const estadoVisible =
+      estado === "OVERHAUL"
+        ? "MANTENCIÓN"
+        : estado;
     const progreso = calcularProgreso(o);
+    
 
     const atrasada = estaOTAtrasada(o);
     const diasAtraso = diasAtrasoOT(o);
@@ -227,7 +232,7 @@ function renderTabla(lista = listaOTs) {
         </div>
 
         <div class="estado-card ${estado.toLowerCase()}">
-          ${estado}
+          ${estadoVisible}
         </div>
 
       </div>
@@ -255,7 +260,7 @@ function renderTabla(lista = listaOTs) {
 
       <div class="mini-gantt">
 
-        ${renderMiniGantt(estado)}
+        ${renderMiniGantt(o)}
 
       </div>
 
@@ -291,41 +296,88 @@ function renderTabla(lista = listaOTs) {
   });
 }
 
-function renderMiniGantt(estadoActual) {
 
+
+function calcularPorcentajeLista(lista = []) {
+  if (!Array.isArray(lista) || lista.length === 0) return 0;
+
+  const completados = lista.filter(item => item.ok === true).length;
+
+  return Math.round((completados / lista.length) * 100);
+}
+
+function calcularProgresoEtapasOT(ot) {
+  const ingreso = calcularPorcentajeLista(ot.ingreso || []);
+  const evaluacion = calcularPorcentajeLista(ot.evaluacion || []);
+  const mantencion = calcularPorcentajeLista(ot.overhaul || []);
+
+  const pruebasMecanicas = calcularPorcentajeLista(ot.pruebas?.mecanico || []);
+  const pruebasElectricas = calcularPorcentajeLista(ot.pruebas?.electrico || []);
+
+  const pruebasListas = [
+    pruebasMecanicas,
+    pruebasElectricas
+  ].filter(p => p > 0);
+
+  const pruebas = pruebasListas.length
+    ? Math.round(pruebasListas.reduce((a, b) => a + b, 0) / pruebasListas.length)
+    : 0;
+
+  const despachoPreparacion = calcularPorcentajeLista(ot.despacho?.preparacion || []);
+  const despachoFinal = calcularPorcentajeLista(ot.despacho?.final || []);
+
+  const despachoListas = [
+    despachoPreparacion,
+    despachoFinal
+  ].filter(p => p > 0);
+
+  const despacho = despachoListas.length
+    ? Math.round(despachoListas.reduce((a, b) => a + b, 0) / despachoListas.length)
+    : 0;
+
+  return {
+    INGRESO: ingreso,
+    EVALUACION: evaluacion,
+    OVERHAUL: mantencion,
+    PRUEBAS: pruebas,
+    DESPACHO: despacho
+  };
+}
+
+
+
+function renderMiniGantt(ot) {
   const etapas = [
-    "INGRESO",
-    "EVALUACION",
-    "OVERHAUL",
-    "PRUEBAS",
-    "DESPACHO"
+    { key: "INGRESO", label: "INGRESO" },
+    { key: "EVALUACION", label: "EVALUACIÓN" },
+    { key: "OVERHAUL", label: "MANTENCIÓN" },
+    { key: "PRUEBAS", label: "PRUEBAS" },
+    { key: "DESPACHO", label: "DESPACHO" }
   ];
 
-  const indexActual = etapas.indexOf(estadoActual);
+  const progresoEtapas = calcularProgresoEtapasOT(ot);
 
-  return etapas.map((etapa, i) => {
+  return etapas.map(etapa => {
+    const porcentaje = progresoEtapas[etapa.key] || 0;
 
     let clase = "mini-gantt-pendiente";
 
-    if (i < indexActual) {
+    if (porcentaje === 100) {
       clase = "mini-gantt-completo";
-    }
-
-    if (i === indexActual) {
+    } else if (porcentaje > 0) {
       clase = "mini-gantt-activo";
     }
 
     return `
       <div class="mini-gantt-row">
-
-        <span>${etapa}</span>
+        <span>${etapa.label}</span>
 
         <div class="mini-gantt-bar">
-
-          <div class="${clase}"></div>
-
+          <div
+            class="${clase}"
+            style="width:${porcentaje}%"
+          ></div>
         </div>
-
       </div>
     `;
   }).join("");
@@ -343,7 +395,7 @@ function renderBadgesOT(o, estado, atrasada, diasAtraso) {
     `);
   }
 
-  if (o.gantt?.diasRepuestos > 0 && estado !== "CERRADA") {
+  if (esperaRepuestosActiva(o) && estado !== "CERRADA") {
     badges.push(`
       <span class="ot-badge badge-naranjo">
         📦 Repuestos
@@ -404,7 +456,7 @@ function obtenerResumenObservacionesJefe(ot) {
 
   revisarItems("Ingreso", ot.ingreso);
   revisarItems("Evaluación", ot.evaluacion);
-  revisarItems("Overhaul", ot.overhaul);
+  revisarItems("Mantención", ot.overhaul);
   revisarItems("Pruebas Mecánicas", ot.pruebas?.mecanico);
   revisarItems("Pruebas Eléctricas", ot.pruebas?.electrico);
 
@@ -561,6 +613,28 @@ function renderEstadoTaller(lista = listaOTs) {
   if (despacho) despacho.textContent = estados.DESPACHO;
 }
 
+
+
+function esperaRepuestosActiva(ot) {
+  if (!ot?.gantt) return false;
+
+  const dias = Number(ot.gantt.diasRepuestos || 0);
+  const fechaSolicitud = ot.gantt.fechaSolicitudRepuestos;
+
+  if (!dias || dias <= 0 || !fechaSolicitud) return false;
+
+  const inicio = new Date(fechaSolicitud + "T00:00:00");
+  const fechaLlegada = new Date(inicio);
+  fechaLlegada.setDate(fechaLlegada.getDate() + dias);
+
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+
+  return hoy <= fechaLlegada;
+}
+
+
+
 function renderAlertasDashboard(lista = listaOTs) {
 
   const cont = document.getElementById("alertasDashboard");
@@ -581,7 +655,7 @@ function renderAlertasDashboard(lista = listaOTs) {
       });
     }
 
-    if (ot.gantt?.diasRepuestos > 0 && estado !== "CERRADA") {
+    if (esperaRepuestosActiva(ot) && estado !== "CERRADA") {
       alertas.push({
         tipo: "repuestos",
         texto: `📦 ${ot.os || "OS sin número"} tiene espera de repuestos`
@@ -991,7 +1065,9 @@ function renderGraficos(lista = listaOTs) {
 chartEstados = new Chart(document.getElementById("graficoEstados"), {
   type: "doughnut",
   data: {
-    labels: Object.keys(estadosCount),
+    labels: Object.keys(estadosCount).map(estado =>
+      estado === "OVERHAUL" ? "MANTENCIÓN" : estado
+    ),
     datasets: [{
       data: Object.values(estadosCount),
       backgroundColor: [

@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+
+<meta charset="UTF-8">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Administrador de Empresa | OVERTRACK</title>
+
+<link rel="stylesheet" href="css/empresa-admin.css">
+
+</head>
+
+<body>
+
+<div class="admin-layout">
+
+    <aside class="sidebar">
+
+        <h2>OVERTRACK</h2>
+
+        <p id="nombreEmpresa">Empresa</p>
+
+        <ul>
+            <li class="active" onclick="cambiarVistaEmpresa('dashboard', this)">Dashboard</li>
+            <li onclick="cambiarVistaEmpresa('usuarios', this)">Usuarios</li>
+            <li onclick="cambiarVistaEmpresa('sucursales', this)">Sucursales</li>
+            <li onclick="cambiarVistaEmpresa('clientes', this)">Clientes</li>
+            <li onclick="cambiarVistaEmpresa('equipos', this)">Equipos</li>
+            <li onclick="cambiarVistaEmpresa('configuracion', this)">Configuración</li>
+        </ul>
+
+        <button class="btn-danger" onclick="volverSuperAdmin()">
+            Volver
+        </button>
+
+    </aside>
+
+    <main class="main-content">
+
+        <section class="dashboard-header">
+
+            <h1 id="tituloEmpresa">
+                Administrador de Empresa
+            </h1>
+
+            <p>
+                Gestión completa de la empresa seleccionada.
+            </p>
+
+        </section>
+
+        <section class="kpi-grid">
+
+            <div class="kpi-card">
+                <h3>Usuarios</h3>
+                <strong id="kpiUsuarios">0</strong>
+            </div>
+
+            <div class="kpi-card">
+                <h3>Sucursales</h3>
+                <strong id="kpiSucursales">0</strong>
+            </div>
+
+            <div class="kpi-card">
+                <h3>Clientes</h3>
+                <strong id="kpiClientes">0</strong>
+            </div>
+
+            <div class="kpi-card">
+                <h3>Equipos</h3>
+                <strong id="kpiEquipos">0</strong>
+            </div>
+
+        </section>
+
+        <section class="card">
+            <div id="vistaEmpresaContenido">
+                Cargando...
+            </div>
+        </section>
+
+
+        <section id="vistaUsuarios" class="card" style="display:none; margin-top:24px;">
+
+        <div class="section-header">
+            <h2>Usuarios de la Empresa</h2>
+
+            <button class="btn-primary" onclick="abrirModalUsuario()">
+            + Nuevo Usuario
+            </button>
+        </div>
+
+        <div id="listaUsuariosEmpresa">
+            No hay usuarios registrados.
+        </div>
+
+        </section>
+
+    </main>
+
+</div>
+
+
+<div id="modalUsuario" class="modal">
+  <div class="modal-content">
+
+    <h2>Nuevo Usuario</h2>
+
+    <label>Nombre</label>
+    <input type="text" id="usuarioNombreNuevo">
+
+    <label>Correo</label>
+    <input type="email" id="usuarioCorreoNuevo">
+
+    <label>Rol</label>
+    <select id="usuarioRolNuevo">
+      <option value="admin_empresa">Administrador Empresa</option>
+      <option value="jefe_taller">Jefe de Taller</option>
+      <option value="usuario_taller">Usuario Taller</option>
+    </select>
+
+    <div class="modal-actions">
+      <button class="btn-success" onclick="crearUsuarioEmpresa()">
+        Guardar Usuario
+      </button>
+
+      <button class="btn-danger" onclick="cerrarModalUsuario()">
+        Cancelar
+      </button>
+    </div>
+
+  </div>
+</div>
+
+
+<script type="module" src="js/empresa-admin.js"></script>
+
+</body>
+
+</html>

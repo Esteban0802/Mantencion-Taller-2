@@ -131,39 +131,41 @@
   </div>
 
   <!-- INGRESO -->
-  <div id="ingreso" class="content">
-    <div class="card">
-      <h3>Checklist Ingreso</h3>
+<div id="ingreso" class="content">
+  <div class="card">
+    <h3>Checklist Ingreso</h3>
 
-      <div class="file-actions">
+    <div class="file-actions solo-jefe">
 
-        <input type="file" id="excelIngreso" accept=".xlsx,.xls">
+      <input type="file" id="excelIngreso" accept=".xlsx,.xls">
 
-        <button class="btn-primary" onclick="cargarIngreso()">
-          Cargar Checklist
-        </button>
-
-      </div>
-
-      <div id="progresoIngreso"></div>
-
-      <div id="listaIngreso"></div>
-
-      <button class="btn-success" onclick="guardarIngreso()">
-        💾 Guardar Progreso
+      <button class="btn-primary" onclick="cargarIngreso()">
+        Cargar Checklist
       </button>
-      <button class="btn-primary" onclick="aprobarIngreso()">
-        Siguiente
-      </button>
+
     </div>
+
+    <div id="progresoIngreso"></div>
+
+    <div id="listaIngreso"></div>
+
+    <button class="btn-success" onclick="guardarIngreso()">
+      💾 Guardar Progreso
+    </button>
+
+    <button class="btn-primary" onclick="aprobarIngreso()">
+      Siguiente
+    </button>
+
   </div>
+</div>
 
   <!-- EVALUACION -->
   <div id="evaluacion" class="content">
     <div class="card">
       <h2>Evaluación</h2>
 
-      <div class="file-actions">
+      <div class="file-actions solo-jefe">
 
         <input type="file" id="excelEvaluacion" accept=".xlsx,.xls">
 
@@ -226,13 +228,13 @@
     </div>
   </div>
 
-  <!-- OVERHAUL -->
+  <!-- MANTENCIÓN -->
   <div id="overhaul" class="content">
   <div class="card">
     <h2>Mantenciónl</h2>
 
 
-  <div class="file-actions">
+  <div class="file-actions solo-jefe">
 
   <input type="file" id="excelOverhaul" accept=".xlsx,.xls">
 
@@ -292,7 +294,7 @@
 
     <h3>Checklist Mecánico</h3>
 
-<div class="file-actions">
+<div class="file-actions solo-jefe">
   <input type="file" id="excelMecanico" accept=".xlsx,.xls">
 
   <button class="btn-primary" onclick="cargarChecklist('mecanico')">
@@ -308,7 +310,7 @@
 
 <h3>Checklist Eléctrico</h3>
 
-<div class="file-actions">
+<div class="file-actions solo-jefe">
   <input type="file" id="excelElectrico" accept=".xlsx,.xls">
 
   <button class="btn-primary" onclick="cargarChecklist('electrico')">

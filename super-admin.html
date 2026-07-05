@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>OverTrack | Super Administrador</title>
+  <link rel="stylesheet" href="css/super-admin.css">
+</head>
+<body>
+
+  <div class="admin-layout">
+
+    <aside class="sidebar">
+      <h2>OVERTRACK</h2>
+      <p>Super Admin</p>
+
+      <ul>
+        <li class="active">Dashboard</li>
+        <li>Empresas</li>
+        <li>Usuarios</li>
+        <li>Sucursales</li>
+        <li>Planes</li>
+        <li>Configuración</li>
+      </ul>
+
+      <button onclick="logout()" class="btn-danger">
+        Cerrar sesión
+      </button>
+    </aside>
+
+    <main class="main-content">
+
+      <header class="dashboard-header">
+        <div>
+          <h1>Panel Super Administrador</h1>
+          <p>Gestión global de empresas, usuarios y sucursales.</p>
+        </div>
+      </header>
+
+      <section class="kpi-grid">
+
+        <div class="kpi-card">
+          <h3>Empresas</h3>
+          <strong id="totalEmpresas">0</strong>
+        </div>
+
+        <div class="kpi-card">
+          <h3>Usuarios</h3>
+          <strong id="totalUsuarios">0</strong>
+        </div>
+
+        <div class="kpi-card">
+          <h3>Sucursales</h3>
+          <strong id="totalSucursales">0</strong>
+        </div>
+
+        <div class="kpi-card">
+          <h3>OS Activas</h3>
+          <strong id="totalOS">0</strong>
+        </div>
+
+      </section>
+
+      <section class="card">
+        <div class="section-header">
+          <h2>Empresas registradas</h2>
+
+          <button class="btn-primary" onclick="abrirModalEmpresa()">
+            + Nueva Empresa
+          </button>
+        </div>
+
+        <div id="listaEmpresas"></div>
+      </section>
+
+    </main>
+
+  </div>
+
+  
+
+  <script type="module" src="./js/super-admin.js"></script>
+
+</body>
+</html>
