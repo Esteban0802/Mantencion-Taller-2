@@ -79,12 +79,15 @@ window.onload = () => {
 };
 
 function escucharOTsTiempoReal() {
-
-  const usuarioActivo = JSON.parse(
-    localStorage.getItem("usuarioActivo")
-  );
+  const usuarioActivo = JSON.parse(localStorage.getItem("usuarioActivo"));
 
   if (!usuarioActivo) {
+    window.location.replace("index.html");
+    return;
+  }
+
+  if (!usuarioActivo.empresaId && usuarioActivo.rol !== "super_admin") {
+    alert("Usuario sin empresa asignada.");
     window.location.replace("index.html");
     return;
   }
@@ -92,7 +95,6 @@ function escucharOTsTiempoReal() {
   let q;
 
   if (usuarioActivo.rol === "super_admin") {
-
     q = query(
       collection(db, "ots"),
       orderBy("fechaCreacion", "desc")
@@ -100,8 +102,7 @@ function escucharOTsTiempoReal() {
 
     console.log("Dashboard GLOBAL super_admin");
 
-  } else if (usuarioActivo.rol === "admin_empresa") {
-
+  } else {
     q = query(
       collection(db, "ots"),
       where("empresaId", "==", usuarioActivo.empresaId),
@@ -109,21 +110,9 @@ function escucharOTsTiempoReal() {
     );
 
     console.log("Dashboard empresa:", usuarioActivo.empresaId);
-
-  } else {
-
-    q = query(
-      collection(db, "ots"),
-      where("empresaId", "==", usuarioActivo.empresaId),
-      where("sucursalId", "==", usuarioActivo.sucursalId),
-      orderBy("fechaCreacion", "desc")
-    );
-
-    console.log("Dashboard sucursal:", usuarioActivo.sucursalId);
   }
 
   onSnapshot(q, (snapshot) => {
-
     listaOTs = snapshot.docs.map(docSnap => ({
       id: docSnap.id,
       ...docSnap.data()
@@ -144,6 +133,9 @@ function escucharOTsTiempoReal() {
     alert("Error al cargar OTs desde Firebase");
   });
 }
+
+
+
 
 function estaOTAtrasada(o) {
 
@@ -1143,6 +1135,8 @@ function renderUsuarioActivo() {
     rol.textContent = "Super Admin";
   } else if (usuarioActivo.rol === "admin_empresa") {
     rol.textContent = "Admin Empresa";
+  } else if (usuarioActivo.rol === "admin_sucursal") {
+  rol.textContent = "Admin Sucursal";
   } else if (usuarioActivo.rol === "jefe_taller") {
     rol.textContent = "Jefe Taller";
   } else if (usuarioActivo.rol === "usuario_taller") {

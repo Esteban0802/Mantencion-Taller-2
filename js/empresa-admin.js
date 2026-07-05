@@ -1,5 +1,4 @@
 import { renderVistaUsuariosEmpresa } from "./empresa/usuarios.js";
-
 import { db } from "./firebase-config.js";
 
 import {
@@ -9,20 +8,56 @@ import {
 
 let empresaActual = null;
 let empresaIdActual = null;
+let usuarioActivo = null;
 
 function obtenerEmpresaIdURL() {
   const params = new URLSearchParams(window.location.search);
   return params.get("id");
 }
 
-async function cargarEmpresa() {
+function validarAccesoEmpresa() {
+  usuarioActivo = JSON.parse(localStorage.getItem("usuarioActivo"));
+
+  if (!usuarioActivo) {
+    window.location.href = "index.html";
+    return false;
+  }
+
   empresaIdActual = obtenerEmpresaIdURL();
 
   if (!empresaIdActual) {
     alert("No se recibió ID de empresa");
-    window.location.href = "super-admin.html";
-    return;
+    window.location.href = "index.html";
+    return false;
   }
+
+  if (usuarioActivo.rol === "super_admin") {
+    return true;
+  }
+
+  if (
+    usuarioActivo.rol === "admin_empresa" &&
+    usuarioActivo.empresaId === empresaIdActual
+  ) {
+    return true;
+  }
+
+  alert("No tienes permiso para acceder a esta empresa.");
+
+  if (
+    usuarioActivo.rol === "jefe_taller" ||
+    usuarioActivo.rol === "usuario_taller"
+  ) {
+    window.location.href = "dashboard.html";
+  } else {
+    window.location.href = "index.html";
+  }
+
+  return false;
+}
+
+async function cargarEmpresa() {
+  if (!validarAccesoEmpresa()) return;
 
   try {
     const refEmpresa = doc(db, "empresas", empresaIdActual);
@@ -30,7 +65,7 @@ async function cargarEmpresa() {
 
     if (!snap.exists()) {
       alert("La empresa no existe");
-      window.location.href = "super-admin.html";
+      window.location.href = "index.html";
       return;
     }
 
@@ -60,42 +95,20 @@ function renderEmpresa() {
   renderVistaDashboardEmpresa();
 }
 
-
 window.cambiarVistaEmpresa = function (vista, elemento) {
   document.querySelectorAll(".sidebar li").forEach(li => {
     li.classList.remove("active");
   });
 
-  if (elemento) {
-    elemento.classList.add("active");
-  }
+  if (elemento) elemento.classList.add("active");
 
-  if (vista === "dashboard") {
-    renderVistaDashboardEmpresa();
-  }
-
-  if (vista === "usuarios") {
-    renderVistaUsuariosEmpresa();
-  }
-
-  if (vista === "sucursales") {
-    renderVistaPlaceholder("Sucursales", "Aquí administraremos las sucursales de la empresa.");
-  }
-
-  if (vista === "clientes") {
-    renderVistaPlaceholder("Clientes", "Aquí administraremos los clientes asociados a la empresa.");
-  }
-
-  if (vista === "equipos") {
-    renderVistaPlaceholder("Equipos", "Aquí administraremos los equipos y activos del cliente.");
-  }
-
-  if (vista === "configuracion") {
-    renderVistaPlaceholder("Configuración", "Aquí administraremos datos, colores, logo y plan de la empresa.");
-  }
+  if (vista === "dashboard") renderVistaDashboardEmpresa();
+  if (vista === "usuarios") renderVistaUsuariosEmpresa();
+  if (vista === "sucursales") renderVistaPlaceholder("Sucursales", "Aquí administraremos las sucursales de la empresa.");
+  if (vista === "clientes") renderVistaPlaceholder("Clientes", "Aquí administraremos los clientes asociados a la empresa.");
+  if (vista === "equipos") renderVistaPlaceholder("Equipos", "Aquí administraremos los equipos y activos del cliente.");
+  if (vista === "configuracion") renderVistaPlaceholder("Configuración", "Aquí administraremos datos, colores, logo y plan de la empresa.");
 };
-
-
 
 function renderVistaDashboardEmpresa() {
   const cont = document.getElementById("vistaEmpresaContenido");
@@ -157,7 +170,6 @@ function renderVistaDashboardEmpresa() {
   `;
 }
 
-
 function renderVistaPlaceholder(titulo, texto) {
   const cont = document.getElementById("vistaEmpresaContenido");
   if (!cont) return;
@@ -171,10 +183,9 @@ function renderVistaPlaceholder(titulo, texto) {
   `;
 }
 
-
-
-window.volverSuperAdmin = function () {
-  window.location.href = "super-admin.html";
+window.salirEmpresaAdmin = function () {
+  localStorage.removeItem("usuarioActivo");
+  window.location.href = "index.html";
 };
 
 document.addEventListener("DOMContentLoaded", cargarEmpresa);

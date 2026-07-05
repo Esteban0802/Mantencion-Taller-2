@@ -32,8 +32,8 @@
             <li onclick="cambiarVistaEmpresa('configuracion', this)">Configuración</li>
         </ul>
 
-        <button class="btn-danger" onclick="volverSuperAdmin()">
-            Volver
+        <button class="btn-danger" onclick="salirEmpresaAdmin()">
+            Cerrar sesión
         </button>
 
     </aside>
@@ -104,36 +104,6 @@
 </div>
 
 
-<div id="modalUsuario" class="modal">
-  <div class="modal-content">
-
-    <h2>Nuevo Usuario</h2>
-
-    <label>Nombre</label>
-    <input type="text" id="usuarioNombreNuevo">
-
-    <label>Correo</label>
-    <input type="email" id="usuarioCorreoNuevo">
-
-    <label>Rol</label>
-    <select id="usuarioRolNuevo">
-      <option value="admin_empresa">Administrador Empresa</option>
-      <option value="jefe_taller">Jefe de Taller</option>
-      <option value="usuario_taller">Usuario Taller</option>
-    </select>
-
-    <div class="modal-actions">
-      <button class="btn-success" onclick="crearUsuarioEmpresa()">
-        Guardar Usuario
-      </button>
-
-      <button class="btn-danger" onclick="cerrarModalUsuario()">
-        Cancelar
-      </button>
-    </div>
-
-  </div>
-</div>
 
 
 <script type="module" src="js/empresa-admin.js"></script>

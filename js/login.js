@@ -62,7 +62,33 @@ async function iniciarSesion() {
       activo: usuario.activo
     }));
 
+    // Redirección según el rol
+
+switch (usuario.rol) {
+
+  case "super_admin":
+    window.location.href = "super-admin.html";
+    break;
+
+  case "admin_empresa":
+    window.location.href = `empresa-admin.html?id=${usuario.empresaId}`;
+    break;
+
+  case "admin_sucursal":
     window.location.href = "dashboard.html";
+    break;
+
+  case "jefe_taller":
+    window.location.href = "dashboard.html";
+    break;
+
+  case "usuario_taller":
+    window.location.href = "dashboard.html";
+    break;
+
+  default:
+    loginError.textContent = "Rol no válido.";
+}
 
   } catch (error) {
     console.error(error);
