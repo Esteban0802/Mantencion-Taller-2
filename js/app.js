@@ -1,7 +1,19 @@
-const usuario = JSON.parse(
-  localStorage.getItem("usuarioActivo")
-);
+import { protegerPagina, cerrarSesion as cerrarSesionGlobal } from "./session.js";
 
+import { db, auth, storage } from "./firebase-config.js";
+
+const usuario = protegerPagina([
+  "admin_empresa",
+  "admin_sucursal",
+  "jefe_taller",
+  "usuario_taller"
+]);
+
+if (!usuario) throw new Error("Acceso no autorizado");
+
+window.cerrarSesion = function () {
+  cerrarSesionGlobal();
+};
 
 const NOMBRES_ETAPAS = {
   ingreso: "Ingreso",
@@ -12,13 +24,6 @@ const NOMBRES_ETAPAS = {
   despachoPreparacion: "Despacho Preparación",
   despachoFinal: "Despacho Final"
 };
-
-
-if (!usuario) {
-  window.location.replace("index.html");
-}
-
-import { db, auth, storage } from "./firebase-config.js";
 
 import {
   collection,
@@ -7877,23 +7882,6 @@ function renderHeaderOTPro() {
   header.style.display = "block";
 }
 
-function cerrarSesion() {
-
-  const confirmar = confirm(
-    "¿Estás seguro de que deseas cerrar sesión?"
-  );
-
-  if (!confirmar) return;
-
-  localStorage.removeItem("usuarioActivo");
-  localStorage.removeItem("otActiva");
-
-  sessionStorage.clear();
-
-  window.location.replace("index.html");
-}
-
-window.cerrarSesion = cerrarSesion;
 
 
 function mostrarAlertasJefe(ot) {

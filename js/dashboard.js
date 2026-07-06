@@ -1,10 +1,14 @@
-const usuario = JSON.parse(
-  localStorage.getItem("usuarioActivo")
-);
+import { protegerPagina, cerrarSesion } from "./session.js";
 
-if (!usuario) {
-  window.location.replace("index.html");
-}
+const usuario = protegerPagina([
+  "super_admin",
+  "admin_empresa",
+  "admin_sucursal",
+  "jefe_taller",
+  "usuario_taller"
+]);
+
+if (!usuario) throw new Error("Acceso no autorizado");
 
 import { db } from "./firebase-config.js";
 
@@ -1147,21 +1151,11 @@ function renderUsuarioActivo() {
 }
 }
 
-function cerrarSesion() {
-
-  const confirmar = confirm(
-    "¿Estás seguro de que deseas cerrar sesión?"
-  );
-
-  if (!confirmar) return;
-
-  localStorage.removeItem("usuarioActivo");
-  localStorage.removeItem("otActiva");
-
-  sessionStorage.clear();
-
-  window.location.replace("index.html");
+function cerrarSesionDashboard() {
+  cerrarSesion();
 }
+
+window.cerrarSesion = cerrarSesionDashboard;
 
 window.cerrarSesion = cerrarSesion;
 

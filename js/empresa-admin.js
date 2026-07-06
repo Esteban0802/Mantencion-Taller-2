@@ -1,14 +1,24 @@
 import { renderVistaUsuariosEmpresa } from "./empresa/usuarios.js";
 import { db } from "./firebase-config.js";
+import { protegerPagina, cerrarSesion } from "./session.js";
 
 import {
   doc,
   getDoc
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
+const usuarioActivo = protegerPagina([
+    "super_admin",
+    "admin_empresa",
+    "admin_sucursal",
+    "jefe_taller",
+    "usuario_taller"
+]);
+
+if (!usuarioActivo) throw new Error("Acceso no autorizado");
+
 let empresaActual = null;
 let empresaIdActual = null;
-let usuarioActivo = null;
 
 function obtenerEmpresaIdURL() {
   const params = new URLSearchParams(window.location.search);
@@ -16,7 +26,6 @@ function obtenerEmpresaIdURL() {
 }
 
 function validarAccesoEmpresa() {
-  usuarioActivo = JSON.parse(localStorage.getItem("usuarioActivo"));
 
   if (!usuarioActivo) {
     window.location.href = "index.html";
@@ -86,13 +95,34 @@ async function cargarEmpresa() {
 }
 
 function renderEmpresa() {
-  document.getElementById("nombreEmpresa").textContent =
-    empresaActual.nombre || "Empresa";
 
-  document.getElementById("tituloEmpresa").textContent =
-    empresaActual.nombre || "Administrador de Empresa";
+    document.getElementById("nombreEmpresa").textContent =
+        empresaActual.nombre || "Empresa";
 
-  renderVistaDashboardEmpresa();
+    document.getElementById("tituloEmpresa").textContent =
+        empresaActual.nombre || "Administrador de Empresa";
+
+    renderBotonSalida();
+
+    renderVistaDashboardEmpresa();
+}
+
+
+function renderBotonSalida() {
+  const btn = document.getElementById("btnSalidaEmpresa");
+  if (!btn) return;
+
+  if (usuarioActivo.rol === "super_admin") {
+    btn.textContent = "Volver";
+    btn.onclick = () => {
+      window.location.href = "super-admin.html";
+    };
+  } else {
+    btn.textContent = "Cerrar sesión";
+    btn.onclick = () => {
+      cerrarSesion();
+    };
+  }
 }
 
 window.cambiarVistaEmpresa = function (vista, elemento) {
@@ -183,9 +213,5 @@ function renderVistaPlaceholder(titulo, texto) {
   `;
 }
 
-window.salirEmpresaAdmin = function () {
-  localStorage.removeItem("usuarioActivo");
-  window.location.href = "index.html";
-};
 
 document.addEventListener("DOMContentLoaded", cargarEmpresa);

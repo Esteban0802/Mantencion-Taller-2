@@ -1,3 +1,4 @@
+import { protegerPagina, cerrarSesion } from "./session.js";
 import { abrirWizard } from "./components/wizard.js";
 
 import { db } from "./firebase-config.js";
@@ -6,8 +7,13 @@ import {
   collection,
   addDoc,
   getDocs,
+  doc,
+  deleteDoc,
   serverTimestamp
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+const usuarioActivo = protegerPagina(["super_admin"]);
+if (!usuarioActivo) throw new Error("Acceso no autorizado");
 
 let empresas = [];
 
@@ -219,8 +225,7 @@ function renderKPIs() {
 }
 
 window.logout = function () {
-  localStorage.removeItem("usuarioActivo");
-  window.location.href = "index.html";
+  cerrarSesion();
 };
 
 document.addEventListener("DOMContentLoaded", cargarEmpresas);
@@ -232,9 +237,20 @@ window.verEmpresa = function (empresaId) {
 };
 
 window.eliminarEmpresa = async function (empresaId) {
-  const confirmar = confirm("¿Eliminar esta empresa de prueba?");
+  const confirmar = confirm(
+    "¿Eliminar esta empresa?\n\nEsta acción eliminará el registro de la empresa en Firestore."
+  );
 
   if (!confirmar) return;
 
-  alert("Luego conectaremos la eliminación con Firestore.");
+  try {
+    await deleteDoc(doc(db, "empresas", empresaId));
+
+    alert("Empresa eliminada correctamente");
+    await cargarEmpresas();
+
+  } catch (error) {
+    console.error("Error eliminando empresa:", error);
+    alert("No se pudo eliminar la empresa.");
+  }
 };
