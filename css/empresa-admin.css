@@ -362,3 +362,134 @@ body {
   gap: 10px;
   margin-top: 24px;
 }
+
+
+
+
+.modulos-section-header {
+  align-items: flex-start;
+}
+
+.modulos-admin-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 22px;
+}
+
+.modulo-admin-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: 48px 1fr auto;
+  align-items: center;
+  gap: 14px;
+  min-height: 110px;
+  padding: 18px;
+  background: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 16px;
+  cursor: pointer;
+  transition:
+    transform 0.2s ease,
+    border-color 0.2s ease,
+    background 0.2s ease;
+}
+
+.modulo-admin-card:hover {
+  transform: translateY(-2px);
+  border-color: #f97316;
+  background: #111c31;
+}
+
+.modulo-admin-icono {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 13px;
+  background: #020617;
+  font-size: 23px;
+}
+
+.modulo-admin-info strong {
+  display: block;
+  margin-bottom: 5px;
+  color: #f8fafc;
+  font-size: 15px;
+}
+
+.modulo-admin-info p {
+  margin: 0;
+  color: #94a3b8;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.switch-modulo {
+  position: relative;
+  display: inline-block;
+  width: 48px;
+  height: 26px;
+}
+
+.switch-modulo input {
+  width: 0;
+  height: 0;
+  opacity: 0;
+}
+
+.switch-slider {
+  position: absolute;
+  inset: 0;
+  background: #334155;
+  border-radius: 999px;
+  transition: 0.25s ease;
+}
+
+.switch-slider::before {
+  content: "";
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  left: 3px;
+  top: 3px;
+  background: #f8fafc;
+  border-radius: 50%;
+  transition: 0.25s ease;
+}
+
+.switch-modulo input:checked + .switch-slider {
+  background: #f97316;
+}
+
+.switch-modulo input:checked + .switch-slider::before {
+  transform: translateX(22px);
+}
+
+.modulos-admin-aviso {
+  margin-top: 20px;
+  padding: 14px 16px;
+  color: #fdba74;
+  background: rgba(249, 115, 22, 0.09);
+  border: 1px solid rgba(249, 115, 22, 0.3);
+  border-radius: 13px;
+  font-size: 13px;
+}
+
+@media (max-width: 900px) {
+  .modulos-admin-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  .modulo-admin-card {
+    grid-template-columns: 42px 1fr;
+  }
+
+  .switch-modulo {
+    grid-column: 1 / -1;
+    justify-self: end;
+  }
+}

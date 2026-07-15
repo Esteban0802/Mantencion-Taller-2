@@ -24,12 +24,52 @@
         <p id="nombreEmpresa">Empresa</p>
 
         <ul>
-            <li class="active" onclick="cambiarVistaEmpresa('dashboard', this)">Dashboard</li>
-            <li onclick="cambiarVistaEmpresa('usuarios', this)">Usuarios</li>
-            <li onclick="cambiarVistaEmpresa('sucursales', this)">Sucursales</li>
-            <li onclick="cambiarVistaEmpresa('clientes', this)">Clientes</li>
-            <li onclick="cambiarVistaEmpresa('equipos', this)">Equipos</li>
-            <li onclick="cambiarVistaEmpresa('configuracion', this)">Configuración</li>
+            <li
+  data-modulo="dashboard"
+  onclick="cambiarVistaEmpresa('dashboard', this)"
+>
+  Dashboard
+</li>
+
+<li
+  data-modulo="usuarios"
+  onclick="cambiarVistaEmpresa('usuarios', this)"
+>
+  Usuarios
+</li>
+
+<li
+  data-modulo="sucursales"
+  onclick="cambiarVistaEmpresa('sucursales', this)"
+>
+  Sucursales
+</li>
+
+<li
+  data-modulo="clientes"
+  onclick="cambiarVistaEmpresa('clientes', this)"
+>
+  Clientes
+</li>
+
+<li
+  data-modulo="equipos"
+  onclick="cambiarVistaEmpresa('equipos', this)"
+>
+  Equipos
+</li>
+
+<li onclick="cambiarVistaEmpresa('configuracion', this)">
+  Configuración
+</li>
+
+<li
+  id="menuModulosEmpresa"
+  onclick="cambiarVistaEmpresa('modulos', this)"
+  style="display: none;"
+>
+  Módulos
+</li>
         </ul>
 
         <button
