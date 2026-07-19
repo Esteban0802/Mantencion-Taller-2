@@ -7,7 +7,11 @@ import {
   doc,
   getDoc,
   updateDoc,
-  serverTimestamp
+  serverTimestamp,
+  collection,
+  query,
+  where,
+  getCountFromServer
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 const usuarioActivo = protegerPagina([
@@ -113,6 +117,8 @@ function renderEmpresa() {
 
     renderBotonSalida();
 
+    renderKPIsEmpresa();
+    cargarKPIsEmpresa();
     renderVistaDashboardEmpresa();
 }
 
@@ -232,6 +238,182 @@ window.cambiarVistaEmpresa = function (vista, elemento) {
     );
   }
 };
+
+
+const CATALOGO_KPI_EMPRESA = [
+  {
+    modulo: "usuarios",
+    titulo: "Usuarios",
+    id: "kpiUsuarios"
+  },
+  {
+    modulo: "sucursales",
+    titulo: "Sucursales",
+    id: "kpiSucursales"
+  },
+  {
+    modulo: "clientes",
+    titulo: "Clientes",
+    id: "kpiClientes"
+  },
+  {
+    modulo: "equipos",
+    titulo: "Equipos",
+    id: "kpiEquipos"
+  }
+];
+
+
+function renderKPIsEmpresa() {
+  const cont = document.getElementById("kpiEmpresaGrid");
+
+  if (!cont || !empresaActual) return;
+
+  const kpisActivos = CATALOGO_KPI_EMPRESA.filter(kpi =>
+    moduloActivo(empresaActual, kpi.modulo)
+  );
+
+  if (!kpisActivos.length) {
+    cont.innerHTML = "";
+    cont.style.display = "none";
+    return;
+  }
+
+  cont.style.display = "grid";
+
+  cont.innerHTML = kpisActivos
+    .map(kpi => `
+      <div class="kpi-card">
+        <h3>${kpi.titulo}</h3>
+        <strong id="${kpi.id}">0</strong>
+      </div>
+    `)
+    .join("");
+}
+
+
+
+window.irSistemaOperacional = function () {
+  if (!usuarioActivo) {
+    window.location.href = "index.html";
+    return;
+  }
+
+  if (!empresaActual?.id) {
+    alert("No se encontró la empresa activa.");
+    return;
+  }
+
+  if (!moduloActivo(empresaActual, "ordenesServicio")) {
+    alert(
+      "El módulo de Órdenes de Servicio no está habilitado para esta empresa."
+    );
+    return;
+  }
+
+  window.location.href = "dashboard.html";
+};
+
+
+
+
+async function cargarKPIsEmpresa() {
+  if (!empresaActual?.id) return;
+
+  const empresaId = empresaActual.id;
+
+  const consultas = [];
+
+  if (moduloActivo(empresaActual, "usuarios")) {
+    consultas.push(
+      cargarConteoKPI({
+        coleccion: "usuarios",
+        empresaId,
+        elementoId: "kpiUsuarios"
+      })
+    );
+  }
+
+  if (moduloActivo(empresaActual, "sucursales")) {
+    consultas.push(
+      cargarConteoKPI({
+        coleccion: "sucursales",
+        empresaId,
+        elementoId: "kpiSucursales"
+      })
+    );
+  }
+
+  if (moduloActivo(empresaActual, "clientes")) {
+    consultas.push(
+      cargarConteoKPI({
+        coleccion: "clientes",
+        empresaId,
+        elementoId: "kpiClientes"
+      })
+    );
+  }
+
+  if (moduloActivo(empresaActual, "equipos")) {
+    consultas.push(
+      cargarConteoKPI({
+        coleccion: "equipos",
+        empresaId,
+        elementoId: "kpiEquipos"
+      })
+    );
+  }
+
+  await Promise.allSettled(consultas);
+}
+
+
+
+async function cargarConteoKPI({
+  coleccion,
+  empresaId,
+  elementoId
+}) {
+  const elemento = document.getElementById(elementoId);
+
+  if (!elemento) return;
+
+  elemento.textContent = "…";
+
+  try {
+    const consulta = query(
+      collection(db, coleccion),
+      where("empresaId", "==", empresaId)
+    );
+
+    const resultado = await getCountFromServer(consulta);
+
+    elemento.textContent = resultado.data().count;
+
+  } catch (error) {
+
+  if (error.code === "permission-denied") {
+
+    console.warn(
+      `KPI ${coleccion}: pendiente configurar permisos de Firestore.`
+    );
+
+  } else {
+
+    console.error(
+      `Error cargando KPI de ${coleccion}:`,
+      error
+    );
+
+  }
+
+  elemento.textContent = "0";
+
+}
+}
+
+
+
 
 function renderVistaDashboardEmpresa() {
   const cont = document.getElementById("vistaEmpresaContenido");
@@ -502,6 +684,10 @@ async function guardarModulosEmpresa() {
     window.modulosEmpresaActual = modulosActualizados;
 
     aplicarModulosEnInterfaz(empresaActual);
+
+    renderKPIsEmpresa();
+
+    await cargarKPIsEmpresa();
 
     alert("Módulos actualizados correctamente.");
 

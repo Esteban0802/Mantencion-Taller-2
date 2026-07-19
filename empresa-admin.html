@@ -59,6 +59,14 @@
   Equipos
 </li>
 
+<li
+  id="menuSistemaOperacional"
+  data-modulo="ordenesServicio"
+  onclick="irSistemaOperacional()"
+>
+  Operación del Taller
+</li>
+
 <li onclick="cambiarVistaEmpresa('configuracion', this)">
   Configuración
 </li>
@@ -93,28 +101,9 @@
 
         </section>
 
-        <section class="kpi-grid">
-
-            <div class="kpi-card">
-                <h3>Usuarios</h3>
-                <strong id="kpiUsuarios">0</strong>
-            </div>
-
-            <div class="kpi-card">
-                <h3>Sucursales</h3>
-                <strong id="kpiSucursales">0</strong>
-            </div>
-
-            <div class="kpi-card">
-                <h3>Clientes</h3>
-                <strong id="kpiClientes">0</strong>
-            </div>
-
-            <div class="kpi-card">
-                <h3>Equipos</h3>
-                <strong id="kpiEquipos">0</strong>
-            </div>
-
+        <section
+            id="kpiEmpresaGrid"
+            class="kpi-grid">
         </section>
 
         <section class="card">

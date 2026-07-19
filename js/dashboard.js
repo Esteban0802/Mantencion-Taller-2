@@ -1,5 +1,23 @@
 import { protegerPagina, cerrarSesion } from "./session.js";
 
+import {
+  obtenerModulosEmpresa,
+  moduloActivo
+} from "./modulos.js";
+
+
+import {
+  puedeVerDashboard,
+  puedeVerOrdenesServicio,
+  puedeCrearOT,
+  puedeAbrirOT,
+  puedeVerGantt,
+  puedeVerDespacho,
+  puedeVerReportes,
+  puedeEntrarPanelEmpresa
+} from "./permisos.js";
+
+
 const usuario = protegerPagina([
   "super_admin",
   "admin_empresa",
@@ -17,11 +35,16 @@ import {
   query,
   where,
   orderBy,
-  onSnapshot
+  onSnapshot,
+  doc,
+  getDoc
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 let listaOTs = [];
 let listaFiltrada = [];
+let empresaActualDashboard = null;
+let modulosDashboard = {};
+let cancelarEscuchaOTs = null;
 
 // =======================
 // ESTADO AUTOMÁTICO
@@ -68,19 +91,350 @@ function calcularProgreso(ot) {
 // =======================
 // CARGAR TODAS LAS OT
 // =======================
-window.onload = () => {
+window.onload = async () => {
   renderUsuarioActivo();
 
-  escucharOTsTiempoReal();
+  const btnPanelEmpresa =
+    document.getElementById("btnPanelEmpresa");
+
+  if (btnPanelEmpresa) {
+    btnPanelEmpresa.style.display =
+      usuario.rol === "admin_empresa"
+        ? "block"
+        : "none";
+  }
 
   document.querySelectorAll(".sidebar li").forEach(item => {
-    item.addEventListener("click", function() {
-      document.querySelectorAll(".sidebar li").forEach(i => i.classList.remove("active"));
+    item.addEventListener("click", function () {
+      document
+        .querySelectorAll(".sidebar li")
+        .forEach(i => i.classList.remove("active"));
+
       this.classList.add("active");
     });
   });
 
+  const empresaCargada =
+    await cargarConfiguracionEmpresaDashboard();
+
+  if (!empresaCargada) return;
+
+  aplicarModulosDashboard();
+  configurarNavegacionPorPermisos();
+
+  if (
+    puedeVerOrdenesServicio(
+      usuario,
+      empresaActualDashboard
+    )
+  ) {
+    escucharOTsTiempoReal();
+  } else {
+    mostrarDashboardSinOrdenes();
+  }
 };
+
+
+async function cargarConfiguracionEmpresaDashboard() {
+  try {
+    if (!usuario) {
+      window.location.replace("index.html");
+      return false;
+    }
+
+    /*
+     * El Super Admin no debería trabajar normalmente
+     * desde el dashboard operacional.
+     * Le damos una configuración completa para evitar
+     * romper pruebas antiguas.
+     */
+    if (usuario.rol === "super_admin") {
+      empresaActualDashboard = {
+        id: "",
+        nombre: "OverTrack",
+        modulos: {
+          dashboard: true,
+          ordenesServicio: true,
+          gantt: true,
+          despacho: true,
+          reportesPDF: true,
+          aprobaciones: true,
+          checklists: true,
+          evidencias: true,
+          comentarios: true
+        }
+      };
+
+      modulosDashboard =
+        obtenerModulosEmpresa(empresaActualDashboard);
+
+      return true;
+    }
+
+    if (!usuario.empresaId) {
+      alert("El usuario no tiene una empresa asignada.");
+      cerrarSesion();
+      return false;
+    }
+
+    const empresaRef = doc(
+      db,
+      "empresas",
+      usuario.empresaId
+    );
+
+    const empresaSnap = await getDoc(empresaRef);
+
+    if (!empresaSnap.exists()) {
+      alert("No se encontró la empresa asociada al usuario.");
+      cerrarSesion();
+      return false;
+    }
+
+    empresaActualDashboard = {
+      id: empresaSnap.id,
+      ...empresaSnap.data()
+    };
+
+    modulosDashboard =
+      obtenerModulosEmpresa(empresaActualDashboard);
+
+    window.empresaActualDashboard =
+      empresaActualDashboard;
+
+    window.modulosDashboard =
+      modulosDashboard;
+
+    return true;
+
+  } catch (error) {
+    console.error(
+      "Error cargando configuración de empresa:",
+      error
+    );
+
+    alert(
+      "No fue posible cargar la configuración de la empresa."
+    );
+
+    return false;
+  }
+}
+
+
+
+function mostrarElemento(id, mostrar, displayVisible = "") {
+  const elemento = document.getElementById(id);
+
+  if (!elemento) return;
+
+  elemento.style.display = mostrar
+    ? displayVisible
+    : "none";
+}
+
+function aplicarModulosDashboard() {
+  if (!empresaActualDashboard) return;
+
+  const tieneDashboard =
+    puedeVerDashboard(
+      usuario,
+      empresaActualDashboard
+    );
+
+  const tieneOrdenes =
+    puedeVerOrdenesServicio(
+      usuario,
+      empresaActualDashboard
+    );
+
+  const tieneGantt =
+    puedeVerGantt(
+      usuario,
+      empresaActualDashboard
+    );
+
+  const tieneDespacho =
+    puedeVerDespacho(
+      usuario,
+      empresaActualDashboard
+    );
+
+  const tieneReportes =
+    puedeVerReportes(
+      usuario,
+      empresaActualDashboard
+    );
+
+  mostrarElemento(
+    "panelHeroDashboard",
+    tieneDashboard
+  );
+
+  mostrarElemento(
+    "panelKPIs",
+    tieneDashboard && tieneOrdenes,
+    "grid"
+  );
+
+  mostrarElemento(
+    "panelEstadoTaller",
+    tieneDashboard && tieneOrdenes,
+    "grid"
+  );
+
+  mostrarElemento(
+    "panelBuscadorOT",
+    tieneOrdenes
+  );
+
+  mostrarElemento(
+    "panelOTs",
+    tieneOrdenes
+  );
+
+  mostrarElemento(
+    "panelGraficos",
+    tieneReportes,
+    "grid"
+  );
+
+  mostrarElemento(
+    "panelDespachos",
+    tieneDespacho
+  );
+
+  mostrarElemento(
+    "panelGantt",
+    tieneGantt
+  );
+}
+
+
+
+function configurarNavegacionPorPermisos() {
+  const btnPanelEmpresa =
+    document.getElementById("btnPanelEmpresa");
+
+  const menuNuevaOT =
+    document.getElementById("menuNuevaOT");
+
+  const menuDashboard =
+    document.getElementById(
+      "menuDashboardOperacional"
+    );
+
+  if (btnPanelEmpresa) {
+    btnPanelEmpresa.style.display =
+      puedeEntrarPanelEmpresa(
+        usuario,
+        empresaActualDashboard
+      )
+        ? ""
+        : "none";
+  }
+
+  if (menuNuevaOT) {
+    menuNuevaOT.style.display =
+      puedeCrearOT(
+        usuario,
+        empresaActualDashboard
+      )
+        ? ""
+        : "none";
+  }
+
+  if (menuDashboard) {
+    menuDashboard.style.display =
+      puedeVerDashboard(
+        usuario,
+        empresaActualDashboard
+      )
+        ? ""
+        : "none";
+  }
+}
+
+
+
+
+function renderizarDashboardOperacional(lista = listaOTs) {
+  if (!empresaActualDashboard) return;
+
+  const tieneDashboard =
+    moduloActivo(empresaActualDashboard, "dashboard");
+
+  const tieneOrdenes =
+    moduloActivo(empresaActualDashboard, "ordenesServicio");
+
+  const tieneGantt =
+    moduloActivo(empresaActualDashboard, "gantt");
+
+  const tieneDespacho =
+    moduloActivo(empresaActualDashboard, "despacho");
+
+  const tieneReportes =
+    moduloActivo(empresaActualDashboard, "reportesPDF");
+
+  if (tieneOrdenes) {
+    renderTabla(lista);
+  }
+
+  if (tieneDashboard && tieneOrdenes) {
+    calcularKPIs(lista);
+    renderEstadoTaller(lista);
+    renderAlertasDashboard(lista);
+  }
+
+  if (tieneOrdenes && tieneReportes) {
+    renderGraficos(lista);
+  } else {
+    destruirGraficosDashboard();
+  }
+
+  if (tieneOrdenes && tieneDespacho) {
+    renderProximosDespachos(lista);
+  }
+
+  if (tieneOrdenes && tieneGantt) {
+    renderGanttTaller(lista);
+  }
+}
+
+
+
+function mostrarDashboardSinOrdenes() {
+  listaOTs = [];
+  listaFiltrada = [];
+
+  const contenidoPrincipal =
+    document.querySelector(".main-content");
+
+  if (!contenidoPrincipal) return;
+
+  const aviso = document.createElement("div");
+
+  aviso.id = "avisoModuloOrdenesInactivo";
+  aviso.className = "card";
+  aviso.innerHTML = `
+    <div class="panel-header-pro">
+      <div>
+        <h3>Órdenes de Servicio no habilitadas</h3>
+
+        <p class="sin-alertas">
+          Esta empresa no tiene contratado el módulo de
+          Órdenes de Servicio.
+        </p>
+      </div>
+    </div>
+  `;
+
+  contenidoPrincipal.appendChild(aviso);
+}
+
+
+
+
 
 function escucharOTsTiempoReal() {
   const usuarioActivo = JSON.parse(localStorage.getItem("usuarioActivo"));
@@ -124,13 +478,7 @@ function escucharOTsTiempoReal() {
 
     listaFiltrada = [...listaOTs];
 
-    renderTabla(listaFiltrada);
-    calcularKPIs(listaFiltrada);
-    renderGraficos(listaFiltrada);
-    renderEstadoTaller(listaFiltrada);
-    renderAlertasDashboard(listaFiltrada);
-    renderProximosDespachos(listaFiltrada);
-    renderGanttTaller(listaFiltrada);
+    renderizarDashboardOperacional(listaFiltrada);
 
   }, (error) => {
     console.error("Error escuchando OTs:", error);
@@ -929,6 +1277,29 @@ function abrirPopoverGantt(data) {
 }
 
 
+
+function volverPanelEmpresa() {
+  if (
+    !puedeEntrarPanelEmpresa(
+      usuario,
+      empresaActualDashboard
+    )
+  ) {
+    alert(
+      "No tienes permiso para acceder al Panel de Empresa."
+    );
+
+    return;
+  }
+
+  window.location.href =
+    `empresa-admin.html?id=${empresaActualDashboard.id}`;
+}
+
+window.volverPanelEmpresa = volverPanelEmpresa;
+
+
+
 function abrirPopoverGanttDesdeElemento(el) {
   try {
     const data = JSON.parse(
@@ -968,6 +1339,19 @@ function formatearFechaCorta(fecha) {
 // ABRIR OT
 // =======================
 function abrirOT(index) {
+  if (
+    !puedeAbrirOT(
+      usuario,
+      empresaActualDashboard
+    )
+  ) {
+    alert(
+      "No tienes permiso para abrir Órdenes de Servicio."
+    );
+
+    return;
+  }
+
   const ot = listaOTs[index];
 
   if (!ot) {
@@ -986,6 +1370,19 @@ window.abrirOT = abrirOT;
 // NUEVA OT
 // =======================
 function nuevaOT() {
+  if (
+    !puedeCrearOT(
+      usuario,
+      empresaActualDashboard
+    )
+  ) {
+    alert(
+      "No tienes permiso para crear Órdenes de Servicio."
+    );
+
+    return;
+  }
+
   localStorage.removeItem("otActiva");
   window.location.href = "flujo.html";
 }
@@ -998,6 +1395,11 @@ window.nuevaOT = nuevaOT;
 function irDashboard() {
   window.location.href = "dashboard.html";
 }
+
+
+window.volverPanelEmpresa = volverPanelEmpresa;
+
+
 
 window.irDashboard = irDashboard;
 
@@ -1017,18 +1419,28 @@ function filtrarOTs() {
     );
   });
 
-  renderTabla(listaFiltrada);
-  calcularKPIs(listaFiltrada);
-  renderEstadoTaller(listaFiltrada);
-  renderAlertasDashboard(listaFiltrada);
-  renderProximosDespachos(listaFiltrada);
-  renderGanttTaller(listaFiltrada);
+  renderizarDashboardOperacional(listaFiltrada);
 }
 
 window.filtrarOTs = filtrarOTs;
 
 let chartEstados = null;
 let chartProgreso = null;
+
+
+function destruirGraficosDashboard() {
+  if (chartEstados) {
+    chartEstados.destroy();
+    chartEstados = null;
+  }
+
+  if (chartProgreso) {
+    chartProgreso.destroy();
+    chartProgreso = null;
+  }
+}
+
+
 
 function renderGraficos(lista = listaOTs) {
 
@@ -1150,12 +1562,6 @@ function renderUsuarioActivo() {
   }
 }
 }
-
-function cerrarSesionDashboard() {
-  cerrarSesion();
-}
-
-window.cerrarSesion = cerrarSesionDashboard;
 
 window.cerrarSesion = cerrarSesion;
 

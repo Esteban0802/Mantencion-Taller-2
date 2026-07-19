@@ -17,8 +17,26 @@
     </div>
 
     <ul>
-      <li onclick="irDashboard()">📊 Dashboard</li>
-      <li onclick="nuevaOT()">➕ Nueva OT</li>
+      <li
+        id="menuDashboardOperacional"
+        onclick="irDashboard()"
+      >
+        📊 Dashboard
+      </li>
+
+      <li
+        id="menuNuevaOT"
+        onclick="nuevaOT()"
+      >
+        ➕ Nueva OT
+      </li>
+      <li
+          id="btnPanelEmpresa"
+          style="display:none"
+          onclick="volverPanelEmpresa()"
+      >
+          ⚙ Panel Empresa
+      </li>
     </ul>
   </aside>
 
@@ -47,7 +65,7 @@
 
 </div>
 
-    <div class="buscador">
+<div class="buscador" id="panelBuscadorOT">
   <input 
     type="text" 
     id="inputBuscar" 
@@ -57,7 +75,7 @@
 </div>
 
       <!-- 🔥 KPI AQUÍ -->
-<div class="dashboard-hero">
+<div class="dashboard-hero" id="panelHeroDashboard">
 
   <div class="dashboard-title">
     <h1>Panel Operacional</h1>
@@ -66,7 +84,7 @@
 
 </div>
 
-<div class="kpis kpis-pro">
+<div class="kpis kpis-pro" id="panelKPIs">
 
   <div class="kpi-card total">
     <div class="kpi-icon">📊</div>
@@ -106,7 +124,7 @@
 
 </div>
 
-<div class="card">
+<div class="card" id="panelOTs">
   <div class="panel-header-pro">
     <h3>📋 Órdenes de Servicio</h3>
     <span>Vista operacional del taller</span>
@@ -115,7 +133,7 @@
   <div id="cardsOT" class="cards-ot-grid"></div>
 </div>
 
-    <div class="charts">
+    <div class="charts" id="panelGraficos">
 
   <div class="chart-card">
     <h3>Estado de Órdenes</h3>
@@ -130,7 +148,7 @@
 </div>
 
 
-<div class="dashboard-grid-pro">
+<div class="dashboard-grid-pro" id="panelEstadoTaller">
 
   <div class="panel-pro">
     <div class="panel-header-pro">
@@ -160,7 +178,7 @@
 
 </div>
 
-<div class="panel-pro proximos-despachos">
+<div class="panel-pro proximos-despachos" id="panelDespachos">
   <div class="panel-header-pro">
     <h3>📅 Próximos Despachos</h3>
     <span>Según Carta Gantt</span>
@@ -175,7 +193,7 @@
 
 <!-- 🔥 GANTT GENERAL DEL TALLER -->
 
-<div class="panel-pro gantt-taller-panel">
+<div class="panel-pro gantt-taller-panel" id="panelGantt">
   <div class="panel-header-pro">
     <h3>📊 Carta Gantt General del Taller</h3>
     <span>Planificación global</span>
