@@ -32,6 +32,11 @@ import {
 } from "./modulos/pruebas.js";
 
 
+import {
+  inicializarModuloDespacho
+} from "./modulos/despacho.js";
+
+
 
 
 const usuario = protegerPagina([
@@ -491,6 +496,27 @@ inicializarModuloPruebas({
 });
 
 
+inicializarModuloDespacho({
+
+    getOT: () => ot,
+    getUsuario: () => usuario,
+
+    guardarCambiosOT,
+
+    OTBloqueada,
+
+    esJefeTaller,
+    esUsuarioTaller,
+
+    puedeEliminarComentario,
+
+    subirArchivoStorage,
+
+    actualizarAlertaJefe
+
+});
+
+
 
 
 function existenComentariosJefePendientes(ot) {
@@ -587,13 +613,6 @@ async function responderComentarioJefe(etapa, itemIndex, comentarioIndex, tipo =
 
   alert("Observación atendida ✅");
 }
-
-
-
-
-
-
-
 
 // =======================
 // CHECK
@@ -4169,26 +4188,6 @@ function calcularDiasHabilesEntreIncluyendoFinal(inicio, fin) {
 
   return contador;
 }
-
-
-// =======================
-// CARGAR CHECKLIST PRUEBAS
-// =======================
-
-
-// =======================
-// RENDER PRUEBAS
-// =======================
-
-
-
-
-
-
-
-
-
-
 
 
 
