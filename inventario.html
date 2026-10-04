@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Inventario | Vectaria</title>
+  <link rel="icon" type="image/png" href="img/vectaria-favicon-official.png?v=3">
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/brand-overtrack.css">
+  <link rel="stylesheet" href="css/brand-overtrack-light.css">
+  <link rel="stylesheet" href="css/notificaciones.css">
+  <link rel="stylesheet" href="css/inventario.css?v=20261004-15">
+  <link rel="stylesheet" href="css/desktop-density.css">
+</head>
+<body class="dashboard-overtrack inventario-page">
+<div class="app">
+  <header class="mobile-topbar">
+    <div class="mobile-topbar-brand" aria-label="Vectaria">
+      <div class="mobile-brand-composite" role="img" aria-label="Vectaria - Gestión operativa">
+        <img class="mobile-brand-layer mobile-brand-base" src="img/vectaria-logo-official.png?v=3" alt="">
+      </div>
+    </div>
+    <button type="button" class="mobile-menu-toggle" aria-controls="inventarioSidebar" aria-expanded="false" aria-label="Abrir menú de navegación"><span aria-hidden="true">☰</span><span>Menú</span></button>
+  </header>
+  <button type="button" class="mobile-menu-backdrop" aria-label="Cerrar menú de navegación" tabindex="-1"></button>
+
+  <aside class="sidebar" id="inventarioSidebar">
+    <div class="sidebar-logo"><img class="sidebar-brand-logo" src="img/vectaria-logo-official.png?v=3" alt="Vectaria - Tu operación, en una misma dirección"></div>
+    <ul>
+      <li id="menuDashboardInventario" role="button" tabindex="0" onclick="location.href='dashboard.html'"><svg class="ot-icon nav-icon" aria-hidden="true"><use href="img/icons-overtrack.svg#dashboard"></use></svg><span>Dashboard</span></li>
+      <li id="menuOrdenesInventario" role="button" tabindex="0" onclick="location.href='ordenes.html'"><svg class="ot-icon nav-icon" aria-hidden="true"><use href="img/icons-overtrack.svg#list"></use></svg><span>Todas las OT</span></li>
+      <li class="active"><svg class="ot-icon nav-icon" aria-hidden="true"><use href="img/icons-overtrack.svg#clipboard"></use></svg><span>Inventario</span></li>
+      <li id="menuProgramacionInventario" role="button" tabindex="0" style="display:none" onclick="location.href='programacion.html'"><svg class="ot-icon nav-icon" aria-hidden="true"><use href="img/icons-overtrack.svg#calendar"></use></svg><span>Programación</span></li>
+      <li id="menuPanelEmpresaInventario" role="button" tabindex="0" style="display:none"><svg class="ot-icon nav-icon" aria-hidden="true"><use href="img/icons-overtrack.svg#building-cog"></use></svg><span>Panel Empresa</span></li>
+    </ul>
+    <button type="button" class="mobile-menu-logout" id="btnSalirInventario">Salir</button>
+  </aside>
+
+  <main class="main-content inventario-main">
+    <div class="header inventario-header">
+      <div><h2>Inventario</h2><p>Control simple de repuestos y materiales por sucursal.</p></div>
+      <div class="user-box"><span id="usuarioNombre">Usuario</span><small id="usuarioRol">Rol</small><button type="button" class="btn-logout" id="btnSalirInventarioTop">Salir</button></div>
+    </div>
+
+    <section class="inventario-toolbar card">
+      <div class="inventario-filtros">
+        <label id="grupoSucursalInventario"><span>Sucursal</span><select id="selectorSucursalInventario"><option value="">Seleccionar sucursal</option></select></label>
+        <label><span>Buscar</span><input id="buscarInventario" type="search" placeholder="Buscar en todo el inventario..."></label>
+      </div>
+      <div class="inventario-acciones" id="accionesEdicionInventario">
+        <input type="file" id="archivoInventario" accept=".xlsx,.xls" hidden>
+        <button type="button" class="btn-secondary-inventario" id="btnImportarInventario">Importar Excel</button>
+        <button type="button" class="btn-primary-inventario" id="btnAgregarInventario">Agregar repuesto</button>
+        <button type="button" class="btn-secondary-inventario" id="btnExportarInventario">Exportar Excel</button>
+      </div>
+    </section>
+
+    <section class="inventario-resumen" aria-label="Resumen de inventario">
+      <article><span>Registros</span><strong id="totalInventario">…</strong></article>
+      <article><span>Columnas</span><strong id="totalColumnasInventario">…</strong></article>
+      <article><span>Última actualización</span><strong id="ultimaActualizacionInventario">…</strong></article>
+    </section>
+
+    <section class="card inventario-tabla-card">
+      <div class="inventario-tabla-encabezado"><div><h3>Existencias</h3><p id="estadoInventario">Cargando inventario…</p></div></div>
+      <div class="inventario-tabla-scroll">
+        <table class="inventario-tabla" id="tablaInventario">
+          <thead><tr><th>Inventario</th></tr></thead>
+          <tbody><tr><td class="inventario-vacio">Selecciona una sucursal para comenzar.</td></tr></tbody>
+        </table>
+      </div>
+      <div class="inventario-paginacion">
+        <button type="button" class="btn-secondary-inventario" id="btnCargarMasInventario" hidden>Cargar 50 más</button>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div class="inventario-modal" id="modalRepuesto" hidden>
+  <section class="inventario-modal-contenido" role="dialog" aria-modal="true" aria-labelledby="tituloModalRepuesto">
+    <div class="inventario-modal-header"><div><h2 id="tituloModalRepuesto">Agregar repuesto</h2><p>Registra un nuevo material o repuesto en el inventario de la sucursal.</p></div><button type="button" id="cerrarModalRepuesto" aria-label="Cerrar">×</button></div>
+    <form id="formRepuesto"><div id="camposRepuesto" class="inventario-form-grid"></div><div class="inventario-modal-acciones"><button type="button" class="btn-secondary-inventario" id="cancelarModalRepuesto">Cancelar</button><button type="submit" class="btn-primary-inventario">Guardar repuesto</button></div></form>
+  </section>
+</div>
+
+<script src="js/components/notificaciones.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script type="module" src="js/inventario.js?v=20261004-10"></script>
+</body>
+</html>

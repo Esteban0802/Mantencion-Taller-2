@@ -5,7 +5,12 @@ const ROLES = {
   ADMIN_EMPRESA: "admin_empresa",
   ADMIN_SUCURSAL: "admin_sucursal",
   JEFE_TALLER: "jefe_taller",
-  USUARIO_TALLER: "usuario_taller"
+  USUARIO_TALLER: "usuario_taller",
+  SUPERVISOR: "supervisor",
+  TECNICO: "tecnico",
+  PLANIFICADOR: "planificador",
+  BODEGUERO: "bodeguero",
+  SHEQ: "sheq"
 };
 
 function usuarioValido(usuario) {
@@ -22,7 +27,9 @@ export function tieneRol(
 ) {
   if (!usuarioValido(usuario)) return false;
 
-  return rolesPermitidos.includes(usuario.rol);
+  if (rolesPermitidos.includes(usuario.rol)) return true;
+  return [ROLES.SUPERVISOR, ROLES.TECNICO].includes(usuario.rol) &&
+    rolesPermitidos.includes(ROLES.USUARIO_TALLER);
 }
 
 export function perteneceAEmpresa(
@@ -97,7 +104,6 @@ export function puedeCrearOT(
 
   return tieneRol(usuario, [
     ROLES.SUPER_ADMIN,
-    ROLES.ADMIN_EMPRESA,
     ROLES.ADMIN_SUCURSAL,
     ROLES.JEFE_TALLER,
     ROLES.USUARIO_TALLER
@@ -151,9 +157,9 @@ export function puedeCargarChecklists(
 
   return tieneRol(usuario, [
     ROLES.SUPER_ADMIN,
-    ROLES.ADMIN_EMPRESA,
     ROLES.ADMIN_SUCURSAL,
-    ROLES.JEFE_TALLER
+    ROLES.JEFE_TALLER,
+    ROLES.USUARIO_TALLER
   ]);
 }
 
@@ -223,7 +229,8 @@ export function puedeEntrarPanelEmpresa(
 
   return tieneRol(usuario, [
     ROLES.SUPER_ADMIN,
-    ROLES.ADMIN_EMPRESA
+    ROLES.ADMIN_EMPRESA,
+    ROLES.ADMIN_SUCURSAL
   ]);
 }
 

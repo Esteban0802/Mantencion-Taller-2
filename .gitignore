@@ -1,0 +1,60 @@
+# Dependencias instaladas localmente
+node_modules/
+.firebase-cli-config*/
+functions/node_modules/
+
+# Registros temporales y de Firebase
+*.log
+*-debug.log
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+
+# Datos locales de Firebase y emuladores
+.firebase/
+.firestore/
+firebase-export/
+emulator-data/
+.firebase-config-*/
+.firebase-test-config/
+.npm-cache-codex/
+
+# Variables de entorno y credenciales privadas
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*service-account*.json
+*service_account*.json
+*credentials*.json
+
+# Respaldos y copias de trabajo locales
+*.backup
+*.backup.*
+*.backup.html
+*.backup.js
+*.backup.json
+*.pre-password.backup
+*.pre-*.backup
+*.backup*.html
+*.backup*.js
+*.backup*.json
+
+# Archivos del sistema y editores
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+
+# Cobertura y resultados temporales de pruebas
+coverage/
+.nyc_output/
+test-results/
+dist/
+outputs/
+
+gitignore-seguro.txt

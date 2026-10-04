@@ -1,0 +1,1129 @@
+:root {
+  --otl-bg: #f7f9fc;
+  --otl-surface: #ffffff;
+  --otl-surface-soft: #f1f5f8;
+  --otl-text: #0d1b2a;
+  --otl-muted: #607d8b;
+  --otl-border: #dce4ea;
+  --otl-blue: #0878e8;
+  --otl-green: #6da92f;
+  --otl-lime: #9bea20;
+  --otl-amber: #d78b0b;
+  --otl-shadow: 0 12px 32px rgba(13, 27, 42, 0.08);
+}
+
+/* Prueba reversible del tema híbrido claro. */
+body.dashboard-overtrack,
+body.flow-overtrack {
+  color: var(--otl-text);
+  background:
+    radial-gradient(circle at 88% 8%, rgba(21, 101, 192, 0.08), transparent 28%),
+    linear-gradient(135deg, #ffffff, var(--otl-bg) 52%, #f2f6f9) !important;
+}
+
+.dashboard-overtrack .mobile-topbar,
+.dashboard-overtrack .mobile-menu-toggle,
+.dashboard-overtrack .mobile-menu-backdrop,
+.dashboard-overtrack .mobile-menu-logout {
+  display: none;
+}
+
+.flow-overtrack .mobile-menu-toggle,
+.flow-overtrack .mobile-menu-backdrop,
+.flow-overtrack .mobile-flow-menu,
+.flow-overtrack .mobile-brand-composite {
+  display: none;
+}
+
+@media (max-width: 760px) {
+  body.flow-overtrack.menu-mobile-open { overflow: hidden; }
+
+  .flow-overtrack .topbar-overtrack {
+    position: fixed;
+    inset: 0 0 auto 0;
+    z-index: 1002;
+    display: flex;
+    flex-direction: row !important;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    height: 76px;
+    min-height: 76px;
+    max-height: 76px;
+    padding: 2px 12px 2px 14px;
+  }
+
+  .flow-overtrack .brand-overtrack {
+    justify-content: flex-start;
+    flex: 0 1 auto;
+    width: auto;
+    margin: 0;
+    min-width: 0;
+    gap: 9px;
+  }
+
+  .flow-overtrack .brand-overtrack .desktop-brand-symbol,
+  .flow-overtrack .brand-overtrack .desktop-brand-name,
+  .flow-overtrack .brand-overtrack .desktop-brand-logo {
+    display: none;
+  }
+
+  .flow-overtrack .brand-overtrack .mobile-brand-composite {
+    position: relative;
+    display: block;
+    width: 110px;
+    aspect-ratio: 3 / 2;
+    filter: drop-shadow(0 4px 7px rgba(0, 0, 0, .24));
+  }
+
+  .flow-overtrack .mobile-brand-layer,
+  .dashboard-overtrack .mobile-brand-layer {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+
+  .flow-overtrack .mobile-brand-over,
+  .dashboard-overtrack .mobile-brand-over {
+    clip-path: inset(61% 52% 20% 4%);
+    filter: brightness(0) invert(1);
+  }
+
+  .flow-overtrack .mobile-brand-tagline,
+  .dashboard-overtrack .mobile-brand-tagline {
+    clip-path: inset(79% 3% 10% 3%);
+    filter: brightness(0) invert(82%);
+  }
+
+  .flow-overtrack .brand-overtrack strong {
+    display: block;
+    overflow: hidden;
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: .02em;
+    white-space: nowrap;
+  }
+
+  .flow-overtrack .topbar-overtrack > .user-box { display: none; }
+
+  .flow-overtrack .mobile-menu-toggle {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 8px;
+    width: auto !important;
+    min-height: 40px;
+    padding: 8px 12px;
+    border: 1px solid rgba(255, 255, 255, .16);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, .06);
+    color: #fff;
+    font: inherit;
+    font-weight: 800;
+    cursor: pointer;
+    margin: 0;
+  }
+
+  .flow-overtrack .mobile-menu-toggle > span:first-child { font-size: 20px; line-height: 1; }
+
+  .flow-overtrack .mobile-menu-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    border: 0;
+    background: rgba(5, 13, 23, .58);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .2s ease;
+  }
+
+  .flow-overtrack.menu-mobile-open .mobile-menu-backdrop {
+    display: block;
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .flow-overtrack .mobile-flow-menu {
+    position: fixed;
+    inset: 76px auto 0 0;
+    z-index: 1001;
+    width: min(310px, 86vw);
+    padding: 18px 16px;
+    background: linear-gradient(180deg, #0b1726, #132237);
+    box-shadow: 10px 0 30px rgba(13, 27, 42, .18);
+    transform: translateX(-105%);
+    transition: transform .22s ease;
+  }
+
+  .flow-overtrack.menu-mobile-open .mobile-flow-menu {
+    display: grid;
+    align-content: start;
+    gap: 10px;
+    transform: translateX(0);
+  }
+
+  .flow-overtrack .mobile-flow-menu button {
+    width: 100%;
+    padding: 12px 14px;
+    border-radius: 11px;
+    color: #fff;
+    font: inherit;
+    font-weight: 800;
+    cursor: pointer;
+  }
+
+  .flow-overtrack .mobile-flow-back {
+    border: 1px solid rgba(21, 101, 192, .5);
+    background: rgba(21, 101, 192, .2);
+  }
+
+  .flow-overtrack .mobile-flow-logout {
+    margin-top: 8px;
+    border: 0;
+    background: #e84d55;
+  }
+
+  .flow-overtrack .container {
+    padding-top: 94px !important;
+  }
+
+  .flow-overtrack .btn-upload-pro {
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 100%;
+    margin: 0;
+  }
+}
+
+@media (max-width: 1024px) {
+  body.dashboard-overtrack.menu-mobile-open { overflow: hidden; }
+
+  .dashboard-overtrack .app {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: clip;
+  }
+
+  .dashboard-overtrack .mobile-topbar {
+    position: fixed;
+    inset: 0 0 auto 0;
+    z-index: 1002;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 76px;
+    padding: 2px 12px 2px 14px;
+    border-bottom: 1px solid #26374d;
+    background: linear-gradient(90deg, #0b1726, #132237);
+    box-shadow: 0 7px 22px rgba(13, 27, 42, .2);
+  }
+
+  .dashboard-overtrack .mobile-topbar-brand {
+    display: flex;
+    flex: 0 1 auto;
+    align-items: center;
+    gap: 9px;
+    min-width: 0;
+    color: #fff;
+  }
+
+  .dashboard-overtrack .mobile-brand-composite {
+    position: relative;
+    display: block;
+    flex: 0 0 110px;
+    width: 110px;
+    height: 74px;
+    aspect-ratio: 3 / 2;
+    overflow: hidden;
+    filter: drop-shadow(0 4px 7px rgba(0, 0, 0, .24));
+  }
+
+  .dashboard-overtrack .mobile-brand-layer {
+    position: absolute;
+    inset: 0;
+    display: block;
+    width: 100%;
+    height: 100%;
+    max-width: 100%;
+    object-fit: contain;
+  }
+
+  .dashboard-overtrack .mobile-topbar-brand strong {
+    overflow: hidden;
+    color: #1976d2;
+    font-size: 17px;
+    letter-spacing: .02em;
+    white-space: nowrap;
+  }
+
+  .dashboard-overtrack .mobile-topbar-brand strong span { color: #fff; }
+
+  .dashboard-overtrack .mobile-menu-toggle {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 8px;
+    min-height: 40px;
+    width: auto !important;
+    padding: 8px 12px;
+    border: 1px solid rgba(255, 255, 255, .16);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, .06);
+    color: #fff;
+    font: inherit;
+    font-weight: 800;
+    cursor: pointer;
+  }
+
+  .dashboard-overtrack .mobile-menu-toggle > span:first-child { font-size: 20px; line-height: 1; }
+
+  .dashboard-overtrack .mobile-menu-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    border: 0;
+    background: rgba(5, 13, 23, .58);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .2s ease;
+  }
+
+  .dashboard-overtrack.menu-mobile-open .mobile-menu-backdrop {
+    display: block;
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .dashboard-overtrack .sidebar {
+    position: fixed !important;
+    inset: 76px auto 0 0 !important;
+    z-index: 1001;
+    display: block !important;
+    width: min(310px, 86vw) !important;
+    min-width: 0 !important;
+    height: auto !important;
+    padding: 18px 16px !important;
+    overflow-y: auto;
+    transform: translateX(-105%);
+    transition: transform .22s ease;
+  }
+
+  .dashboard-overtrack.menu-mobile-open .sidebar { transform: translateX(0); }
+  .dashboard-overtrack .sidebar-logo { display: none; }
+
+  .dashboard-overtrack .sidebar ul {
+    display: grid;
+    gap: 8px;
+    width: 100%;
+    margin: 0;
+  }
+
+  .dashboard-overtrack .mobile-menu-logout {
+    display: block;
+    width: 100%;
+    margin-top: 18px;
+    padding: 12px 16px;
+    border: 0;
+    border-radius: 11px;
+    background: #e84d55;
+    color: #fff;
+    font: inherit;
+    font-weight: 800;
+    cursor: pointer;
+  }
+
+  .dashboard-overtrack .sidebar li {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 12px 14px !important;
+    text-align: left;
+    font-size: 14px;
+  }
+
+  .dashboard-overtrack .main-content {
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 100%;
+    padding: 94px 14px 38px !important;
+  }
+
+  .dashboard-overtrack .header-right {
+    display: none !important;
+  }
+}
+
+.dashboard-overtrack::before,
+.flow-overtrack::before {
+  opacity: 1 !important;
+  background-image:
+    linear-gradient(rgba(96, 125, 139, 0.055) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(96, 125, 139, 0.055) 1px, transparent 1px) !important;
+  background-size: 48px 48px !important;
+}
+
+/* Dashboard: se conserva el sidebar oscuro. */
+.dashboard-overtrack .main-content {
+  color: var(--otl-text);
+}
+
+.dashboard-overtrack .header {
+  border-bottom-color: var(--otl-border);
+}
+
+.dashboard-overtrack .header h2,
+.dashboard-overtrack .dashboard-title h1,
+.dashboard-overtrack .kpi-card h3,
+.dashboard-overtrack .panel-header-pro h3,
+.dashboard-overtrack .estado-taller-list b {
+  color: var(--otl-text);
+}
+
+.dashboard-overtrack .dashboard-title p,
+.dashboard-overtrack .kpi-card span,
+.dashboard-overtrack .kpi-card small,
+.dashboard-overtrack .sin-alertas {
+  color: var(--otl-muted);
+}
+
+.dashboard-overtrack .buscador input {
+  color: var(--otl-text);
+  border-color: var(--otl-border);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 6px 18px rgba(13, 27, 42, 0.04);
+}
+
+.dashboard-overtrack .buscador input::placeholder {
+  color: #8295a1;
+}
+
+.dashboard-overtrack .kpi-card,
+.dashboard-overtrack .card,
+.dashboard-overtrack .panel-pro,
+.dashboard-overtrack .chart-card {
+  color: var(--otl-text);
+  border-color: var(--otl-border) !important;
+  background: rgba(255, 255, 255, 0.96) !important;
+  box-shadow: var(--otl-shadow);
+}
+
+.dashboard-overtrack .charts {
+  align-items: stretch;
+  gap: 20px;
+  margin-top: 26px;
+  margin-bottom: 26px;
+}
+
+.dashboard-overtrack .chart-card {
+  position: relative;
+  min-height: 340px;
+  padding: 22px 24px 20px;
+  overflow: hidden;
+}
+
+.dashboard-overtrack .chart-card::before {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 4px;
+  background: linear-gradient(90deg, var(--otl-blue), var(--otl-green));
+  content: "";
+}
+
+.dashboard-overtrack .chart-card h3 {
+  display: flex;
+  align-items: center;
+  margin: 0 0 18px;
+  padding: 0 0 14px;
+  border-bottom: 1px solid var(--otl-border);
+  color: var(--otl-text) !important;
+  font-family: var(--ot-font);
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+}
+
+.dashboard-overtrack .chart-card h3 .section-icon {
+  width: 21px;
+  height: 21px;
+  margin-right: 9px;
+  color: var(--otl-blue);
+}
+
+.dashboard-overtrack .chart-card canvas {
+  width: 100% !important;
+  max-height: 250px !important;
+}
+
+.dashboard-overtrack .kpi-card:hover {
+  border-color: rgba(21, 101, 192, 0.38) !important;
+  box-shadow: 0 16px 38px rgba(13, 27, 42, 0.12);
+}
+
+.dashboard-overtrack .kpi-icon {
+  border-color: rgba(21, 101, 192, 0.18);
+  background: #edf5fd;
+}
+
+.dashboard-overtrack .panel-header-pro {
+  border-bottom-color: var(--otl-border);
+}
+
+.dashboard-overtrack .panel-header-pro span {
+  color: var(--otl-green) !important;
+}
+
+.dashboard-overtrack .estado-taller-list > div {
+  color: #405766;
+  border-color: var(--otl-border);
+  background: var(--otl-surface-soft);
+}
+
+.dashboard-overtrack .estado-taller-list span {
+  color: #405766 !important;
+  font-weight: 700;
+}
+
+.dashboard-overtrack .cards-ot-grid > *,
+.dashboard-overtrack .ot-card,
+.dashboard-overtrack .ot-card-pro {
+  color: var(--otl-text) !important;
+  border-color: var(--otl-border) !important;
+  background: #ffffff !important;
+  box-shadow: 0 9px 24px rgba(13, 27, 42, 0.07) !important;
+}
+
+.dashboard-overtrack .ot-card h3,
+.dashboard-overtrack .ot-card-pro h3,
+.dashboard-overtrack .ot-card-top h3,
+.dashboard-overtrack .ot-card-progress,
+.dashboard-overtrack .ot-card-actions {
+  color: var(--otl-text) !important;
+}
+
+.dashboard-overtrack .ot-card-top span,
+.dashboard-overtrack .ot-card-cliente,
+.dashboard-overtrack .ot-card-progress small,
+.dashboard-overtrack .mini-gantt-row span {
+  color: var(--otl-muted) !important;
+}
+
+.dashboard-overtrack .mini-gantt-bar {
+  background: #e3eaf0 !important;
+}
+
+.dashboard-overtrack .ot-card-footer,
+.dashboard-overtrack .ot-card-footer > div {
+  color: #607d8b !important;
+}
+
+.dashboard-overtrack .badge-amarillo,
+.dashboard-overtrack .badge-observacion-btn {
+  color: #8a5900 !important;
+  border: 1px solid #efc66d !important;
+  background: #fff4d6 !important;
+  opacity: 1 !important;
+}
+
+.dashboard-overtrack .alerta-dashboard-item {
+  color: #8f2934 !important;
+  border: 1px solid #efb0b7 !important;
+  background: #fff0f2 !important;
+  font-weight: 700;
+}
+
+.dashboard-overtrack .alerta-dashboard-item.alerta-revision {
+  color: #1557a0 !important;
+  border-color: #a9cef5 !important;
+  background: #edf6ff !important;
+}
+
+.dashboard-overtrack .alerta-dashboard-item.alerta-correccion,
+.dashboard-overtrack .alerta-dashboard-item.alerta-jefe {
+  color: #805400 !important;
+  border-color: #efc66d !important;
+  background: #fff7df !important;
+}
+
+.dashboard-overtrack .ot-badge.badge-azul {
+  color: #1557a0 !important;
+  border-color: #a9cef5 !important;
+  background: #edf6ff !important;
+}
+
+/* Flujo: topbar oscuro, contenido claro. */
+.flow-overtrack .topbar-overtrack {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  color: #f8fbff;
+}
+
+.flow-overtrack .topbar-overtrack > .brand-overtrack {
+  flex: 0 0 auto;
+}
+
+@media (min-width: 761px) {
+  .flow-overtrack .topbar-overtrack > .brand-overtrack {
+    width: 220px;
+    height: 56px;
+    overflow: hidden;
+  }
+
+  .flow-overtrack .brand-overtrack .desktop-brand-logo {
+    transform: scale(1.8);
+    transform-origin: center 48%;
+  }
+}
+
+.flow-overtrack .topbar-overtrack > .user-box {
+  display: flex;
+  flex: 0 1 auto;
+  width: auto;
+  max-width: min(520px, calc(100% - 300px));
+  margin: 0;
+  justify-content: flex-start;
+  flex-wrap: nowrap;
+}
+
+.flow-overtrack .topbar-overtrack > .user-box span,
+.flow-overtrack .topbar-overtrack > .user-box small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 760px) {
+  .flow-overtrack .topbar-overtrack > .user-box {
+    display: none;
+  }
+}
+
+.flow-overtrack .container {
+  color: var(--otl-text);
+}
+
+.flow-overtrack .header-ot-pro,
+.flow-overtrack .content > .card,
+.flow-overtrack .content .card,
+.flow-overtrack .modal-repuestos-content,
+.flow-overtrack .modal-gantt-content,
+.flow-overtrack .modal-content-doc {
+  color: var(--otl-text) !important;
+  border-color: var(--otl-border) !important;
+  background: rgba(255, 255, 255, 0.97) !important;
+  box-shadow: var(--otl-shadow) !important;
+}
+
+.flow-overtrack .header-ot-main h1,
+.flow-overtrack .header-ot-grid strong,
+.flow-overtrack .header-ot-progress-info strong,
+.flow-overtrack .card h2,
+.flow-overtrack .card h3,
+.flow-overtrack .card h4 {
+  color: var(--otl-text);
+}
+
+.flow-overtrack .header-ot-label,
+.flow-overtrack .header-ot-grid span,
+.flow-overtrack .header-ot-progress-info span,
+.flow-overtrack .decision-text {
+  color: var(--otl-muted);
+}
+
+.flow-overtrack .header-ot-grid > div {
+  border-color: var(--otl-border);
+  background: var(--otl-surface-soft);
+}
+
+.flow-overtrack .header-ot-estado {
+  color: #0d58a8;
+  border-color: rgba(21, 101, 192, 0.24);
+  background: #edf5fd;
+}
+
+.flow-overtrack .tabs-timeline-pro {
+  border-color: var(--otl-border);
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: var(--otl-shadow);
+}
+
+.flow-overtrack .tabs-timeline-pro::before {
+  background: linear-gradient(90deg, var(--otl-blue), #a9c9e8, #b7d98e);
+}
+
+.flow-overtrack .tabs-timeline-pro .tab {
+  color: var(--otl-muted);
+}
+
+.flow-overtrack .tabs-timeline-pro .tab-dot {
+  color: #496274;
+  border-color: #b9c7d0;
+  background: #f1f5f8;
+  box-shadow: 0 0 0 6px #fff;
+}
+
+.flow-overtrack .tabs-timeline-pro .tab.active {
+  color: var(--otl-text);
+}
+
+.flow-overtrack .tabs-timeline-pro .tab.active .tab-dot {
+  color: #fff;
+  border-color: var(--otl-blue);
+  background: linear-gradient(135deg, var(--otl-blue), #2187df);
+  box-shadow: 0 0 0 6px #fff, 0 8px 20px rgba(21, 101, 192, 0.24);
+}
+
+.flow-overtrack .card h2 {
+  border-bottom-color: var(--otl-border);
+}
+
+.flow-overtrack input:not([type="checkbox"]):not([type="radio"]),
+.flow-overtrack textarea,
+.flow-overtrack select {
+  color: var(--otl-text) !important;
+  border-color: #cfdbe3 !important;
+  background: #ffffff !important;
+}
+
+.flow-overtrack input::placeholder,
+.flow-overtrack textarea::placeholder {
+  color: #7f929e !important;
+}
+
+.flow-overtrack input[type="file"]::file-selector-button {
+  color: #244052;
+  background: #e7eef3;
+}
+
+.flow-overtrack .decision-box,
+.flow-overtrack .comentarios-despacho-box,
+.flow-overtrack .gantt-etapa-card,
+.flow-overtrack .gantt-field,
+.flow-overtrack .gantt-fechas-generales {
+  color: var(--otl-text);
+  border-color: var(--otl-border) !important;
+  background: var(--otl-surface-soft) !important;
+}
+
+.flow-overtrack hr {
+  border-top-color: var(--otl-border);
+}
+
+.flow-overtrack .checklist-card,
+.flow-overtrack .doc-card-pro,
+.flow-overtrack .progreso-etapa-card {
+  color: var(--otl-text) !important;
+  border-color: var(--otl-border) !important;
+  background: #ffffff !important;
+  box-shadow: 0 8px 22px rgba(13, 27, 42, 0.06) !important;
+}
+
+.flow-overtrack .checklist-card.completed {
+  border-color: rgba(109, 169, 47, 0.46) !important;
+  background: linear-gradient(145deg, #ffffff, #f7fbf2) !important;
+}
+
+.flow-overtrack .checklist-card-title h4,
+.flow-overtrack .progreso-etapa-header,
+.flow-overtrack .doc-card-info h4 {
+  color: var(--otl-text) !important;
+}
+
+.flow-overtrack .checklist-mini-badge,
+.flow-overtrack .doc-card-info span {
+  color: var(--otl-muted) !important;
+  background: #eef3f6 !important;
+}
+
+.flow-overtrack .comentario-fecha {
+  display: block;
+  width: auto;
+  margin: 4px 0 10px;
+  padding: 0;
+  color: #718794 !important;
+  background: transparent !important;
+}
+
+.flow-overtrack .checklist-upload-box,
+.flow-overtrack .checklist-comment-box {
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.flow-overtrack .checklist-upload-box {
+  padding-inline: 0 !important;
+}
+
+.flow-overtrack .checklist-comment-box {
+  padding-inline: 0 !important;
+}
+
+.flow-overtrack .comentario-card {
+  color: var(--otl-text);
+  border-color: var(--otl-border);
+  background: #ffffff !important;
+  box-shadow: 0 8px 22px rgba(13, 27, 42, 0.06) !important;
+}
+
+.flow-overtrack .comentario-card > strong,
+.flow-overtrack .comentario-jefe > strong {
+  color: var(--otl-text) !important;
+}
+
+.flow-overtrack .comentario-jefe {
+  color: var(--otl-text);
+  border-color: rgba(215, 139, 11, 0.5) !important;
+  border-left-color: #e5a329 !important;
+  background: linear-gradient(145deg, #fffdfa, #fff9ed) !important;
+  box-shadow: 0 8px 22px rgba(13, 27, 42, 0.06) !important;
+}
+
+.flow-overtrack .comentario-jefe::before {
+  color: #b87300 !important;
+}
+
+.flow-overtrack .respuesta-observacion {
+  color: #24401d;
+  border-color: rgba(109, 169, 47, 0.45);
+  border-left-color: var(--otl-lime);
+  background: linear-gradient(145deg, #fbfef8, #f1f8e9);
+}
+
+.flow-overtrack .respuesta-observacion strong {
+  color: #4e8a20 !important;
+}
+
+.flow-overtrack .respuesta-observacion p {
+  color: #24401d;
+}
+
+.flow-overtrack .respuesta-observacion small {
+  color: #6f836d;
+}
+
+.flow-overtrack input:disabled,
+.flow-overtrack textarea:disabled,
+.flow-overtrack select:disabled {
+  color: #667985 !important;
+  background: #edf1f4 !important;
+}
+
+.flow-overtrack .btn-volver-panel {
+  color: #0d58a8 !important;
+  border: 1px solid #2780d4 !important;
+  background: #ffffff !important;
+  box-shadow: 0 7px 18px rgba(21, 101, 192, 0.08) !important;
+  opacity: 1 !important;
+}
+
+.flow-overtrack .btn-volver-panel:hover {
+  color: #ffffff !important;
+  background: var(--otl-blue) !important;
+}
+
+/* Alineación de acciones en Mantención. */
+.flow-overtrack #overhaul .file-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.flow-overtrack #overhaul .file-actions > .carga-checklist {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.flow-overtrack #overhaul .overhaul-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.flow-overtrack #overhaul .file-actions button,
+.flow-overtrack #overhaul .overhaul-actions button {
+  margin: 0;
+  white-space: nowrap;
+}
+
+.flow-overtrack #overhaul > .card > .solo-jefe {
+  display: grid;
+  grid-template-columns: minmax(280px, auto) auto;
+  align-items: center;
+  justify-content: start;
+  gap: 12px;
+  margin-top: 30px;
+}
+
+.flow-overtrack #overhaul > .card > .solo-jefe h3 {
+  grid-column: 1 / -1;
+  margin: 0 0 4px;
+}
+
+.flow-overtrack #overhaul > .card > .solo-jefe button {
+  margin: 0;
+  white-space: nowrap;
+}
+
+@media (max-width: 760px) {
+  .flow-overtrack #overhaul .file-actions,
+  .flow-overtrack #overhaul .file-actions > .carga-checklist,
+  .flow-overtrack #overhaul .overhaul-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .flow-overtrack #overhaul > .card > .solo-jefe {
+    grid-template-columns: 1fr;
+  }
+
+  .flow-overtrack #overhaul > .card > .solo-jefe h3 {
+    grid-column: auto;
+  }
+}
+
+@media (max-width: 760px) {
+  .flow-overtrack .tabs-timeline-pro .tab-dot {
+    box-shadow: 0 0 0 5px #fff;
+  }
+}
+
+@media (max-width: 480px) {
+  .dashboard-overtrack .cards-ot-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .dashboard-overtrack .ot-card,
+  .dashboard-overtrack .ot-card-pro {
+    min-width: 0;
+    padding: 16px;
+  }
+
+  .dashboard-overtrack .ot-card-top {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .flow-overtrack .header-ot-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .flow-overtrack .header-ot-grid > div,
+  .flow-overtrack .content > .card,
+  .flow-overtrack .content .card {
+    min-width: 0;
+  }
+}
+
+/* ==========================================
+   MODAL FORMULARIO CARTA GANTT - TEMA CLARO
+========================================== */
+.flow-overtrack #modalGantt {
+  padding: 24px;
+  background: rgba(7, 20, 33, 0.58);
+  backdrop-filter: blur(8px);
+}
+
+.flow-overtrack #modalGantt .gantt-form-modal {
+  width: min(1040px, calc(100vw - 48px));
+  max-width: 1040px;
+  max-height: calc(100vh - 48px);
+  border: 1px solid var(--otl-border);
+  border-radius: 22px;
+  color: var(--otl-text);
+  background: #fff;
+  box-shadow: 0 28px 80px rgba(13, 27, 42, 0.28);
+  scrollbar-color: var(--otl-blue) #e9f0f5;
+}
+
+.flow-overtrack #modalGantt .gantt-form-modal::-webkit-scrollbar {
+  width: 9px;
+}
+
+.flow-overtrack #modalGantt .gantt-form-modal::-webkit-scrollbar-track {
+  background: #e9f0f5;
+}
+
+.flow-overtrack #modalGantt .gantt-form-modal::-webkit-scrollbar-thumb {
+  border: 2px solid #e9f0f5;
+  border-radius: 999px;
+  background: var(--otl-blue);
+}
+
+.flow-overtrack #modalGantt .modal-gantt-header {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  gap: 24px;
+  padding: 22px 28px;
+  border-bottom: 1px solid var(--otl-border);
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(10px);
+}
+
+.flow-overtrack #modalGantt .modal-gantt-header::before {
+  position: absolute;
+  top: 0;
+  left: 28px;
+  width: 48px;
+  height: 4px;
+  border-radius: 0 0 999px 999px;
+  background: linear-gradient(90deg, var(--otl-blue), var(--otl-lime));
+  content: "";
+}
+
+.flow-overtrack #modalGantt .modal-gantt-header h2 {
+  color: var(--otl-text);
+  font-family: var(--ot-font);
+  font-size: 25px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.flow-overtrack #modalGantt .modal-gantt-header p {
+  color: var(--otl-muted);
+  font-size: 14px;
+}
+
+.flow-overtrack #modalGantt .gantt-form {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+  padding: 28px;
+  background: #fff;
+}
+
+.flow-overtrack #modalGantt .gantt-field,
+.flow-overtrack #modalGantt .gantt-field-full,
+.flow-overtrack #modalGantt .gantt-etapas-manuales,
+.flow-overtrack #modalGantt .gantt-actions {
+  min-width: 0;
+}
+
+.flow-overtrack #modalGantt .gantt-field label,
+.flow-overtrack #modalGantt .gantt-etapa-card label {
+  margin-bottom: 0;
+  color: var(--otl-text);
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.flow-overtrack #modalGantt .gantt-field input,
+.flow-overtrack #modalGantt .gantt-field textarea,
+.flow-overtrack #modalGantt .gantt-etapa-fechas input {
+  min-height: 48px;
+  border: 1px solid #cbd9e4;
+  border-radius: 11px;
+  color: var(--otl-text);
+  font-family: var(--ot-font);
+  background: #fff;
+  box-shadow: none;
+  color-scheme: light;
+}
+
+.flow-overtrack #modalGantt .gantt-field input:focus,
+.flow-overtrack #modalGantt .gantt-field textarea:focus,
+.flow-overtrack #modalGantt .gantt-etapa-fechas input:focus {
+  border-color: var(--otl-blue);
+  outline: 3px solid rgba(21, 101, 192, 0.12);
+}
+
+.flow-overtrack #modalGantt .gantt-fechas-generales {
+  gap: 18px;
+}
+
+.flow-overtrack #modalGantt .gantt-etapas-manuales {
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin: 0;
+  padding: 20px;
+  border: 1px solid var(--otl-border);
+  border-radius: 16px;
+  background: var(--otl-surface-soft);
+}
+
+.flow-overtrack #modalGantt .gantt-etapas-manuales h4 {
+  margin: 0 0 4px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--otl-border);
+  color: var(--otl-text);
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.flow-overtrack #modalGantt .gantt-etapa-card {
+  box-sizing: border-box;
+  padding: 15px;
+  border: 1px solid var(--otl-border);
+  border-radius: 13px;
+  background: #fff;
+}
+
+.flow-overtrack #modalGantt .gantt-etapa-fechas {
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.flow-overtrack #modalGantt .gantt-actions {
+  display: flex;
+  grid-column: 1 / -1;
+  justify-content: flex-end;
+  padding-top: 2px;
+}
+
+.flow-overtrack #modalGantt .gantt-actions button {
+  width: auto;
+  min-width: 230px;
+  height: 48px;
+}
+
+@media (max-width: 760px) {
+  .flow-overtrack #modalGantt {
+    padding: 10px;
+  }
+
+  .flow-overtrack #modalGantt .gantt-form-modal {
+    width: calc(100vw - 20px);
+    max-height: calc(100vh - 20px);
+    border-radius: 16px;
+  }
+
+  .flow-overtrack #modalGantt .modal-gantt-header {
+    align-items: flex-start;
+    flex-direction: row;
+    padding: 20px;
+  }
+
+  .flow-overtrack #modalGantt .gantt-form,
+  .flow-overtrack #modalGantt .gantt-etapas-manuales,
+  .flow-overtrack #modalGantt .gantt-fechas-generales {
+    grid-template-columns: 1fr;
+  }
+
+  .flow-overtrack #modalGantt .gantt-form {
+    padding: 20px;
+  }
+
+  .flow-overtrack #modalGantt .gantt-etapa-fechas {
+    flex-direction: column;
+  }
+
+  .flow-overtrack #modalGantt .gantt-actions button {
+    width: 100%;
+  }
+}

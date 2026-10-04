@@ -1,0 +1,1051 @@
+/*
+ * Densidad visual de escritorio
+ * Compacta la interfaz al 100 % de zoom sin escalar artificialmente la página.
+ * Las vistas móviles y tablet permanecen bajo sus reglas responsive originales.
+ */
+@media (min-width: 1025px) {
+  /* Acceso inicial */
+  body.login-overtrack { font-size: 15px; }
+
+  .login-overtrack .login-wrapper {
+    width: min(1320px, calc(100% - 64px));
+    gap: clamp(48px, 6vw, 92px);
+    padding: 40px 32px;
+  }
+
+  .login-overtrack .login-brand { width: min(760px, 58vw); }
+  .login-overtrack .login-brand-composite { width: min(720px, 100%); }
+
+  .login-overtrack .login-brand > p {
+    max-width: 540px;
+    margin-top: 24px;
+    font-size: 18px;
+  }
+
+  .login-overtrack .login-panel {
+    width: min(430px, 100%);
+    min-height: 520px;
+    padding: 36px;
+    border-radius: 20px;
+  }
+
+  .login-overtrack .login-panel::before {
+    width: 52px;
+    height: 4px;
+    margin-bottom: 24px;
+  }
+
+  .login-overtrack .login-panel h2 { font-size: 30px; }
+  .login-overtrack .login-subtitle { margin: 9px 0 28px; font-size: 15px; }
+  .login-overtrack .login-panel label { margin: 17px 0 8px; font-size: 14px; }
+
+  .login-overtrack .login-panel input {
+    min-height: 52px;
+    padding: 13px 15px;
+    font-size: 15px;
+  }
+
+  .login-overtrack .btn-login {
+    min-height: 54px;
+    margin-top: 28px;
+    font-size: 16px;
+  }
+
+  .login-overtrack .btn-auth-link { font-size: 14px; }
+
+  body.dashboard-overtrack,
+  body.flow-overtrack,
+  body.empresa-admin-page,
+  body.super-admin-page {
+    font-size: 13px;
+  }
+
+  /* Dashboard, órdenes e inventario */
+  .dashboard-overtrack .sidebar {
+    width: 195px;
+    min-width: 195px;
+    flex-basis: 195px;
+    padding: 12px 10px;
+  }
+
+  .dashboard-overtrack .sidebar-logo {
+    min-height: 86px;
+    margin-bottom: 12px;
+    padding-bottom: 9px;
+  }
+
+  .dashboard-overtrack .sidebar-logo .sidebar-brand-logo {
+    width: 154px;
+    height: auto;
+  }
+
+  .dashboard-overtrack .sidebar ul { gap: 3px; }
+
+  .dashboard-overtrack .sidebar li {
+    min-height: 36px;
+    padding: 7px 10px;
+    font-size: 12px;
+  }
+
+  .dashboard-overtrack .main-content {
+    padding: 14px 18px 28px;
+  }
+
+  .dashboard-overtrack .header {
+    min-height: 48px;
+    padding-bottom: 10px;
+  }
+
+  .dashboard-overtrack .header h2 { font-size: 17px; }
+  .dashboard-overtrack .user-box { padding: 5px 6px 5px 10px; }
+  .dashboard-overtrack .buscador { margin: 12px 0 10px; }
+
+  .dashboard-overtrack .buscador input {
+    min-height: 36px;
+    padding-block: 6px;
+  }
+
+  .dashboard-overtrack .dashboard-hero { margin-bottom: 10px; }
+  .dashboard-overtrack .dashboard-title h1 { font-size: clamp(22px, 2vw, 27px); }
+  .dashboard-overtrack .kpis-pro { gap: 9px; margin-bottom: 12px; }
+
+  .dashboard-overtrack .kpi-card {
+    min-height: 88px;
+    padding: 11px 13px;
+    border-radius: 13px;
+  }
+
+  .dashboard-overtrack .kpi-icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+  }
+
+  .dashboard-overtrack .kpi-icon .ot-icon { width: 20px; height: 20px; }
+  .dashboard-overtrack .card,
+  .dashboard-overtrack .panel-pro,
+  .dashboard-overtrack .chart-card { border-radius: 15px; }
+
+  .dashboard-overtrack .panel-pro,
+  .dashboard-overtrack .chart-card { padding: 14px; }
+
+  .inventario-page .inventario-main { gap: 12px; }
+  .inventario-page .inventario-hero,
+  .inventario-page .inventario-panel { padding: 14px; }
+
+  .inventario-page .inventario-toolbar { gap: 14px; margin-bottom: 14px; }
+  .inventario-page .inventario-filtros { gap: 10px; }
+
+  .inventario-page .inventario-filtros input,
+  .inventario-page .inventario-filtros select,
+  .inventario-page .inventario-form-grid input { min-height: 40px; padding: 7px 10px; }
+
+  .inventario-page .btn-primary-inventario,
+  .inventario-page .btn-secondary-inventario { min-height: 39px; padding: 7px 12px; }
+
+  .inventario-page .inventario-resumen { gap: 10px; margin-bottom: 14px; }
+  .inventario-page .inventario-resumen article { padding: 12px 14px; border-radius: 13px; }
+  .inventario-page .inventario-resumen span { margin-bottom: 4px; font-size: 12px; }
+  .inventario-page .inventario-resumen strong { font-size: 20px; }
+  .inventario-page .inventario-tabla-encabezado { padding: 14px 16px; }
+  .inventario-page .inventario-tabla th { padding: 9px 11px; font-size: 12px; }
+  .inventario-page .inventario-tabla td { padding: 8px 11px; }
+  .inventario-page .inventario-paginacion { padding: 11px 14px; }
+  .inventario-page .inventario-modal-contenido { padding: 18px; border-radius: 16px; }
+  .inventario-page .inventario-modal-header { margin-bottom: 14px; }
+  .inventario-page .inventario-form-grid { gap: 11px; }
+  .inventario-page .inventario-modal-acciones { margin-top: 17px; }
+
+  /* Archivo general de órdenes */
+  .ordenes-page .ordenes-filtros { gap: 9px; margin-bottom: 11px; }
+  .ordenes-page .ordenes-filtros input,
+  .ordenes-page .ordenes-filtros select { min-height: 40px; padding-inline: 11px; }
+  .ordenes-page .ordenes-resumen { margin-bottom: 11px; }
+  .ordenes-page .ordenes-lista { gap: 9px; }
+  .ordenes-page .orden-item { padding: 13px; border-radius: 12px; }
+  .ordenes-page .orden-item-principal h3 { margin-bottom: 9px; }
+  .ordenes-page .orden-item-datos { gap: 11px; margin-bottom: 11px; }
+  .ordenes-page .orden-estado { padding: 4px 9px; }
+  .ordenes-page .orden-item .btn-card-open { min-width: 110px; }
+  .ordenes-page .ordenes-paginacion { margin-top: 15px; }
+
+  /* Flujo de una OT */
+  .flow-overtrack .topbar-overtrack {
+    min-height: 56px;
+    padding: 5px 16px;
+  }
+
+  .flow-overtrack .brand-overtrack .desktop-brand-logo {
+    width: 164px;
+    height: 42px;
+  }
+
+  .flow-overtrack .container {
+    width: min(1400px, calc(100% - 28px));
+    padding: 14px 0 28px;
+  }
+
+  .flow-overtrack .header-ot-pro {
+    padding: 14px 16px;
+    border-radius: 14px;
+  }
+
+  .flow-overtrack .tabs-timeline-pro {
+    margin: 11px 0 12px;
+    padding: 9px 8px;
+    border-radius: 13px;
+  }
+
+  .flow-overtrack .tabs-timeline-pro::before { top: 25px; }
+  .flow-overtrack .tabs-timeline-pro .tab { gap: 4px; min-width: 90px; padding: 1px 5px; }
+
+  .flow-overtrack .tabs-timeline-pro .tab-dot {
+    width: 29px;
+    height: 29px;
+    box-shadow: 0 0 0 4px #0b1d2f;
+  }
+
+  .flow-overtrack .content > .card,
+  .flow-overtrack .content .card {
+    padding: 15px 17px;
+    border-radius: 14px;
+  }
+
+  .flow-overtrack .card h2 { padding-bottom: 8px; font-size: 20px; }
+
+  .flow-overtrack input:not([type="checkbox"]):not([type="radio"]),
+  .flow-overtrack textarea,
+  .flow-overtrack select { min-height: 42px; }
+
+  .flow-overtrack textarea { min-height: 82px; }
+  .flow-overtrack .btn-guardar-etapa { margin-top: 14px; }
+
+  /* Panel de administración de empresa */
+  .empresa-admin-page .sidebar,
+  .super-admin-page .sidebar {
+    width: 195px;
+    padding: 13px 11px;
+  }
+
+  .empresa-admin-page .sidebar-brand,
+  .super-admin-page .sidebar-brand { min-height: 86px; }
+
+  .empresa-admin-page .sidebar-brand-composite,
+  .super-admin-page .sidebar-brand-composite { width: 154px; }
+
+  .empresa-admin-page .sidebar-brand-composite,
+  .super-admin-page .sidebar-brand-composite {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    aspect-ratio: auto;
+  }
+
+  .empresa-admin-page .sidebar-brand .sidebar-brand-layer,
+  .super-admin-page .sidebar-brand .sidebar-brand-layer {
+    position: static;
+    inset: auto;
+    width: 154px;
+    height: auto;
+    object-fit: contain;
+    clip-path: none;
+    filter: none;
+    -webkit-mask-image:
+      linear-gradient(to right, #000 0 24%, transparent 24%),
+      linear-gradient(to bottom, #000 0 74%, transparent 74%);
+    -webkit-mask-composite: source-over;
+    mask-image:
+      linear-gradient(to right, #000 0 24%, transparent 24%),
+      linear-gradient(to bottom, #000 0 74%, transparent 74%);
+    mask-composite: add;
+  }
+
+  .empresa-admin-page .sidebar-brand-composite::after,
+  .super-admin-page .sidebar-brand-composite::after {
+    content: "Tu operación, en una misma dirección.";
+    display: block;
+    margin-top: 4px;
+    color: #c5d4e3;
+    font-family: var(--ot-font, "Segoe UI", Arial, sans-serif);
+    font-size: 9px;
+    font-weight: 500;
+    line-height: 1.2;
+    letter-spacing: -.01em;
+    white-space: nowrap;
+  }
+
+  .empresa-admin-page .sidebar > p,
+  .super-admin-page .sidebar > p { margin-bottom: 17px; }
+
+  .empresa-admin-page .sidebar li,
+  .super-admin-page .sidebar nav button {
+    min-height: 36px;
+    margin-bottom: 3px;
+    padding: 7px 10px;
+    font-size: 12px;
+  }
+
+  .empresa-admin-page .main-content,
+  .super-admin-page .main-content {
+    width: calc(100% - 195px);
+    margin-left: 195px;
+    padding: 17px 20px 28px;
+  }
+
+  .empresa-admin-page .dashboard-header,
+  .super-admin-page .dashboard-header {
+    padding: 16px 19px;
+    border-radius: 15px;
+  }
+
+  .empresa-admin-page .kpi-card,
+  .super-admin-page .kpi-card {
+    min-height: 92px;
+    padding: 13px;
+  }
+
+  .empresa-admin-page .card,
+  .super-admin-page .card {
+    padding: 15px;
+    border-radius: 15px;
+  }
+
+  .empresa-admin-page .configuracion-grid,
+  .super-admin-page .configuracion-grid {
+    gap: 14px;
+    margin-top: 17px;
+  }
+
+  .empresa-admin-page .config-tabs { margin-top: 16px; }
+  .empresa-admin-page .config-tab { padding: 9px 13px; }
+  .empresa-admin-page .plantillas-panel { margin-top: 17px; }
+  .empresa-admin-page .plantillas-grid { gap: 14px; }
+
+  /* Tablas, módulos y formularios de administración */
+  .empresa-admin-page .kpi-grid,
+  .super-admin-page .kpi-grid { gap: 11px; margin: 14px 0; }
+
+  .empresa-admin-page .dato-box { padding: 10px; }
+  .empresa-admin-page .toolbar-usuarios { gap: 9px; }
+  .empresa-admin-page .toolbar-usuarios input,
+  .empresa-admin-page .toolbar-usuarios select,
+  .super-admin-page .admin-search { padding: 8px 10px; min-height: 39px; }
+
+  .empresa-admin-page .tabla-admin th,
+  .empresa-admin-page .tabla-admin td,
+  .super-admin-page .admin-table th,
+  .super-admin-page .admin-table td { padding: 9px 8px; font-size: 12px; }
+
+  .empresa-admin-page .modulos-admin-grid { gap: 10px; }
+  .empresa-admin-page .modulo-admin-card { min-height: 88px; padding: 12px; }
+  .empresa-admin-page .modulo-admin-icono { width: 39px; height: 39px; font-size: 19px; }
+
+  .empresa-admin-page .plantilla-form { gap: 11px; }
+  .empresa-admin-page .plantilla-form input,
+  .empresa-admin-page .plantillas-listado-header input { padding: 8px 10px; }
+  .empresa-admin-page .plantilla-upload-zone { padding: 13px; }
+  .empresa-admin-page .plantilla-item { padding: 9px; }
+
+  .super-admin-page .plans-grid,
+  .super-admin-page .settings-grid { gap: 12px; }
+  .super-admin-page .plan-card { padding: 17px; }
+  .super-admin-page .plan-card h2 { font-size: 20px; }
+  .super-admin-page .info-note { padding: 10px 12px; }
+  .super-admin-page .users-company-groups { gap: 9px; }
+  .super-admin-page .users-company-summary { padding: 10px 12px; }
+  .super-admin-page .users-company-title strong { font-size: 14px; }
+
+  .empresa-admin-page .wizard-box,
+  .super-admin-page .wizard-box { width: 620px; padding: 20px; }
+  .empresa-admin-page .wizard-header h2,
+  .super-admin-page .wizard-header h2 { font-size: 21px; }
+  .empresa-admin-page .wizard-steps,
+  .super-admin-page .wizard-steps { margin: 14px 0; }
+  .empresa-admin-page .wizard-step,
+  .super-admin-page .wizard-step { padding: 7px; }
+  .empresa-admin-page .wizard-content,
+  .super-admin-page .wizard-content { padding: 15px; }
+  .empresa-admin-page .wizard-content input,
+  .empresa-admin-page .wizard-content select,
+  .super-admin-page .wizard-content input,
+  .super-admin-page .wizard-content select { padding: 9px; min-height: 40px; }
+
+  .super-admin-page .modal-content { width: 420px; padding: 18px; }
+  .super-admin-page .modal-content input,
+  .super-admin-page .modal-content select { padding: 9px; }
+}
+
+/* Escala común para Programación y vistas operativas secundarias. */
+@media (min-width: 1025px) {
+  .programacion-page .programacion-header h2 {
+    margin: 0 0 2px;
+    font-size: 17px;
+    line-height: 1.2;
+  }
+
+  .programacion-page .programacion-header p {
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.35;
+  }
+
+  .programacion-page .programacion-toolbar {
+    gap: 12px;
+    margin-bottom: 11px;
+    padding: 10px 12px;
+    border-radius: 15px;
+  }
+
+  .programacion-page .selector-semana,
+  .programacion-page .acciones-programacion { gap: 7px; }
+
+  .programacion-page .selector-semana > div { min-width: 180px; }
+  .programacion-page .selector-semana > div strong { font-size: 13px; }
+  .programacion-page .selector-semana > div span { font-size: 11px; }
+
+  .programacion-page .btn-semana {
+    width: 34px;
+    height: 34px;
+    min-height: 34px;
+    font-size: 20px;
+  }
+
+  .programacion-page .estado-semana {
+    padding: 5px 9px;
+    font-size: 11px;
+  }
+
+  .programacion-page .acciones-programacion button,
+  .programacion-page .programacion-tabs button {
+    min-height: 36px;
+    padding: 7px 11px;
+    border-radius: 8px;
+    font-size: 12px;
+  }
+
+  .programacion-page .programacion-filtros {
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+
+  .programacion-page .programacion-tabs {
+    gap: 3px;
+    padding: 3px;
+    border-radius: 10px;
+  }
+
+  .programacion-page .programacion-leyenda {
+    gap: 11px;
+    font-size: 11px;
+  }
+
+  .programacion-page .programacion-celda {
+    min-height: 78px;
+    padding: 7px;
+  }
+
+  .programacion-page .programacion-celda.encabezado { min-height: 50px; }
+  .programacion-page .programacion-dia span { margin-top: 3px; font-size: 11px; }
+
+  .programacion-page .bloque-asignacion {
+    padding: 8px 9px;
+    border-radius: 8px;
+  }
+
+  .programacion-page .asignacion-dato {
+    grid-template-columns: 62px minmax(0, 1fr);
+    gap: 6px;
+    padding: 3px 0;
+    font-size: 11px;
+  }
+
+  .programacion-page .asignacion-dato strong { font-size: 10px; }
+  .programacion-page .programacion-resumen { padding-top: 8px; font-size: 11px; }
+
+  .programacion-page .modal-programacion-contenido {
+    padding: 18px;
+    border-radius: 16px;
+  }
+
+  .programacion-page .modal-programacion-header {
+    gap: 12px;
+    margin-bottom: 14px;
+    padding-bottom: 12px;
+  }
+
+  .programacion-page .modal-programacion-header h2 { font-size: 20px; }
+  .programacion-page .modal-programacion-header p { font-size: 13px; }
+  .programacion-page .form-programacion { gap: 11px 14px; }
+
+  .programacion-page .campo input,
+  .programacion-page .campo select { height: 40px; min-height: 40px; padding: 7px 10px; }
+
+  .programacion-page .campo textarea { min-height: 76px; padding: 8px 10px; }
+  .programacion-page .campo select[multiple] { height: 104px; min-height: 104px; }
+  .programacion-page .form-programacion-acciones { padding-top: 12px; }
+
+  /* Listados internos de SHEQ. */
+  .sheq-page .sheq-list-header {
+    gap: 14px;
+    padding: 13px 15px;
+  }
+
+  .sheq-page .sheq-list-header h3 { font-size: 15px; }
+  .sheq-page .sheq-list-header p { margin-top: 3px; font-size: 12px; }
+
+  .sheq-page .sheq-list-header input,
+  .sheq-page .sheq-list-header select {
+    min-height: 37px;
+    padding: 7px 10px;
+    font-size: 12px;
+  }
+
+  .sheq-page .sheq-table th,
+  .sheq-page .sheq-table td { padding: 9px 11px; }
+
+  .sheq-page .sheq-contracts { gap: 10px; padding: 14px; }
+  .sheq-page .sheq-contract { padding: 13px; border-radius: 12px; }
+  .sheq-page .sheq-contract-dates { margin: 9px 0; }
+  .sheq-page .sheq-contract-actions { margin-top: 9px; }
+}
+
+/* Jerarquía tipográfica compartida en los paneles administrativos. */
+@media (min-width: 1025px) {
+  .empresa-admin-page .dashboard-header h1,
+  .super-admin-page .dashboard-header h1 {
+    font-size: 22px;
+    line-height: 1.2;
+  }
+
+  .empresa-admin-page .dashboard-header p,
+  .super-admin-page .dashboard-header p {
+    margin-top: 4px;
+    font-size: 13px;
+    line-height: 1.4;
+  }
+
+  .empresa-admin-page .section-header h2,
+  .super-admin-page .section-header h2 { font-size: 16px; }
+
+  .empresa-admin-page .btn-primary,
+  .empresa-admin-page .btn-secondary,
+  .super-admin-page .btn-primary,
+  .super-admin-page .btn-secondary {
+    min-height: 37px;
+    padding: 7px 12px;
+    border-radius: 9px;
+    font-size: 12px;
+  }
+
+  .empresa-admin-page input,
+  .empresa-admin-page select,
+  .empresa-admin-page textarea,
+  .super-admin-page input,
+  .super-admin-page select,
+  .super-admin-page textarea { font-size: 13px; }
+}
+
+/* Panel SHEQ: misma escala y densidad visual del resto de Vectaria. */
+@media (min-width: 1025px) {
+  .sheq-page .sheq-header h2 {
+    margin: 0 0 2px;
+    font-size: 17px;
+    line-height: 1.2;
+  }
+
+  .sheq-page .sheq-header p {
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.35;
+  }
+
+  .sheq-page .sheq-toolbar {
+    gap: 12px;
+    margin-bottom: 11px;
+    padding: 8px 10px;
+    border-radius: 15px;
+  }
+
+  .sheq-page .sheq-tabs { gap: 3px; }
+
+  .sheq-page .sheq-tabs button {
+    min-height: 34px;
+    padding: 6px 11px;
+    border-radius: 8px;
+    font-size: 12px;
+    line-height: 1.2;
+  }
+
+  .sheq-page .sheq-toolbar-actions { gap: 6px; }
+
+  .sheq-page .sheq-toolbar .btn-sheq-primary,
+  .sheq-page .sheq-toolbar .btn-sheq-secondary {
+    min-height: 36px;
+    padding: 7px 12px;
+    border-radius: 9px;
+    font-size: 12px;
+  }
+
+  .sheq-page .sheq-kpis {
+    gap: 9px;
+    margin-bottom: 11px;
+  }
+
+  .sheq-page .sheq-kpi {
+    min-height: 78px;
+    box-sizing: border-box;
+    padding: 12px 15px;
+    border-radius: 13px;
+  }
+
+  .sheq-page .sheq-kpi::after {
+    right: -17px;
+    top: -25px;
+    width: 68px;
+    height: 68px;
+  }
+
+  .sheq-page .sheq-kpi span {
+    margin-bottom: 5px;
+    font-size: 11px;
+    line-height: 1.25;
+  }
+
+  .sheq-page .sheq-kpi strong {
+    font-size: 22px;
+    line-height: 1;
+  }
+
+  .sheq-page .sheq-panel-grid {
+    gap: 11px;
+    align-items: stretch;
+  }
+
+  .sheq-page .sheq-card {
+    min-height: 0;
+    padding: 14px;
+    border-radius: 15px;
+  }
+
+  .sheq-page .sheq-card-title {
+    gap: 11px;
+    margin-bottom: 10px;
+  }
+
+  .sheq-page .sheq-card-title h3 {
+    font-size: 15px;
+    line-height: 1.25;
+  }
+
+  .sheq-page .sheq-card-title span {
+    font-size: 12px;
+  }
+
+  .sheq-page .sheq-card-title strong {
+    font-size: 21px;
+    line-height: 1;
+  }
+
+  .sheq-page .sheq-alertas { gap: 6px; }
+
+  .sheq-page .sheq-alert {
+    gap: 8px;
+    padding: 8px 10px;
+    border-radius: 9px;
+    font-size: 12px;
+  }
+
+  .sheq-page .sheq-alert small {
+    margin-top: 2px;
+    font-size: 11px;
+  }
+
+  .sheq-page .sheq-alert time { font-size: 11px; }
+
+  .sheq-page .sheq-empty {
+    padding: 24px 16px;
+    font-size: 12px;
+  }
+
+  .sheq-page .sheq-progress {
+    height: 9px;
+    margin: 16px 0 12px;
+  }
+
+  .sheq-page .sheq-resumen-lista {
+    gap: 3px;
+    font-size: 12px;
+  }
+
+  .sheq-page .sheq-resumen-lista div {
+    padding: 7px 0;
+  }
+}
+
+/*
+ * Densidad compacta definitiva.
+ * Reduce una etapa adicional la interfaz al 100 % de zoom, sin usar transform ni zoom CSS.
+ */
+@media (min-width: 1025px) {
+  body.dashboard-overtrack,
+  body.flow-overtrack,
+  body.empresa-admin-page,
+  body.super-admin-page { font-size: 12px; }
+
+  .dashboard-overtrack .sidebar,
+  .empresa-admin-page .sidebar,
+  .super-admin-page .sidebar {
+    width: 184px;
+    min-width: 184px;
+  }
+
+  .dashboard-overtrack .sidebar { flex-basis: 184px; }
+
+  .empresa-admin-page .main-content,
+  .super-admin-page .main-content {
+    width: calc(100% - 184px);
+    margin-left: 184px;
+    padding: 14px 17px 24px;
+  }
+
+  .dashboard-overtrack .sidebar-logo .sidebar-brand-logo,
+  .empresa-admin-page .sidebar-brand-composite,
+  .super-admin-page .sidebar-brand-composite { width: 146px; }
+
+  .empresa-admin-page .sidebar-brand .sidebar-brand-layer,
+  .super-admin-page .sidebar-brand .sidebar-brand-layer { width: 146px; }
+
+  .dashboard-overtrack .sidebar li,
+  .empresa-admin-page .sidebar li,
+  .super-admin-page .sidebar nav button {
+    min-height: 33px;
+    padding: 6px 9px;
+    font-size: 11px;
+  }
+
+  .dashboard-overtrack .main-content { padding: 12px 15px 24px; }
+  .dashboard-overtrack .header { min-height: 44px; padding-bottom: 8px; }
+  .dashboard-overtrack .header h2 { font-size: 16px; }
+  .dashboard-overtrack .user-box { padding: 4px 5px 4px 9px; }
+  .dashboard-overtrack .btn-logout { padding: 6px 10px; font-size: 11px; }
+
+  .dashboard-overtrack .buscador { margin: 9px 0 8px; }
+  .dashboard-overtrack .buscador input { min-height: 34px; font-size: 12px; }
+  .dashboard-overtrack .dashboard-hero { margin-bottom: 8px; }
+  .dashboard-overtrack .dashboard-title h1 { font-size: clamp(20px, 1.8vw, 24px); }
+  .dashboard-overtrack .dashboard-title p { font-size: 12px; }
+  .dashboard-overtrack .kpis-pro { gap: 8px; margin-bottom: 10px; }
+
+  .dashboard-overtrack .kpi-card {
+    min-height: 78px;
+    padding: 9px 11px;
+    border-radius: 12px;
+  }
+
+  .dashboard-overtrack .kpi-icon {
+    width: 34px;
+    height: 34px;
+    border-radius: 9px;
+  }
+
+  .dashboard-overtrack .kpi-icon .ot-icon { width: 18px; height: 18px; }
+  .dashboard-overtrack .panel-pro,
+  .dashboard-overtrack .chart-card { padding: 12px; }
+
+  .empresa-admin-page .dashboard-header,
+  .super-admin-page .dashboard-header { padding: 13px 16px; }
+
+  .empresa-admin-page .dashboard-header h1,
+  .super-admin-page .dashboard-header h1 { font-size: 19px; }
+
+  .empresa-admin-page .dashboard-header p,
+  .super-admin-page .dashboard-header p { font-size: 12px; }
+
+  .empresa-admin-page .kpi-card,
+  .super-admin-page .kpi-card {
+    min-height: 78px;
+    padding: 11px;
+  }
+
+  .empresa-admin-page .card,
+  .super-admin-page .card {
+    padding: 13px;
+    border-radius: 13px;
+  }
+
+  .empresa-admin-page .tabla-admin th,
+  .empresa-admin-page .tabla-admin td,
+  .super-admin-page .admin-table th,
+  .super-admin-page .admin-table td {
+    padding: 7px;
+    font-size: 11px;
+  }
+
+  .flow-overtrack .topbar-overtrack { min-height: 50px; }
+  .flow-overtrack .brand-overtrack .desktop-brand-logo { width: 150px; height: 38px; }
+  .flow-overtrack .container { padding: 11px 0 24px; }
+  .flow-overtrack .header-ot-pro { padding: 11px 13px; }
+  .flow-overtrack .tabs-timeline-pro { margin: 9px 0 10px; padding: 7px 6px; }
+  .flow-overtrack .content > .card,
+  .flow-overtrack .content .card { padding: 13px 15px; }
+  .flow-overtrack .card h2 { font-size: 18px; }
+
+  .programacion-page .programacion-toolbar { padding: 8px 10px; }
+  .programacion-page .programacion-celda { min-height: 70px; padding: 6px; }
+  .programacion-page .programacion-celda.encabezado { min-height: 46px; }
+
+  .sheq-page .sheq-kpi { min-height: 70px; padding: 10px 13px; }
+  .sheq-page .sheq-kpi strong { font-size: 20px; }
+  .sheq-page .sheq-card { padding: 12px; }
+
+  .inventario-page .inventario-hero,
+  .inventario-page .inventario-panel { padding: 12px; }
+  .inventario-page .inventario-resumen article { padding: 10px 12px; }
+
+  .ordenes-page .orden-item { padding: 11px; }
+}
+
+/* Flujo de OT: cabecera y contenido con la misma densidad compacta. */
+@media (min-width: 1025px) {
+  .flow-overtrack .topbar-overtrack {
+    min-height: 48px;
+    padding: 4px 14px;
+  }
+
+  .flow-overtrack .topbar-overtrack > .brand-overtrack {
+    width: 178px;
+    height: auto;
+    overflow: visible;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0;
+    color: inherit;
+    text-decoration: none;
+    cursor: pointer;
+  }
+
+  .flow-overtrack .brand-overtrack .desktop-brand-logo {
+    width: 178px;
+    max-width: none;
+    height: auto;
+    object-fit: contain;
+    transform: none;
+    transform-origin: center;
+    -webkit-mask-image:
+      linear-gradient(to right, #000 0 24%, transparent 24%),
+      linear-gradient(to bottom, #000 0 74%, transparent 74%);
+    -webkit-mask-composite: source-over;
+    mask-image:
+      linear-gradient(to right, #000 0 24%, transparent 24%),
+      linear-gradient(to bottom, #000 0 74%, transparent 74%);
+    mask-composite: add;
+  }
+
+  .flow-overtrack .topbar-overtrack > .brand-overtrack::after {
+    content: "Tu operación, en una misma dirección.";
+    display: block;
+    margin-top: 0;
+    color: #c5d4e3;
+    font-family: var(--ot-font, "Segoe UI", Arial, sans-serif);
+    font-size: 9px;
+    font-weight: 500;
+    line-height: 1.15;
+    letter-spacing: -.02em;
+    white-space: nowrap;
+  }
+
+  .flow-overtrack .topbar-overtrack > .brand-overtrack:hover::after {
+    color: #fff;
+  }
+
+  .flow-overtrack .topbar-overtrack > .user-box {
+    gap: 7px;
+    max-width: min(420px, calc(100% - 230px));
+    padding: 4px 5px 4px 10px;
+    border-radius: 11px;
+    font-size: 12px;
+  }
+
+  .flow-overtrack .topbar-overtrack > .user-box span {
+    font-size: 13px;
+    line-height: 1.2;
+  }
+
+  .flow-overtrack .topbar-overtrack > .user-box small {
+    font-size: 12px;
+    line-height: 1.2;
+  }
+
+  .flow-overtrack .topbar-overtrack .btn-logout {
+    min-height: 33px;
+    padding: 6px 10px;
+    border-radius: 8px !important;
+    font-size: 11px;
+  }
+
+  .flow-overtrack .container {
+    width: min(1480px, calc(100% - 24px));
+    padding: 9px 0 22px;
+  }
+
+  .flow-overtrack .header-ot-pro {
+    margin: 12px 0;
+    padding: 12px 14px;
+    border-radius: 14px;
+  }
+
+  .flow-overtrack .header-ot-main {
+    gap: 12px;
+    margin-bottom: 13px;
+  }
+
+  .flow-overtrack .header-ot-label { font-size: 10px; }
+
+  .flow-overtrack .header-ot-main h1 {
+    margin-top: 4px;
+    font-size: 25px;
+    line-height: 1.15;
+  }
+
+  .flow-overtrack .header-ot-estado {
+    padding: 7px 12px;
+    font-size: 10px;
+  }
+
+  .flow-overtrack .header-ot-grid {
+    gap: 9px;
+    margin-bottom: 13px;
+  }
+
+  .flow-overtrack .header-ot-grid > div {
+    padding: 10px 12px;
+    border-radius: 10px;
+  }
+
+  .flow-overtrack .header-ot-grid span {
+    margin-bottom: 4px;
+    font-size: 9px;
+  }
+
+  .flow-overtrack .header-ot-grid strong { font-size: 12px; }
+
+  .flow-overtrack .header-ot-progress-info {
+    margin-bottom: 5px;
+    font-size: 10px;
+  }
+
+  .flow-overtrack .header-ot-progress-bar { height: 8px; }
+
+  .flow-overtrack .tabs-timeline-pro {
+    min-height: 0;
+    margin: 8px 0 9px;
+    padding: 10px 6px 7px;
+  }
+
+  .flow-overtrack .tabs-timeline-pro::before { top: 23px; }
+
+  .flow-overtrack .tabs-timeline-pro .tab {
+    min-width: 80px;
+    gap: 3px;
+    padding: 0 4px;
+    font-size: 10px;
+  }
+
+  .flow-overtrack .tabs-timeline-pro .tab-dot {
+    width: 26px;
+    height: 26px;
+    font-size: 11px;
+    box-shadow: 0 0 0 4px #fff;
+  }
+
+  .flow-overtrack .tabs-timeline-pro .tab.active .tab-dot {
+    box-shadow: 0 0 0 4px #fff, 0 6px 16px rgba(21, 101, 192, 0.22);
+  }
+
+  .flow-overtrack input:not([type="checkbox"]):not([type="radio"]),
+  .flow-overtrack select { min-height: 36px; font-size: 12px; }
+
+  .flow-overtrack textarea { min-height: 70px; font-size: 12px; }
+
+  .flow-overtrack button { font-size: 11px; }
+}
+
+/* Inventario: filtros y acciones nivelados en una sola barra. */
+@media (min-width: 1025px) {
+  .inventario-page .inventario-toolbar {
+    display: grid;
+    grid-template-columns: minmax(430px, 1fr) auto;
+    align-items: end;
+    gap: 14px;
+    padding: 12px 14px;
+  }
+
+  .inventario-page .inventario-filtros {
+    grid-template-columns: minmax(190px, 275px) minmax(260px, 350px);
+    align-items: start;
+    gap: 10px;
+  }
+
+  .inventario-page .inventario-filtros label {
+    display: grid !important;
+    grid-template-rows: 14px 38px;
+    align-self: start !important;
+    gap: 5px;
+    height: 57px;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .inventario-page .inventario-filtros label > span {
+    display: flex;
+    align-items: center;
+    height: 14px;
+    margin: 0 !important;
+    padding: 0 !important;
+    font-size: 11px;
+    line-height: 14px;
+  }
+
+  .inventario-page .inventario-filtros input,
+  .inventario-page .inventario-filtros select {
+    box-sizing: border-box !important;
+    height: 38px !important;
+    min-height: 38px !important;
+    max-height: 38px !important;
+    margin: 0 !important;
+    padding: 0 10px !important;
+    border-radius: 9px !important;
+    font-size: 12px !important;
+    line-height: 36px;
+  }
+
+  .inventario-page .inventario-acciones {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 7px;
+  }
+
+  .inventario-page .inventario-acciones input[type="file"] {
+    display: none !important;
+  }
+
+  .inventario-page .inventario-acciones .btn-primary-inventario,
+  .inventario-page .inventario-acciones .btn-secondary-inventario {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: auto;
+    box-sizing: border-box !important;
+    height: 38px !important;
+    min-height: 38px !important;
+    max-height: 38px !important;
+    padding: 0 12px !important;
+    border-radius: 9px;
+    font-size: 11px;
+    line-height: 1;
+    white-space: nowrap;
+  }
+}

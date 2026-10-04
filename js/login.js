@@ -2,7 +2,9 @@ import { auth, db } from "./firebase-config.js";
 
 
 import {
-  signInWithEmailAndPassword
+  sendPasswordResetEmail,
+  signInWithEmailAndPassword,
+  signOut
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
 import {
@@ -14,8 +16,14 @@ const btnLogin = document.getElementById("btnLogin");
 const emailInput = document.getElementById("email");
 const passwordInput = document.getElementById("password");
 const loginError = document.getElementById("loginError");
+const loginMensaje = document.getElementById("loginMensaje");
+const btnMostrarRecuperacion = document.getElementById("btnMostrarRecuperacion");
+const panelRecuperacion = document.getElementById("panelRecuperacion");
+const btnRecuperarPassword = document.getElementById("btnRecuperarPassword");
 
 btnLogin.addEventListener("click", iniciarSesion);
+btnMostrarRecuperacion.addEventListener("click", mostrarRecuperacion);
+btnRecuperarPassword.addEventListener("click", recuperarPassword);
 
 emailInput.addEventListener("keydown", function(e) {
   if (e.key === "Enter") {
@@ -31,12 +39,16 @@ passwordInput.addEventListener("keydown", function(e) {
 
 async function iniciarSesion() {
   const email = emailInput.value.trim();
-  const password = passwordInput.value.trim();
+  const password = passwordInput.value;
 
   if (!email || !password) {
     loginError.textContent = "Ingresa correo y contraseña.";
     return;
   }
+
+  loginError.textContent = "";
+  loginMensaje.textContent = "";
+  btnLogin.disabled = true;
 
   try {
     const credencial = await signInWithEmailAndPassword(auth, email, password);
@@ -46,11 +58,18 @@ async function iniciarSesion() {
     const usuarioSnap = await getDoc(usuarioRef);
 
     if (!usuarioSnap.exists()) {
-      loginError.textContent = "Usuario autenticado, pero sin perfil en Firestore.";
+      await signOut(auth);
+      loginError.textContent = "No fue posible iniciar sesión.";
       return;
     }
 
     const usuario = usuarioSnap.data();
+
+    if (usuario.activo !== true) {
+      await signOut(auth);
+      loginError.textContent = "No fue posible iniciar sesión.";
+      return;
+    }
 
     localStorage.setItem("usuarioActivo", JSON.stringify({
       uid,
@@ -59,8 +78,14 @@ async function iniciarSesion() {
       rol: usuario.rol,
       empresaId: usuario.empresaId,
       sucursalId: usuario.sucursalId,
-      activo: usuario.activo
+      activo: usuario.activo,
+      debeCambiarPassword: usuario.debeCambiarPassword === true
     }));
+
+    if (usuario.debeCambiarPassword === true) {
+      window.location.replace("cambiar-password.html");
+      return;
+    }
 
     // Redirección según el rol
 
@@ -83,7 +108,18 @@ switch (usuario.rol) {
     break;
 
   case "usuario_taller":
+  case "supervisor":
+  case "tecnico":
+  case "planificador":
     window.location.href = "dashboard.html";
+    break;
+
+  case "bodeguero":
+    window.location.href = "inventario.html";
+    break;
+
+  case "sheq":
+    window.location.href = "sheq.html";
     break;
 
   default:
@@ -93,5 +129,43 @@ switch (usuario.rol) {
   } catch (error) {
     console.error(error);
     loginError.textContent = "Correo o contraseña incorrectos.";
+  } finally {
+    btnLogin.disabled = false;
+  }
+}
+
+function mostrarRecuperacion() {
+  panelRecuperacion.hidden = !panelRecuperacion.hidden;
+  btnMostrarRecuperacion.setAttribute(
+    "aria-expanded",
+    String(!panelRecuperacion.hidden)
+  );
+  loginError.textContent = "";
+  loginMensaje.textContent = "";
+}
+
+async function recuperarPassword() {
+  const email = emailInput.value.trim();
+
+  loginError.textContent = "";
+  loginMensaje.textContent = "";
+
+  if (!email) {
+    loginError.textContent = "Ingresa tu correo para recuperar la contraseña.";
+    emailInput.focus();
+    return;
+  }
+
+  btnRecuperarPassword.disabled = true;
+
+  try {
+    await sendPasswordResetEmail(auth, email);
+  } catch (error) {
+    // No revelamos si el correo está o no registrado.
+    console.warn("Solicitud de recuperación procesada:", error.code || error);
+  } finally {
+    btnRecuperarPassword.disabled = false;
+    loginMensaje.textContent =
+      "Si el correo pertenece a una cuenta habilitada, recibirás instrucciones para recuperar el acceso.";
   }
 }

@@ -1,0 +1,673 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function profileExists() {
+      return signedIn() &&
+        exists(/databases/$(database)/documents/usuarios/$(request.auth.uid));
+    }
+
+    function profile() {
+      return get(
+        /databases/$(database)/documents/usuarios/$(request.auth.uid)
+      ).data;
+    }
+
+    function activeUser() {
+      return profileExists() && profile().activo == true;
+    }
+
+    function companyOperational(empresaId) {
+      let empresa = get(
+        /databases/$(database)/documents/empresas/$(empresaId)
+      ).data;
+      return empresa.activa != false;
+    }
+
+    function canWriteCompany(data) {
+      return companyOperational(data.empresaId);
+    }
+
+    function hasRole(roles) {
+      return activeUser() && profile().rol in roles;
+    }
+
+    function isSuperAdmin() {
+      return hasRole(['super_admin']);
+    }
+
+    function isCompanyAdmin() {
+      return hasRole([
+        'admin_empresa',
+        'admin_sucursal'
+      ]);
+    }
+
+    function isWorkshopUser() {
+      return hasRole([
+        'jefe_taller',
+        'usuario_taller',
+        'supervisor',
+        'tecnico'
+      ]);
+    }
+
+    function sameCompany(data) {
+      return activeUser() &&
+        data.empresaId is string &&
+        profile().empresaId == data.empresaId;
+    }
+
+    function isCompanyWideAdmin() {
+      return hasRole(['admin_empresa']);
+    }
+
+    function isBranchRole() {
+      return hasRole([
+        'admin_sucursal',
+        'jefe_taller',
+        'usuario_taller',
+        'supervisor',
+        'tecnico',
+        'planificador',
+        'bodeguero',
+        'sheq'
+      ]);
+    }
+
+    function sameBranch(data) {
+      return sameCompany(data) &&
+        profile().sucursalId is string &&
+        profile().sucursalId != '' &&
+        data.sucursalId is string &&
+        profile().sucursalId == data.sucursalId;
+    }
+
+    function canReadBranchData(data) {
+      return isSuperAdmin() ||
+        (isCompanyWideAdmin() && sameCompany(data)) ||
+        (isBranchRole() && sameBranch(data));
+    }
+
+    function canReadSheq(data) {
+      return isSuperAdmin() || (
+        sameCompany(data) &&
+        hasRole(['admin_empresa', 'admin_sucursal', 'jefe_taller', 'planificador', 'sheq'])
+      );
+    }
+
+    function canManageSheq(data) {
+      return isSuperAdmin() || (
+        sameCompany(data) &&
+        hasRole(['admin_empresa', 'admin_sucursal', 'sheq']) &&
+        canWriteCompany(data)
+      );
+    }
+
+    function empresaDeOT(data) {
+      return get(
+        /databases/$(database)/documents/empresas/$(data.empresaId)
+      ).data;
+    }
+
+    function moduloEtapaActivo(empresa, modulo) {
+      return !('modulos' in empresa) ||
+        !(empresa.modulos is map) ||
+        !(modulo in empresa.modulos) ||
+        empresa.modulos[modulo] != false;
+    }
+
+    function indicadorActivo(data, campo) {
+      return campo in data && data[campo] == true;
+    }
+
+    function ingresoCompleto(data, empresa) {
+      return !moduloEtapaActivo(empresa, 'ingreso') ||
+        indicadorActivo(data, 'ingresoAprobado');
+    }
+
+    function evaluacionCompleta(data, empresa) {
+      return !moduloEtapaActivo(empresa, 'evaluacion') ||
+        indicadorActivo(data, 'evaluacionAprobada');
+    }
+
+    function mantencionRequerida(data, empresa) {
+      return !moduloEtapaActivo(empresa, 'evaluacion') ||
+        !('overhaulRequerido' in data) ||
+        data.overhaulRequerido != false;
+    }
+
+    function mantencionCompleta(data, empresa) {
+      return !moduloEtapaActivo(empresa, 'mantencion') ||
+        !mantencionRequerida(data, empresa) ||
+        indicadorActivo(data, 'overhaulAprobado');
+    }
+
+    function pruebasCompletas(data, empresa) {
+      return !moduloEtapaActivo(empresa, 'pruebas') ||
+        !mantencionRequerida(data, empresa) ||
+        indicadorActivo(data, 'pruebasAprobado');
+    }
+
+    function estadoOTValido(data) {
+      return data.estado in [
+        'INGRESO',
+        'EVALUACION',
+        'OVERHAUL',
+        'PRUEBAS',
+        'DESPACHO',
+        'CERRADA'
+      ];
+    }
+
+    function avanceOTValido(data, empresa) {
+      return
+        // Los estados finales se evalúan primero para no agotar el límite
+        // de expresiones de Firestore durante el cierre de una OT.
+        (data.estado == 'CERRADA' &&
+          data.cerrada == true &&
+          ingresoCompleto(data, empresa) &&
+          evaluacionCompleta(data, empresa) &&
+          mantencionCompleta(data, empresa) &&
+          pruebasCompletas(data, empresa)) ||
+        (data.estado == 'INGRESO' && moduloEtapaActivo(empresa, 'ingreso')) ||
+        (data.estado == 'EVALUACION' &&
+          ingresoCompleto(data, empresa) &&
+          moduloEtapaActivo(empresa, 'evaluacion')) ||
+        (data.estado == 'OVERHAUL' &&
+          ingresoCompleto(data, empresa) &&
+          evaluacionCompleta(data, empresa) &&
+          mantencionRequerida(data, empresa) &&
+          moduloEtapaActivo(empresa, 'mantencion')) ||
+        (data.estado == 'PRUEBAS' &&
+          ingresoCompleto(data, empresa) &&
+          evaluacionCompleta(data, empresa) &&
+          mantencionCompleta(data, empresa) &&
+          moduloEtapaActivo(empresa, 'pruebas')) ||
+        (data.estado == 'DESPACHO' &&
+          ingresoCompleto(data, empresa) &&
+          evaluacionCompleta(data, empresa) &&
+          mantencionCompleta(data, empresa) &&
+          pruebasCompletas(data, empresa) &&
+          moduloEtapaActivo(empresa, 'despacho'));
+    }
+
+    function puedeAprobarOCerrarOT() {
+      return hasRole(['admin_empresa', 'admin_sucursal', 'jefe_taller']);
+    }
+
+    function cambiaCamposAprobacionOT() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasAny([
+        'decisionEvaluacion',
+        'evaluacionAprobada',
+        'overhaulRequerido',
+        'decisionPruebas',
+        'pruebasAprobado'
+      ]);
+    }
+
+    function cambiaCamposCierreOT() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasAny([
+        'cerrada',
+        'fechaCierre',
+        'cerradoPor',
+        'cerradoPorNombre',
+        'cerradoPorRol'
+      ]);
+    }
+
+    function actualizacionOTValida() {
+      let empresa = empresaDeOT(request.resource.data);
+      return (
+          !(
+            (cambiaCamposAprobacionOT() &&
+              moduloEtapaActivo(empresa, 'aprobaciones')) ||
+            cambiaCamposCierreOT()
+          ) ||
+          puedeAprobarOCerrarOT()
+        ) && (
+          request.resource.data.estado == resource.data.estado || (
+            estadoOTValido(request.resource.data) &&
+            avanceOTValido(request.resource.data, empresa)
+          )
+        );
+    }
+
+    function solicitaCierreOT() {
+      return resource.data.cerrada != true &&
+        request.resource.data.cerrada == true &&
+        request.resource.data.estado == 'CERRADA';
+    }
+
+    function cierreOTValido() {
+      let empresa = empresaDeOT(request.resource.data);
+      return puedeAprobarOCerrarOT() &&
+        ingresoCompleto(request.resource.data, empresa) &&
+        evaluacionCompleta(request.resource.data, empresa) &&
+        mantencionCompleta(request.resource.data, empresa) &&
+        pruebasCompletas(request.resource.data, empresa);
+    }
+
+    // Los perfiles se crean y administran mediante Cloud Functions.
+    // El cliente solo puede leerlos y confirmar el cambio de contraseña.
+    match /usuarios/{userId} {
+      allow get: if signedIn() && (
+        request.auth.uid == userId ||
+        isSuperAdmin() ||
+        (isCompanyWideAdmin() && sameCompany(resource.data)) ||
+        (hasRole(['admin_sucursal', 'jefe_taller', 'planificador', 'bodeguero', 'sheq']) && sameBranch(resource.data))
+      );
+
+      allow list: if isSuperAdmin() || (
+        isCompanyWideAdmin() && sameCompany(resource.data)
+      ) || (
+        hasRole(['admin_sucursal', 'bodeguero', 'sheq']) && sameBranch(resource.data)
+      ) || (
+        hasRole(['jefe_taller', 'planificador']) && sameBranch(resource.data)
+      );
+
+      allow create, delete: if false;
+
+      allow update: if (
+        signedIn() &&
+        request.auth.uid == userId &&
+        companyOperational(profile().empresaId) &&
+        resource.data.activo == true &&
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['debeCambiarPassword', 'fechaActualizacion']) &&
+        resource.data.debeCambiarPassword == true &&
+        request.resource.data.debeCambiarPassword == false
+      );
+
+    }
+
+    match /empresas/{empresaId} {
+      allow read: if isSuperAdmin() || (
+        activeUser() && profile().empresaId == empresaId
+      );
+
+      allow create, delete: if isSuperAdmin();
+
+      allow update: if isSuperAdmin() || (
+        hasRole(['admin_empresa']) &&
+        profile().empresaId == empresaId &&
+        companyOperational(empresaId) &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'nombre',
+          'correo',
+          'telefono',
+          'ciudad',
+          'pais',
+          'direccion',
+          'colorPrimario',
+          'colorSecundario',
+          'brandingInforme',
+          'fechaActualizacion'
+        ])
+      );
+
+      match /pagos/{pagoId} {
+        allow read, create, update: if isSuperAdmin();
+        allow delete: if false;
+      }
+    }
+
+    match /sucursales/{sucursalId} {
+      allow read: if isSuperAdmin() ||
+        (isCompanyWideAdmin() && sameCompany(resource.data)) ||
+        (isBranchRole() && sameCompany(resource.data) && profile().sucursalId == sucursalId);
+
+      // Se crea exclusivamente mediante la Cloud Function, que valida el
+      // límite contratado, el código único, el rol y la empresa activa.
+      allow create: if false;
+
+      // Los cambios de estado se realizan mediante una Cloud Function para
+      // impedir desactivar sucursales con OT abiertas. El SDK Admin omite reglas.
+      allow update: if isSuperAdmin();
+
+      allow delete: if isSuperAdmin() || (
+        hasRole(['admin_empresa']) && sameCompany(resource.data) &&
+        companyOperational(resource.data.empresaId)
+      );
+    }
+
+    match /ots/{otId} {
+      allow read: if canReadBranchData(resource.data);
+
+      allow create: if activeUser() && (
+        isSuperAdmin() ||
+        (
+          sameCompany(request.resource.data) &&
+          canWriteCompany(request.resource.data) &&
+          sameBranch(request.resource.data) &&
+          hasRole(['admin_sucursal', 'jefe_taller', 'usuario_taller', 'supervisor', 'tecnico']) &&
+          request.resource.data.creadoPor == request.auth.uid &&
+          request.resource.data.cerrada == false &&
+          (
+            (request.resource.data.estado in ['INGRESO', 'Ingreso'] &&
+              moduloEtapaActivo(
+                empresaDeOT(request.resource.data),
+                'ingreso'
+              )) ||
+            (request.resource.data.estado != 'INGRESO' &&
+              request.resource.data.estado != 'Ingreso' &&
+              estadoOTValido(request.resource.data) &&
+              avanceOTValido(
+                request.resource.data,
+                empresaDeOT(request.resource.data)
+              ))
+          )
+        )
+      );
+
+      allow update: if isSuperAdmin() || (
+        activeUser() &&
+        canWriteCompany(resource.data) &&
+        sameCompany(resource.data) &&
+        sameCompany(request.resource.data) &&
+        sameBranch(resource.data) &&
+        sameBranch(request.resource.data) &&
+        resource.data.cerrada != true &&
+        resource.data.estado != 'CERRADA' &&
+          request.resource.data.empresaId == resource.data.empresaId &&
+          request.resource.data.sucursalId == resource.data.sucursalId &&
+          request.resource.data.creadoPor == resource.data.creadoPor &&
+          request.resource.data.cerrada == true ==
+            (request.resource.data.estado == 'CERRADA') &&
+          (
+            (solicitaCierreOT() && cierreOTValido()) ||
+            (!solicitaCierreOT() && actualizacionOTValida())
+          ) &&
+          hasRole([
+            'admin_sucursal',
+            'jefe_taller',
+            'usuario_taller',
+            'supervisor',
+            'tecnico'
+          ])
+        );
+
+      allow delete: if isSuperAdmin() || (
+        hasRole(['admin_empresa']) && sameCompany(resource.data) &&
+        canWriteCompany(resource.data)
+      );
+    }
+
+    // Documento liviano para Dashboard e historial. Contiene únicamente
+    // identificación, estado, avance y alertas; nunca evidencias ni archivos.
+    match /otsResumen/{otId} {
+      allow read: if canReadBranchData(resource.data);
+
+      allow create: if isSuperAdmin() || (
+        activeUser() &&
+        sameCompany(request.resource.data) &&
+        canWriteCompany(request.resource.data) &&
+        (
+          isCompanyWideAdmin() ||
+          (isBranchRole() && sameBranch(request.resource.data))
+        )
+      );
+
+      allow update: if isSuperAdmin() || (
+        activeUser() &&
+        canWriteCompany(resource.data) &&
+        sameCompany(resource.data) &&
+        sameCompany(request.resource.data) &&
+        request.resource.data.empresaId == resource.data.empresaId &&
+        request.resource.data.sucursalId == resource.data.sucursalId &&
+        (
+          isCompanyWideAdmin() ||
+          (isBranchRole() && sameBranch(resource.data) && sameBranch(request.resource.data))
+        )
+      );
+
+      allow delete: if isSuperAdmin() || (
+        activeUser() && sameCompany(resource.data) && canWriteCompany(resource.data) &&
+        (
+          isCompanyWideAdmin() ||
+          (isBranchRole() && sameBranch(resource.data))
+        )
+      );
+    }
+
+    // Colecciones futuras del modelo multiempresa.
+    match /clientes/{documentId} {
+      allow read: if isSuperAdmin() || sameCompany(resource.data);
+      allow create: if isSuperAdmin() ||
+        (isCompanyAdmin() && sameCompany(request.resource.data) && canWriteCompany(request.resource.data));
+      allow update: if isSuperAdmin() || (
+        isCompanyAdmin() &&
+        canWriteCompany(resource.data) &&
+        sameCompany(resource.data) &&
+        sameCompany(request.resource.data)
+      );
+      allow delete: if isSuperAdmin() ||
+        (hasRole(['admin_empresa']) && sameCompany(resource.data) && canWriteCompany(resource.data));
+    }
+
+    match /equipos/{documentId} {
+      allow read: if isSuperAdmin() || sameCompany(resource.data);
+      allow create: if isSuperAdmin() ||
+        (isCompanyAdmin() && sameCompany(request.resource.data) && canWriteCompany(request.resource.data));
+      allow update: if isSuperAdmin() || (
+        isCompanyAdmin() &&
+        canWriteCompany(resource.data) &&
+        sameCompany(resource.data) &&
+        sameCompany(request.resource.data)
+      );
+      allow delete: if isSuperAdmin() ||
+        (hasRole(['admin_empresa']) && sameCompany(resource.data) && canWriteCompany(resource.data));
+    }
+
+    match /plantillasMantenimiento/{plantillaId} {
+      allow read: if isSuperAdmin() || sameCompany(resource.data);
+      allow create: if isSuperAdmin() || (
+        hasRole(['admin_empresa']) && sameCompany(request.resource.data) &&
+        canWriteCompany(request.resource.data) &&
+        request.resource.data.creadoPor == request.auth.uid
+      );
+      allow update: if isSuperAdmin() || (
+        hasRole(['admin_empresa']) && sameCompany(resource.data) &&
+        canWriteCompany(resource.data) &&
+        sameCompany(request.resource.data) &&
+        request.resource.data.empresaId == resource.data.empresaId
+      );
+      allow delete: if isSuperAdmin() || (
+        hasRole(['admin_empresa']) && sameCompany(resource.data) &&
+        canWriteCompany(resource.data)
+      );
+    }
+
+    // Inventario independiente por empresa y sucursal. Los técnicos pueden
+    // consultar; administradores y jefes de taller pueden mantener existencias.
+    match /inventarioConfiguraciones/{configId} {
+      allow read: if canReadBranchData(resource.data) &&
+        moduloEtapaActivo(empresaDeOT(resource.data), 'inventario');
+
+      allow create: if isSuperAdmin() || (
+        activeUser() &&
+        canWriteCompany(request.resource.data) &&
+        canReadBranchData(request.resource.data) &&
+        hasRole(['admin_empresa', 'admin_sucursal', 'jefe_taller', 'planificador', 'bodeguero']) &&
+        moduloEtapaActivo(empresaDeOT(request.resource.data), 'inventario')
+      );
+
+      allow update: if isSuperAdmin() || (
+        activeUser() &&
+        canWriteCompany(resource.data) &&
+        canReadBranchData(resource.data) &&
+        canReadBranchData(request.resource.data) &&
+        hasRole(['admin_empresa', 'admin_sucursal', 'jefe_taller', 'planificador', 'bodeguero']) &&
+        request.resource.data.empresaId == resource.data.empresaId &&
+        request.resource.data.sucursalId == resource.data.sucursalId &&
+        moduloEtapaActivo(empresaDeOT(request.resource.data), 'inventario')
+      );
+
+      allow delete: if isSuperAdmin() || (
+        hasRole(['admin_empresa', 'admin_sucursal']) &&
+        canWriteCompany(resource.data) &&
+        canReadBranchData(resource.data)
+      );
+    }
+
+    match /inventarioItems/{itemId} {
+      allow read: if canReadBranchData(resource.data) &&
+        moduloEtapaActivo(empresaDeOT(resource.data), 'inventario');
+
+      allow create: if isSuperAdmin() || (
+        activeUser() &&
+        canWriteCompany(request.resource.data) &&
+        canReadBranchData(request.resource.data) &&
+        hasRole(['admin_empresa', 'admin_sucursal', 'jefe_taller', 'planificador', 'bodeguero']) &&
+        request.resource.data.datos is map &&
+        request.resource.data.creadoPor == request.auth.uid &&
+        moduloEtapaActivo(empresaDeOT(request.resource.data), 'inventario')
+      );
+
+      allow update: if isSuperAdmin() || (
+        activeUser() &&
+        canWriteCompany(resource.data) &&
+        canReadBranchData(resource.data) &&
+        canReadBranchData(request.resource.data) &&
+        hasRole(['admin_empresa', 'admin_sucursal', 'jefe_taller', 'planificador', 'bodeguero']) &&
+        request.resource.data.empresaId == resource.data.empresaId &&
+        request.resource.data.sucursalId == resource.data.sucursalId &&
+        request.resource.data.creadoPor == resource.data.creadoPor &&
+        request.resource.data.datos is map &&
+        moduloEtapaActivo(empresaDeOT(request.resource.data), 'inventario')
+      );
+
+      allow delete: if isSuperAdmin() || (
+        activeUser() &&
+        canWriteCompany(resource.data) &&
+        canReadBranchData(resource.data) &&
+        hasRole(['admin_empresa', 'admin_sucursal', 'jefe_taller', 'planificador', 'bodeguero']) &&
+        moduloEtapaActivo(empresaDeOT(resource.data), 'inventario')
+      );
+    }
+
+    // Planificación semanal por empresa. Los trabajadores consultan su
+    // programación y las jefaturas publican o actualizan asignaciones.
+    match /programaciones/{programacionId} {
+      allow read: if isSuperAdmin() || sameCompany(resource.data);
+
+      allow create: if isSuperAdmin() || (
+        hasRole(['admin_empresa', 'admin_sucursal', 'jefe_taller', 'planificador']) &&
+        sameCompany(request.resource.data) &&
+        canWriteCompany(request.resource.data) &&
+        moduloEtapaActivo(empresaDeOT(request.resource.data), 'programacion')
+      );
+
+      allow update: if isSuperAdmin() || (
+        hasRole(['admin_empresa', 'admin_sucursal', 'jefe_taller', 'planificador']) &&
+        sameCompany(resource.data) &&
+        sameCompany(request.resource.data) &&
+        request.resource.data.empresaId == resource.data.empresaId &&
+        canWriteCompany(resource.data) &&
+        moduloEtapaActivo(empresaDeOT(resource.data), 'programacion')
+      );
+
+      allow delete: if isSuperAdmin() || (
+        hasRole(['admin_empresa', 'admin_sucursal', 'jefe_taller', 'planificador']) &&
+        sameCompany(resource.data) &&
+        canWriteCompany(resource.data)
+      );
+    }
+
+    match /programacionSemanas/{semanaId} {
+      allow read: if isSuperAdmin() || sameCompany(resource.data);
+
+      allow create: if isSuperAdmin() || (
+        hasRole(['admin_empresa', 'admin_sucursal', 'jefe_taller', 'planificador']) &&
+        sameCompany(request.resource.data) &&
+        canWriteCompany(request.resource.data) &&
+        moduloEtapaActivo(empresaDeOT(request.resource.data), 'programacion')
+      );
+
+      allow update: if isSuperAdmin() || (
+        hasRole(['admin_empresa', 'admin_sucursal', 'jefe_taller', 'planificador']) &&
+        sameCompany(resource.data) &&
+        sameCompany(request.resource.data) &&
+        request.resource.data.empresaId == resource.data.empresaId &&
+        canWriteCompany(resource.data)
+      );
+
+      allow delete: if isSuperAdmin() || (
+        hasRole(['admin_empresa']) && sameCompany(resource.data)
+      );
+    }
+
+    // Acreditaciones SHEQ. Los documentos conservan metadatos, vigencias,
+    // revisión e historial operacional; los archivos viven en Storage.
+    match /sheqContratos/{contratoId} {
+      allow read: if canReadSheq(resource.data) &&
+        moduloEtapaActivo(empresaDeOT(resource.data), 'sheq');
+      allow create: if canManageSheq(request.resource.data) &&
+        request.resource.data.creadoPor == request.auth.uid &&
+        moduloEtapaActivo(empresaDeOT(request.resource.data), 'sheq');
+      allow update: if canManageSheq(resource.data) && canManageSheq(request.resource.data) &&
+        request.resource.data.empresaId == resource.data.empresaId;
+      allow delete: if canManageSheq(resource.data);
+    }
+
+    match /sheqVehiculos/{vehiculoId} {
+      allow read: if canReadSheq(resource.data) &&
+        moduloEtapaActivo(empresaDeOT(resource.data), 'sheq');
+      allow create: if canManageSheq(request.resource.data) &&
+        request.resource.data.creadoPor == request.auth.uid &&
+        moduloEtapaActivo(empresaDeOT(request.resource.data), 'sheq');
+      allow update: if canManageSheq(resource.data) && canManageSheq(request.resource.data) &&
+        request.resource.data.empresaId == resource.data.empresaId;
+      allow delete: if canManageSheq(resource.data);
+    }
+
+    match /sheqDocumentos/{documentoId} {
+      allow read: if canReadSheq(resource.data) &&
+        moduloEtapaActivo(empresaDeOT(resource.data), 'sheq');
+      allow create: if canManageSheq(request.resource.data) &&
+        request.resource.data.creadoPor == request.auth.uid &&
+        request.resource.data.entidadTipo in ['persona', 'vehiculo'] &&
+        request.resource.data.estado in ['pendiente', 'aprobado', 'observado', 'rechazado'] &&
+        moduloEtapaActivo(empresaDeOT(request.resource.data), 'sheq');
+      allow update: if canManageSheq(resource.data) && canManageSheq(request.resource.data) &&
+        request.resource.data.empresaId == resource.data.empresaId &&
+        request.resource.data.creadoPor == resource.data.creadoPor &&
+        request.resource.data.entidadTipo in ['persona', 'vehiculo'] &&
+        request.resource.data.estado in ['pendiente', 'aprobado', 'observado', 'rechazado'];
+      allow delete: if canManageSheq(resource.data);
+    }
+
+    match /planes/{planId} {
+      allow read: if activeUser();
+      allow write: if isSuperAdmin();
+    }
+
+    // Parámetros generales de Vectaria.
+    // Solo el Super Administrador puede consultarlos o modificarlos.
+    match /configuracionGlobal/{configId} {
+      allow read, write: if isSuperAdmin();
+    }
+
+    match /logsSistema/{logId} {
+      allow read: if isSuperAdmin() ||
+        (isCompanyWideAdmin() && sameCompany(resource.data));
+
+      allow create: if activeUser() &&
+        sameCompany(request.resource.data) &&
+        canWriteCompany(request.resource.data) &&
+        request.resource.data.usuarioId == request.auth.uid;
+
+      allow update, delete: if false;
+    }
+
+    // Todo lo no declarado queda bloqueado.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

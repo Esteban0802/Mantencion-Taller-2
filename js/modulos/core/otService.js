@@ -1,18 +1,47 @@
 import { db } from "../../firebase-config.js";
+import { guardarResumenOT } from "./resumenOT.js";
 
 import {
     doc,
-    updateDoc,
+    runTransaction,
     serverTimestamp
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 let getOT = null;
 let renderHeaderOT = null;
+let getEtapasHabilitadas = null;
 let timerAutoguardado = null;
+let cambiosPendientes = false;
+let guardadoEnCurso = false;
+let listenersRecuperacionRegistrados = false;
+
+function actualizarEstadoConexion() {
+    const elemento = document.getElementById("estadoConexion");
+    if (!elemento) return;
+    const enLinea = navigator.onLine;
+    elemento.textContent = enLinea ? "En línea" : "Sin conexión";
+    elemento.className = `estado-conexion ${enLinea ? "en-linea" : "sin-conexion"}`;
+}
+
+const alert = (mensaje) => {
+    const texto = String(mensaje || "");
+
+    if (window.OverTrackUI?.mostrarMensaje) {
+        return window.OverTrackUI.mostrarMensaje({
+            titulo: "No fue posible guardar",
+            mensaje: texto,
+            tipo: "error"
+        });
+    }
+
+    window.alert(texto);
+    return Promise.resolve(true);
+};
 
 export function inicializarOTService({
     getOT: obtenerOT,
-    renderHeaderOTPro = null
+    renderHeaderOTPro = null,
+    getEtapasHabilitadas: obtenerEtapasHabilitadas = null
 }) {
 
     if (typeof obtenerOT !== "function") {
@@ -23,6 +52,27 @@ export function inicializarOTService({
 
     getOT = obtenerOT;
     renderHeaderOT = renderHeaderOTPro;
+    getEtapasHabilitadas = obtenerEtapasHabilitadas;
+
+    if (!listenersRecuperacionRegistrados) {
+        window.addEventListener("beforeunload", evento => {
+            if (!cambiosPendientes && !guardadoEnCurso) return;
+            evento.preventDefault();
+            evento.returnValue = "";
+        });
+
+        window.addEventListener("online", () => {
+            actualizarEstadoConexion();
+            if (cambiosPendientes && !guardadoEnCurso) {
+                guardarCambiosOT(true);
+            }
+        });
+        window.addEventListener("offline", actualizarEstadoConexion);
+        document.addEventListener("DOMContentLoaded", actualizarEstadoConexion, { once: true });
+        actualizarEstadoConexion();
+
+        listenersRecuperacionRegistrados = true;
+    }
 }
 
 export function obtenerEstadoOT(ot) {
@@ -36,30 +86,42 @@ export function obtenerEstadoOT(ot) {
         return "CERRADA";
     }
 
-    if (!ot.ingresoAprobado) {
+    const etapas = typeof getEtapasHabilitadas === "function"
+        ? getEtapasHabilitadas()
+        : { ingreso: true, evaluacion: true, mantencion: true, pruebas: true, despacho: true };
+
+    if (etapas.ingreso !== false && !ot.ingresoAprobado) {
         return "INGRESO";
     }
 
-    if (!ot.evaluacionAprobada) {
+    if (etapas.evaluacion !== false && !ot.evaluacionAprobada) {
         return "EVALUACION";
     }
 
-    if (ot.overhaulRequerido === false) {
-        return "DESPACHO";
+    if (etapas.evaluacion !== false && ot.overhaulRequerido === false) {
+        // Si Despacho está deshabilitado, la OT permanece en Evaluación
+        // hasta que el Jefe de Taller utilice el cierre explícito.
+        return etapas.despacho !== false ? "DESPACHO" : "EVALUACION";
     }
 
-    if (
-        ot.overhaulRequerido === true &&
-        !ot.overhaulAprobado
-    ) {
+    if (etapas.mantencion !== false && !ot.overhaulAprobado) {
         return "OVERHAUL";
     }
 
-    if (!ot.pruebasAprobado) {
+    if (etapas.pruebas !== false && !ot.pruebasAprobado) {
         return "PRUEBAS";
     }
 
-    return "DESPACHO";
+    if (etapas.despacho !== false) {
+        return "DESPACHO";
+    }
+
+    // Mantiene la OT en la última etapa operativa habilitada hasta que
+    // se implemente y confirme su cierre definitivo.
+    if (etapas.pruebas !== false) return "PRUEBAS";
+    if (etapas.mantencion !== false) return "OVERHAUL";
+    if (etapas.evaluacion !== false) return "EVALUACION";
+    return etapas.ingreso !== false ? "INGRESO" : "SIN_ETAPAS";
 }
 
 export function mostrarEstadoAutoguardado(
@@ -78,9 +140,11 @@ export function mostrarEstadoAutoguardado(
 
     clearTimeout(window.hideAutoSave);
 
-    window.hideAutoSave = setTimeout(() => {
-        elemento.style.opacity = "0";
-    }, 2500);
+    if (tipo !== "error") {
+        window.hideAutoSave = setTimeout(() => {
+            elemento.style.opacity = "0";
+        }, 2500);
+    }
 
     elemento.style.opacity = "1";
 }
@@ -91,7 +155,7 @@ export async function guardarCambiosOT(
 
     const ot = getOT?.();
 
-    if (!ot) return;
+    if (!ot) return false;
 
     const id = localStorage.getItem("otActiva");
 
@@ -101,10 +165,12 @@ export async function guardarCambiosOT(
             alert("No hay OT activa");
         }
 
-        return;
+        return false;
     }
 
     try {
+
+        guardadoEnCurso = true;
 
         ot.estado = obtenerEstadoOT(ot);
 
@@ -117,10 +183,27 @@ export async function guardarCambiosOT(
             serverTimestamp();
 
 
-        await updateDoc(
-            doc(db, "ots", id),
-            datosActualizar
-        );
+        const revisionLocal = Math.max(0, Number(ot.revision || 0));
+        const nuevaRevision = revisionLocal + 1;
+
+        await runTransaction(db, async transaction => {
+            const referencia = doc(db, "ots", id);
+            const snapshot = await transaction.get(referencia);
+            if (!snapshot.exists()) throw new Error("OT_NO_EXISTE");
+
+            const revisionRemota = Math.max(0, Number(snapshot.data()?.revision || 0));
+            if (revisionRemota !== revisionLocal) throw new Error("OT_MODIFICADA_POR_OTRO_USUARIO");
+
+            transaction.update(referencia, {
+                ...datosActualizar,
+                revision: nuevaRevision
+            });
+        });
+
+        ot.revision = nuevaRevision;
+        await guardarResumenOT(id, ot).catch(error => {
+            console.warn("La OT fue guardada, pero su resumen se sincronizará más adelante.", error);
+        });
 
         console.log(
             "OT actualizada en Firebase ✅"
@@ -135,6 +218,11 @@ export async function guardarCambiosOT(
             "ok"
         );
 
+        cambiosPendientes = false;
+        guardadoEnCurso = false;
+
+        return true;
+
     } catch (error) {
 
         console.error(
@@ -142,16 +230,27 @@ export async function guardarCambiosOT(
             error
         );
 
+        const conflicto = error?.message === "OT_MODIFICADA_POR_OTRO_USUARIO";
+
         if (!silencioso) {
-            alert(
-                "Error al guardar cambios en Firebase"
-            );
+            alert(conflicto
+                ? "La OT fue modificada desde otro dispositivo. Recarga la página antes de continuar para no sobrescribir esos cambios."
+                : "Error al guardar cambios en Firebase");
         }
 
         mostrarEstadoAutoguardado(
-            "Error al guardar",
+            conflicto
+                ? "Hay cambios más recientes. Recarga la OT"
+                : navigator.onLine
+                ? "No se pudo guardar. Intenta nuevamente"
+                : "Sin conexión. Los cambios siguen pendientes",
             "error"
         );
+
+        cambiosPendientes = true;
+        guardadoEnCurso = false;
+
+        return false;
     }
 }
 
@@ -164,6 +263,8 @@ export function autoguardarCambiosOT(
     if (!ot) return;
 
     clearTimeout(timerAutoguardado);
+
+    cambiosPendientes = true;
 
     mostrarEstadoAutoguardado(
         "Guardando cambios...",

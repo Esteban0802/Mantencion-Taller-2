@@ -1,32 +1,7 @@
-let getOT;
-let getUsuario;
-
-let guardarCambiosOT;
-let autoguardarCambiosOT;
-
-let renderProgresoEtapa;
-let itemCompleto;
-
-let OTBloqueada;
-let esJefeTaller;
-let esUsuarioTaller;
-let puedeEliminarComentario;
-
-let actualizarEstadoGanttDesdeChecklist;
-let recalcularGanttAutomatico;
-let renderCartaGantt;
-
-let comprimirImagenBlob;
-let subirArchivoStorage;
-let eliminarArchivoStorage;
-let verImagenModal;
-
-let actualizarAlertaJefe;
-let obtenerEstadoOT;
-let habilitarTab;
-let cambiarTab;
-let responderComentarioJefe;
-
+import {
+  capturarBorradoresFormulario,
+  restaurarBorradoresFormulario
+} from "./core/utilidades.js";
 
 /**
  * Inicializa el módulo de Pruebas.
@@ -34,70 +9,10 @@ let responderComentarioJefe;
  * El módulo no accede directamente a variables globales de app.js.
  * Todas sus dependencias se reciben desde inicializarModuloPruebas().
  */
-export function inicializarModuloPruebas(dependencias = {}) {
+export function inicializarModuloPruebas(servicios = {}) {
+let avancePruebasEnCurso = false;
 
-  getOT = dependencias.getOT;
-  getUsuario = dependencias.getUsuario;
-
-  guardarCambiosOT = dependencias.guardarCambiosOT;
-  autoguardarCambiosOT = dependencias.autoguardarCambiosOT;
-
-  renderProgresoEtapa = dependencias.renderProgresoEtapa;
-  itemCompleto = dependencias.itemCompleto;
-
-  OTBloqueada = dependencias.OTBloqueada;
-  esJefeTaller = dependencias.esJefeTaller;
-  esUsuarioTaller = dependencias.esUsuarioTaller;
-  puedeEliminarComentario = dependencias.puedeEliminarComentario;
-
-  actualizarEstadoGanttDesdeChecklist =
-    dependencias.actualizarEstadoGanttDesdeChecklist;
-
-  recalcularGanttAutomatico =
-    dependencias.recalcularGanttAutomatico;
-
-  renderCartaGantt = dependencias.renderCartaGantt;
-
-  comprimirImagenBlob = dependencias.comprimirImagenBlob;
-  subirArchivoStorage = dependencias.subirArchivoStorage;
-  eliminarArchivoStorage = dependencias.eliminarArchivoStorage;
-  verImagenModal = dependencias.verImagenModal;
-
-  actualizarAlertaJefe = dependencias.actualizarAlertaJefe;
-  obtenerEstadoOT = dependencias.obtenerEstadoOT;
-  habilitarTab = dependencias.habilitarTab;
-  cambiarTab = dependencias.cambiarTab;
-  responderComentarioJefe = dependencias.responderComentarioJefe;
-
-  validarDependencias();
-
-  exponerFuncionesGlobales();
-
-  console.log("🧩 Módulo Pruebas inicializado correctamente");
-
-  return {
-    cargarChecklist,
-    renderChecklist,
-    togglePrueba,
-    subirFotoPrueba,
-    agregarComentarioPrueba,
-    renderComentariosPrueba,
-    eliminarComentarioPrueba,
-    mostrarFotosPrueba,
-    eliminarFotoPrueba,
-    guardarPruebas,
-    aprobarPruebas,
-    validarPruebasCompleto
-  };
-}
-
-
-/**
- * Comprueba que app.js haya entregado las funciones necesarias.
- */
-function validarDependencias() {
-
-  const requeridas = {
+  const {
     getOT,
     getUsuario,
     guardarCambiosOT,
@@ -119,8 +34,101 @@ function validarDependencias() {
     obtenerEstadoOT,
     habilitarTab,
     cambiarTab,
-    responderComentarioJefe
+    navegarSiguienteEtapa,
+    responderComentarioJefe,
+    aprobacionesHabilitadas,
+    agregarBitacora
+  } = servicios;
+
+  const alert = (mensaje) => {
+    const texto = String(mensaje || "");
+    const tipo = /correctamente|completad[ao]|aprobad[ao]|guardad[ao]/i.test(texto)
+      ? "exito"
+      : /error|no fue posible|no hay os|no hay ot|no se encontró/i.test(texto)
+        ? "error"
+        : "advertencia";
+    const titulo = tipo === "exito"
+      ? "Operación completada"
+      : tipo === "error"
+        ? "No fue posible completar la acción"
+        : "Revisa la información";
+
+    if (window.OverTrackUI?.mostrarMensaje) {
+      return window.OverTrackUI.mostrarMensaje({ titulo, mensaje: texto, tipo });
+    }
+
+    window.alert(texto);
+    return Promise.resolve(true);
   };
+
+  const confirmarEliminacion = (elemento) => {
+    if (window.OverTrackUI?.confirmarAccion) {
+      return window.OverTrackUI.confirmarAccion({
+        titulo: `Eliminar ${elemento}`,
+        mensaje: `Este elemento (${elemento}) se eliminará de la orden de trabajo.`,
+        tipo: "advertencia",
+        textoConfirmar: "Eliminar",
+        textoCancelar: "Cancelar",
+        peligrosa: true
+      });
+    }
+
+    return Promise.resolve(window.confirm(`¿Eliminar ${elemento}?`));
+  };
+
+  validarDependencias({
+    getOT,
+    getUsuario,
+    guardarCambiosOT,
+    autoguardarCambiosOT,
+    renderProgresoEtapa,
+    itemCompleto,
+    OTBloqueada,
+    esJefeTaller,
+    esUsuarioTaller,
+    puedeEliminarComentario,
+    actualizarEstadoGanttDesdeChecklist,
+    recalcularGanttAutomatico,
+    renderCartaGantt,
+    comprimirImagenBlob,
+    subirArchivoStorage,
+    eliminarArchivoStorage,
+    verImagenModal,
+    actualizarAlertaJefe,
+    obtenerEstadoOT,
+    habilitarTab,
+    cambiarTab,
+    navegarSiguienteEtapa,
+    responderComentarioJefe,
+    aprobacionesHabilitadas,
+    agregarBitacora
+  });
+
+  exponerFuncionesGlobales();
+
+  console.log("🧩 Módulo Pruebas inicializado correctamente");
+
+  return {
+    cargarChecklist,
+    renderChecklist,
+    togglePrueba,
+    subirFotoPrueba,
+    agregarComentarioPrueba,
+    renderComentariosPrueba,
+    eliminarComentarioPrueba,
+    mostrarFotosPrueba,
+    eliminarFotoPrueba,
+    guardarPruebas,
+    aprobarPruebas,
+    finalizarPruebasSinAprobacion,
+    validarPruebasCompleto
+  };
+
+
+/**
+ * Comprueba que app.js haya entregado las funciones necesarias.
+ */
+function validarDependencias(requeridas) {
 
   Object.entries(requeridas).forEach(([nombre, valor]) => {
     if (typeof valor !== "function") {
@@ -145,6 +153,7 @@ window.agregarComentarioPrueba = agregarComentarioPrueba;
 window.eliminarComentarioPrueba = eliminarComentarioPrueba;
 window.guardarPruebas = guardarPruebas;
 window.aprobarPruebas = aprobarPruebas;
+window.finalizarPruebasSinAprobacion = finalizarPruebasSinAprobacion;
 
 }
 
@@ -153,7 +162,29 @@ window.aprobarPruebas = aprobarPruebas;
 // CARGAR CHECKLIST
 // =======================
 
-function cargarChecklist(tipo) {
+function obtenerChecklistPruebas(ot) {
+  if (!ot) return [];
+
+  // Compatibilidad con OT creadas por plantillas antes de unificar Pruebas.
+  // Esas OT guardaban el checklist directamente como un arreglo.
+  if (Array.isArray(ot.pruebas)) {
+    ot.pruebas = { general: ot.pruebas };
+  }
+
+  if (!ot.pruebas || typeof ot.pruebas !== "object") {
+    ot.pruebas = { general: [] };
+  }
+
+  if (!Array.isArray(ot.pruebas.general)) {
+    const mecanicas = Array.isArray(ot.pruebas.mecanico) ? ot.pruebas.mecanico : [];
+    const electricas = Array.isArray(ot.pruebas.electrico) ? ot.pruebas.electrico : [];
+    ot.pruebas.general = [...mecanicas, ...electricas];
+  }
+
+  return ot.pruebas.general;
+}
+
+function cargarChecklist() {
 
   const ot = getOT();
 
@@ -162,12 +193,7 @@ function cargarChecklist(tipo) {
     return;
   }
 
-  const inputId =
-    tipo === "mecanico"
-      ? "excelMecanico"
-      : "excelElectrico";
-
-  const input = document.getElementById(inputId);
+  const input = document.getElementById("excelPruebas");
   const file = input?.files?.[0];
 
   if (!file) {
@@ -175,9 +201,19 @@ function cargarChecklist(tipo) {
     return;
   }
 
+  if (!/\.xlsx?$/i.test(file.name) || file.size > 5 * 1024 * 1024) {
+    alert("Selecciona un archivo Excel válido de máximo 5 MB.");
+    input.value = "";
+    return;
+  }
+
   const reader = new FileReader();
 
   reader.onload = async function (event) {
+    const pruebasAnteriores = ot.pruebas && typeof ot.pruebas === "object"
+      ? { ...ot.pruebas, general: ot.pruebas.general }
+      : ot.pruebas;
+    let checklistReemplazado = false;
 
     try {
 
@@ -196,29 +232,29 @@ function cargarChecklist(tipo) {
 
       const checklist = json
         .flat()
-        .filter(item => item)
+        .filter(item => item !== null && item !== undefined && String(item).trim() !== "")
+        .slice(0, 400)
         .map(item => ({
-          item,
+          item: String(item).trim().slice(0, 240),
           ok: false,
           fotos: [],
           comentarios: [],
           fecha: null
         }));
 
-      if (!ot.pruebas) {
-        ot.pruebas = {
-          mecanico: [],
-          electrico: []
-        };
-      }
+      if (!checklist.length) throw new Error("El archivo Excel no contiene ítems válidos.");
 
-      ot.pruebas[tipo] = checklist;
+      if (!ot.pruebas || typeof ot.pruebas !== "object") ot.pruebas = {};
+      ot.pruebas.general = checklist;
+      checklistReemplazado = true;
 
-      await guardarCambiosOT();
+      const guardado = await guardarCambiosOT();
+      if (!guardado) throw new Error("No fue posible guardar el checklist en la OT.");
 
-      renderChecklist(tipo);
+      renderChecklist("general");
 
     } catch (error) {
+      if (checklistReemplazado) ot.pruebas = pruebasAnteriores;
 
       console.error(
         "Error cargando checklist de pruebas:",
@@ -242,30 +278,21 @@ function cargarChecklist(tipo) {
 // RENDER
 // =======================
 
-function renderChecklist(tipo) {
+function renderChecklist(tipo = "general") {
 
   const ot = getOT();
 
   if (!ot) return;
 
-  const contId =
-    tipo === "mecanico"
-      ? "listaMecanico"
-      : "listaElectrico";
-
-  const progresoId =
-    tipo === "mecanico"
-      ? "progresoMecanico"
-      : "progresoElectrico";
-
-  const cont = document.getElementById(contId);
+  tipo = "general";
+  const cont = document.getElementById("listaPruebas");
 
   if (!cont) return;
 
-  const lista = ot.pruebas?.[tipo] || [];
+  const lista = obtenerChecklistPruebas(ot);
 
   renderProgresoEtapa(
-    progresoId,
+    "progresoPruebas",
     lista
   );
 
@@ -442,16 +469,15 @@ async function subirFotoPrueba(event, tipo, index) {
 
   if (!files.length) return;
 
+  let item = null;
+  let fotosOriginales = [];
+  const urlsSubidasEnEsteIntento = [];
+
   try {
 
-    if (!ot.pruebas) {
-      ot.pruebas = {
-        mecanico: [],
-        electrico: []
-      };
-    }
+    obtenerChecklistPruebas(ot);
 
-    const item = ot.pruebas?.[tipo]?.[index];
+    item = ot.pruebas?.[tipo]?.[index];
 
     if (!item) {
       throw new Error(
@@ -462,6 +488,8 @@ async function subirFotoPrueba(event, tipo, index) {
     if (!Array.isArray(item.fotos)) {
       item.fotos = [];
     }
+
+    fotosOriginales = [...item.fotos];
 
     for (const file of files) {
 
@@ -483,23 +511,37 @@ async function subirFotoPrueba(event, tipo, index) {
           index
         );
 
+      if (!urlFoto) throw new Error("La fotografía no obtuvo una URL válida");
+
+      urlsSubidasEnEsteIntento.push(urlFoto);
       item.fotos.push(urlFoto);
     }
 
-    await guardarCambiosOT();
+    const guardado = await guardarCambiosOT();
+    if (!guardado) {
+      throw new Error("No fue posible confirmar las fotografías en la OT.");
+    }
 
+    const borradores = capturarBorradoresFormulario("listaPruebas");
     renderChecklist(tipo);
+    restaurarBorradoresFormulario("listaPruebas", borradores);
 
     event.target.value = "";
 
   } catch (error) {
+
+    await Promise.allSettled(
+      urlsSubidasEnEsteIntento.map(url => eliminarArchivoStorage(url))
+    );
+    if (item) item.fotos = fotosOriginales;
+    event.target.value = "";
 
     console.error(
       "Error subiendo foto de pruebas:",
       error
     );
 
-    alert("Error al subir imágenes de pruebas");
+    alert(`No se completó la carga de ${files.length} fotografía(s). No se agregó ninguna evidencia del lote.`);
   }
 }
 
@@ -528,6 +570,9 @@ function mostrarFotosPrueba(tipo, index) {
 
     const img = document.createElement("img");
 
+    img.loading = "lazy";
+    img.decoding = "async";
+    img.alt = `Evidencia ${fotoIndex + 1} de pruebas`;
     img.src = foto;
     img.width = 100;
     img.style.cursor = "pointer";
@@ -564,7 +609,7 @@ async function eliminarFotoPrueba(
 
   if (!ot || OTBloqueada()) return;
 
-  if (!confirm("¿Eliminar esta evidencia?")) {
+  if (!(await confirmarEliminacion("evidencia"))) {
     return;
   }
 
@@ -578,12 +623,15 @@ async function eliminarFotoPrueba(
   if (!urlFoto) return;
 
   try {
-
-    await eliminarArchivoStorage(urlFoto);
-
     fotos.splice(fotoIndex, 1);
 
-    await guardarCambiosOT();
+    const guardado = await guardarCambiosOT();
+    if (!guardado) {
+      fotos.splice(fotoIndex, 0, urlFoto);
+      return;
+    }
+
+    await eliminarArchivoStorage(urlFoto);
 
     renderChecklist(tipo);
 
@@ -603,7 +651,7 @@ async function eliminarFotoPrueba(
 // COMENTARIOS
 // =======================
 
-function agregarComentarioPrueba(tipo, index) {
+async function agregarComentarioPrueba(tipo, index) {
 
   const ot = getOT();
   const usuario = getUsuario();
@@ -634,6 +682,10 @@ function agregarComentarioPrueba(tipo, index) {
     item.comentarios = [];
   }
 
+  const cantidadComentariosAnterior = item.comentarios.length;
+  const alertaJefeAnterior = ot.alertaJefe;
+  const fechaAnterior = item.fecha;
+
   item.comentarios.push({
     nombre,
     texto,
@@ -655,7 +707,16 @@ function agregarComentarioPrueba(tipo, index) {
     item.fecha = new Date().toLocaleString();
   }
 
-  guardarCambiosOT();
+  if (inputComentario) inputComentario.value = "";
+
+  const guardado = await guardarCambiosOT();
+  if (!guardado) {
+    item.comentarios.splice(cantidadComentariosAnterior);
+    ot.alertaJefe = alertaJefeAnterior;
+    item.fecha = fechaAnterior;
+    if (inputComentario) inputComentario.value = texto;
+    return;
+  }
 
   renderChecklist(tipo);
 }
@@ -681,7 +742,7 @@ function renderComentariosPrueba(tipo, index) {
     const div = document.createElement("div");
 
     div.className =
-      comentario.rol === "jefe_taller"
+      ["jefe_taller", "admin_sucursal"].includes(comentario.rol)
         ? "comentario-card comentario-jefe"
         : "comentario-card";
 
@@ -695,7 +756,7 @@ function renderComentariosPrueba(tipo, index) {
       <p>${comentario.texto}</p>
 
       ${
-        comentario.rol === "jefe_taller" &&
+        ["jefe_taller", "admin_sucursal"].includes(comentario.rol) &&
         comentario.atendido !== true &&
         esUsuarioTaller()
           ? `
@@ -716,7 +777,7 @@ function renderComentariosPrueba(tipo, index) {
       }
 
       ${
-        comentario.rol === "jefe_taller" &&
+        ["jefe_taller", "admin_sucursal"].includes(comentario.rol) &&
         comentario.atendido === true
           ? `
             <div class="respuesta-observacion">
@@ -765,7 +826,7 @@ function renderComentariosPrueba(tipo, index) {
 }
 
 
-function eliminarComentarioPrueba(
+async function eliminarComentarioPrueba(
   tipo,
   index,
   comentarioIndex
@@ -775,7 +836,7 @@ function eliminarComentarioPrueba(
 
   if (!ot || OTBloqueada()) return;
 
-  if (!confirm("¿Eliminar este registro?")) {
+  if (!(await confirmarEliminacion("comentario"))) {
     return;
   }
 
@@ -787,11 +848,18 @@ function eliminarComentarioPrueba(
     return;
   }
 
+  const comentarioEliminado = comentarios[comentarioIndex];
+  const alertaJefeAnterior = ot.alertaJefe;
   comentarios.splice(comentarioIndex, 1);
 
   actualizarAlertaJefe();
 
-  guardarCambiosOT();
+  const guardado = await guardarCambiosOT();
+  if (!guardado) {
+    comentarios.splice(comentarioIndex, 0, comentarioEliminado);
+    ot.alertaJefe = alertaJefeAnterior;
+    return;
+  }
 
   renderChecklist(tipo);
 }
@@ -801,7 +869,7 @@ function eliminarComentarioPrueba(
 // GUARDAR
 // =======================
 
-function guardarPruebas() {
+async function guardarPruebas() {
 
   const ot = getOT();
 
@@ -810,7 +878,9 @@ function guardarPruebas() {
     return;
   }
 
-  guardarCambiosOT();
+  const guardado = await guardarCambiosOT();
+
+  if (!guardado) return;
 
   alert("Progreso de PRUEBAS guardado ✅");
 }
@@ -822,9 +892,16 @@ function guardarPruebas() {
 
 async function aprobarPruebas() {
 
+  if (avancePruebasEnCurso) return;
+
   const ot = getOT();
 
   if (!ot || OTBloqueada()) return;
+
+  if (!aprobacionesHabilitadas()) {
+    alert("El módulo Aprobaciones está deshabilitado para esta empresa");
+    return;
+  }
 
   if (!esJefeTaller()) {
     alert("Solo Jefe de Taller puede aprobar pruebas");
@@ -833,15 +910,33 @@ async function aprobarPruebas() {
 
   if (!validarPruebasCompleto()) return;
 
+  avancePruebasEnCurso = true;
+  const botones = Array.from(document.querySelectorAll(
+    '[onclick*="aprobarPruebas"], [onclick*="finalizarPruebasSinAprobacion"]'
+  ));
+  botones.forEach(boton => { boton.disabled = true; });
+  const pruebasAprobadoAnterior = ot.pruebasAprobado;
+  const estadoAnterior = ot.estado;
+
+  try {
+
   ot.pruebasAprobado = true;
   ot.estado = obtenerEstadoOT(ot);
 
-  await guardarCambiosOT();
+  const guardado = await guardarCambiosOT();
+  if (!guardado) {
+    ot.pruebasAprobado = pruebasAprobadoAnterior;
+    ot.estado = estadoAnterior;
+    return;
+  }
 
-  habilitarTab("despacho");
-  cambiarTab("despacho");
+  navegarSiguienteEtapa("pruebas");
 
   alert("Pruebas aprobadas ✅");
+  } finally {
+    avancePruebasEnCurso = false;
+    botones.forEach(boton => { boton.disabled = false; });
+  }
 }
 
 
@@ -858,17 +953,14 @@ function validarPruebasCompleto() {
     return false;
   }
 
-  const tipos = [
-    "mecanico",
-    "electrico"
-  ];
+  const tipos = ["general"];
 
   for (const tipo of tipos) {
 
-    const lista = ot.pruebas[tipo];
+    const lista = obtenerChecklistPruebas(ot);
 
     if (!Array.isArray(lista) || lista.length === 0) {
-      alert(`Falta cargar checklist ${tipo}`);
+      alert("Falta cargar el checklist de pruebas");
       return false;
     }
 
@@ -884,7 +976,7 @@ function validarPruebasCompleto() {
         alert(
           `Falta marcar como realizado el ítem ${
             index + 1
-          } en pruebas ${tipo}`
+          } en pruebas`
         );
 
         return false;
@@ -897,7 +989,7 @@ function validarPruebasCompleto() {
         alert(
           `Falta evidencia fotográfica en el ítem ${
             index + 1
-          } de pruebas ${tipo}`
+          } de pruebas`
         );
 
         return false;
@@ -906,14 +998,14 @@ function validarPruebasCompleto() {
       const comentariosTecnicos =
         (item.comentarios || []).filter(
           comentario =>
-            comentario.rol !== "jefe_taller"
+            !["jefe_taller", "admin_sucursal"].includes(comentario.rol)
         );
 
       if (comentariosTecnicos.length === 0) {
         alert(
           `Falta comentario técnico en el ítem ${
             index + 1
-          } de pruebas ${tipo}`
+          } de pruebas`
         );
 
         return false;
@@ -922,14 +1014,14 @@ function validarPruebasCompleto() {
       const observacionesPendientes =
         (item.comentarios || []).some(
           comentario =>
-            comentario.rol === "jefe_taller" &&
+            ["jefe_taller", "admin_sucursal"].includes(comentario.rol) &&
             comentario.atendido !== true
         );
 
       if (observacionesPendientes) {
         alert(
           `Existen observaciones pendientes del ` +
-          `Jefe de Taller en pruebas ${tipo}, ` +
+          `Jefe de Taller en pruebas, ` +
           `ítem ${index + 1}`
         );
 
@@ -939,4 +1031,76 @@ function validarPruebasCompleto() {
   }
 
   return true;
+}
+
+
+// =======================
+// FINALIZAR SIN APROBACIÓN
+// =======================
+async function finalizarPruebasSinAprobacion() {
+
+  if (avancePruebasEnCurso) return;
+
+  const ot = getOT();
+
+  if (!ot || OTBloqueada()) return;
+
+  if (aprobacionesHabilitadas()) {
+    alert("Esta empresa requiere aprobación del Jefe de Taller");
+    return;
+  }
+
+  if (!validarPruebasCompleto()) return;
+
+  avancePruebasEnCurso = true;
+  const botones = Array.from(document.querySelectorAll(
+    '[onclick*="aprobarPruebas"], [onclick*="finalizarPruebasSinAprobacion"]'
+  ));
+  botones.forEach(boton => { boton.disabled = true; });
+  const estadoAnterior = {
+    pruebasAprobado: ot.pruebasAprobado,
+    decisionPruebas: ot.decisionPruebas,
+    estado: ot.estado,
+    bitacora: Array.isArray(ot.bitacora) ? [...ot.bitacora] : null
+  };
+
+  try {
+    ot.pruebasAprobado = true;
+    ot.decisionPruebas = {
+      resultado: "NO REQUERIDA",
+      comentario: "La empresa tiene deshabilitado el módulo Aprobaciones.",
+      usuario: getUsuario()?.nombre || "Usuario",
+      rol: getUsuario()?.rol || "usuario_taller",
+      fecha: new Date().toLocaleString()
+    };
+    ot.estado = obtenerEstadoOT(ot);
+
+    agregarBitacora(
+      "Pruebas completadas sin aprobación",
+      "El módulo Aprobaciones está deshabilitado. La OT continúa al siguiente paso habilitado."
+    );
+
+    const guardado = await guardarCambiosOT();
+    if (!guardado) throw new Error("No fue posible confirmar la etapa de Pruebas.");
+
+    const siguiente = navegarSiguienteEtapa("pruebas");
+
+    if (siguiente) {
+      alert("Pruebas completadas. Se habilita la siguiente etapa ✅");
+    }
+
+  } catch (error) {
+    ot.pruebasAprobado = estadoAnterior.pruebasAprobado;
+    ot.decisionPruebas = estadoAnterior.decisionPruebas;
+    ot.estado = estadoAnterior.estado;
+    if (estadoAnterior.bitacora) ot.bitacora = estadoAnterior.bitacora;
+    else delete ot.bitacora;
+    console.error("Error finalizando Pruebas sin aprobación:", error);
+    alert("No fue posible finalizar la etapa de Pruebas");
+  } finally {
+    avancePruebasEnCurso = false;
+    botones.forEach(boton => { boton.disabled = false; });
+  }
+}
+
 }

@@ -1,46 +1,46 @@
-let getOT = null;
-let getUsuario = null;
-
-let guardarCambiosOT = null;
-let OTBloqueada = null;
-let esJefeTaller = null;
-
-
 /**
  * Inicializa las dependencias del módulo de repuestos.
  */
-export function inicializarModuloRepuestos(dependencias = {}) {
+export function inicializarModuloRepuestos(servicios = {}) {
 
-    getOT = dependencias.getOT;
-    getUsuario = dependencias.getUsuario;
+    const {
+        getOT,
+        getUsuario,
+        guardarCambiosOT,
+        OTBloqueada,
+        esJefeTaller,
+        repuestosHabilitados
+    } = servicios;
 
-    guardarCambiosOT =
-        dependencias.guardarCambiosOT;
+    const alert = (mensaje) => {
+        const texto = String(mensaje || "");
+        const tipo = /correctamente|guardad[ao]|cargad[ao]/i.test(texto)
+            ? "exito"
+            : /error|no fue posible|no hay una os|no hay repuestos/i.test(texto)
+                ? "error"
+                : "advertencia";
+        const titulo = tipo === "exito"
+            ? "Operación completada"
+            : tipo === "error"
+                ? "No fue posible completar la acción"
+                : "Revisa la información";
 
-    OTBloqueada =
-        dependencias.OTBloqueada;
+        if (window.OverTrackUI?.mostrarMensaje) {
+            return window.OverTrackUI.mostrarMensaje({ titulo, mensaje: texto, tipo });
+        }
 
-    esJefeTaller =
-        dependencias.esJefeTaller;
+        window.alert(texto);
+        return Promise.resolve(true);
+    };
 
-    if (typeof getOT !== "function") {
-        throw new Error(
-            "repuestos.js requiere una función getOT"
-        );
-    }
-
-    if (typeof getUsuario !== "function") {
-        throw new Error(
-            "repuestos.js requiere una función getUsuario"
-        );
-    }
-
-    if (typeof guardarCambiosOT !== "function") {
-        throw new Error(
-            "repuestos.js requiere guardarCambiosOT"
-        );
-    }
-}
+    validarDependencias({
+        getOT,
+        getUsuario,
+        guardarCambiosOT,
+        OTBloqueada,
+        esJefeTaller,
+        repuestosHabilitados
+    });
 
 
 /* =========================================================
@@ -53,6 +53,18 @@ function obtenerOT() {
 
 function obtenerUsuario() {
     return getUsuario?.() || null;
+}
+
+function validarModuloRepuestos() {
+    if (repuestosHabilitados?.() === true) {
+        return true;
+    }
+
+    alert(
+        "El módulo Repuestos no está habilitado para esta empresa."
+    );
+
+    return false;
 }
 
 function escaparHTML(valor) {
@@ -70,7 +82,9 @@ function escaparHTML(valor) {
    CARGAR EXCEL
 ========================================================= */
 
-export function cargarRepuestosExcel() {
+function cargarRepuestosExcel() {
+
+    if (!validarModuloRepuestos()) return;
 
     if (!esJefeTaller?.()) {
         alert(
@@ -88,6 +102,12 @@ export function cargarRepuestosExcel() {
         alert(
             "Debes subir un archivo Excel de repuestos"
         );
+        return;
+    }
+
+    if (!/\.xlsx?$/i.test(file.name) || file.size > 5 * 1024 * 1024) {
+        alert("Selecciona un archivo Excel válido de máximo 5 MB");
+        input.value = "";
         return;
     }
 
@@ -127,21 +147,36 @@ export function cargarRepuestosExcel() {
                         String(valor ?? "").trim() !== ""
                     )
                 )
+                .slice(0, 400)
                 .map(fila => ({
-                    codigo: fila[0] || "",
-                    descripcion: fila[1] || "",
-                    cantidad: fila[2] || "",
+                    codigo: String(fila[0] ?? "").trim().slice(0, 120),
+                    descripcion: String(fila[1] ?? "").trim().slice(0, 240),
+                    cantidad: String(fila[2] ?? "").trim().slice(0, 40),
                     usado: false,
                     comentario: "",
                     tecnico: "",
                     fecha: ""
-                }));
+                }))
+                .filter(repuesto => repuesto.codigo || repuesto.descripcion);
 
             if (!repuestos.length) {
                 alert(
                     "El archivo no contiene repuestos válidos"
                 );
                 return;
+            }
+
+            const codigos = repuestos.map(item => item.codigo.toLowerCase()).filter(Boolean);
+            if (new Set(codigos).size !== codigos.length) {
+                throw new Error("El archivo contiene códigos de repuesto duplicados");
+            }
+
+            const cantidadInvalida = repuestos.find(item =>
+                item.cantidad !== "" &&
+                (!Number.isFinite(Number(item.cantidad.replace(",", "."))) || Number(item.cantidad.replace(",", ".")) < 0)
+            );
+            if (cantidadInvalida) {
+                throw new Error(`Cantidad inválida para el repuesto ${cantidadInvalida.codigo || cantidadInvalida.descripcion}`);
             }
 
             const ot = obtenerOT();
@@ -152,6 +187,7 @@ export function cargarRepuestosExcel() {
                 return;
             }
 
+            const repuestosAnteriores = ot.repuestos;
             ot.repuestos = {
                 items: repuestos,
                 cargadoPor:
@@ -161,7 +197,11 @@ export function cargarRepuestosExcel() {
                     new Date().toLocaleString()
             };
 
-            await guardarCambiosOT();
+            const guardado = await guardarCambiosOT();
+            if (!guardado) {
+                ot.repuestos = repuestosAnteriores;
+                return;
+            }
 
             if (input) {
                 input.value = "";
@@ -204,7 +244,9 @@ export function cargarRepuestosExcel() {
    MODAL
 ========================================================= */
 
-export function abrirModalRepuestos() {
+function abrirModalRepuestos() {
+
+    if (!validarModuloRepuestos()) return;
 
     const ot = obtenerOT();
 
@@ -231,7 +273,7 @@ export function abrirModalRepuestos() {
     }
 }
 
-export function cerrarModalRepuestos() {
+function cerrarModalRepuestos() {
 
     const modal =
         document.getElementById("modalRepuestos");
@@ -246,7 +288,9 @@ export function cerrarModalRepuestos() {
    RENDERIZADO
 ========================================================= */
 
-export function renderRepuestosModal() {
+function renderRepuestosModal() {
+
+    if (repuestosHabilitados?.() !== true) return;
 
     const ot = obtenerOT();
 
@@ -353,7 +397,9 @@ export function renderRepuestosModal() {
    GUARDAR USO DE REPUESTOS
 ========================================================= */
 
-export async function guardarRepuestosUsados() {
+async function guardarRepuestosUsados() {
+
+    if (!validarModuloRepuestos()) return;
 
     if (OTBloqueada?.()) {
         alert(
@@ -373,6 +419,7 @@ export async function guardarRepuestosUsados() {
     }
 
     const usuario = obtenerUsuario();
+    const itemsAnteriores = items.map(item => ({ ...item }));
 
     items.forEach((repuesto, index) => {
 
@@ -415,11 +462,57 @@ export async function guardarRepuestosUsados() {
         }
     });
 
-    await guardarCambiosOT();
+    const guardado = await guardarCambiosOT();
+    if (!guardado) {
+        ot.repuestos.items = itemsAnteriores;
+        renderRepuestosModal();
+        return;
+    }
 
     alert(
         "Repuestos guardados correctamente ✅"
     );
 
     cerrarModalRepuestos();
+}
+
+
+/* =========================================================
+   FUNCIONES EXPUESTAS AL HTML
+========================================================= */
+
+window.cargarRepuestosExcel =
+    cargarRepuestosExcel;
+
+window.abrirModalRepuestos =
+    abrirModalRepuestos;
+
+window.cerrarModalRepuestos =
+    cerrarModalRepuestos;
+
+window.renderRepuestosModal =
+    renderRepuestosModal;
+
+window.guardarRepuestosUsados =
+    guardarRepuestosUsados;
+
+console.log(
+    "📦 Módulo Repuestos inicializado correctamente"
+);
+
+}
+
+
+function validarDependencias(dependencias) {
+
+    Object.entries(dependencias).forEach(
+        ([nombre, valor]) => {
+
+            if (typeof valor !== "function") {
+                throw new Error(
+                    `Repuestos: falta la dependencia ${nombre}.`
+                );
+            }
+        }
+    );
 }

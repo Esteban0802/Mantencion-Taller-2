@@ -1,0 +1,19 @@
+Options -Indexes
+DirectoryIndex index.html
+
+# Impide publicar por accidente archivos internos, respaldos y credenciales locales.
+<FilesMatch "(^\.|\.backup($|\.)|\.pre-[^.]+\.backup|^(firebase|firestore|storage)(\.|-)|^(package(-lock)?|README|cors)\.(json|md)$|\.log$)">
+  Require all denied
+</FilesMatch>
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteRule "(^|/)(functions|tests|docs|node_modules|\.git|\.firebase[^/]*|\.npm-cache-codex)(/|$)" - [F,L,NC]
+</IfModule>
+
+<IfModule mod_headers.c>
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set X-Frame-Options "SAMEORIGIN"
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
+  Header always set Permissions-Policy "camera=(self), microphone=(), geolocation=()"
+</IfModule>

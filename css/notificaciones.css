@@ -1,0 +1,156 @@
+.ot-feedback-root {
+  position: relative;
+  z-index: 100000;
+}
+
+.ot-feedback-backdrop {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(4, 15, 30, 0.54);
+  backdrop-filter: blur(5px);
+  opacity: 0;
+  transition: opacity 140ms ease;
+}
+
+.ot-feedback-backdrop.is-visible { opacity: 1; }
+.ot-feedback-backdrop.is-closing { opacity: 0; }
+
+.ot-feedback-dialog {
+  width: min(480px, 100%);
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  gap: 16px;
+  padding: 24px;
+  color: #0d1b2a;
+  background: #fff;
+  border: 1px solid #d8e2ec;
+  border-radius: 20px;
+  box-shadow: 0 24px 70px rgba(13, 27, 42, 0.24);
+  transform: translateY(10px) scale(0.98);
+  transition: transform 140ms ease;
+  font-family: inherit;
+}
+
+.is-visible .ot-feedback-dialog { transform: translateY(0) scale(1); }
+
+.ot-feedback-icon {
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  color: #fff;
+  background: #1565c0;
+  font-size: 25px;
+  font-weight: 800;
+}
+
+.ot-feedback-exito .ot-feedback-icon { background: #16a34a; }
+.ot-feedback-advertencia .ot-feedback-icon { background: #f59e0b; }
+.ot-feedback-error .ot-feedback-icon { background: #dc3545; }
+
+.ot-feedback-content h2 {
+  margin: 2px 0 8px;
+  color: #0d1b2a;
+  font-size: 20px;
+  line-height: 1.25;
+}
+
+.ot-feedback-message {
+  color: #526b7a;
+  font-size: 14px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.ot-feedback-actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 22px;
+}
+
+.ot-feedback-actions button {
+  min-height: 42px;
+  padding: 10px 17px;
+  border-radius: 11px;
+  border: 1px solid transparent;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.ot-feedback-primary {
+  color: #fff;
+  background: #1565c0;
+  box-shadow: 0 8px 18px rgba(21, 101, 192, 0.2);
+}
+
+.ot-feedback-primary.is-danger { background: #dc3545; }
+
+.ot-feedback-secondary,
+.ot-feedback-copy {
+  color: #153047;
+  background: #f4f8fb;
+  border-color: #cbd9e5 !important;
+}
+
+.ot-feedback-actions button:hover { filter: brightness(0.96); }
+.ot-feedback-actions button:focus-visible {
+  outline: 3px solid rgba(21, 101, 192, 0.28);
+  outline-offset: 2px;
+}
+
+@media (max-width: 560px) {
+  .ot-feedback-dialog {
+    grid-template-columns: 1fr;
+    padding: 20px;
+  }
+
+  .ot-feedback-actions { flex-direction: column-reverse; }
+  .ot-feedback-actions button { width: 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ot-feedback-backdrop,
+  .ot-feedback-dialog { transition: none; }
+}
+
+
+.ot-feedback-field {
+  display: grid;
+  gap: 7px;
+  margin-top: 16px;
+  color: #334155;
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.ot-feedback-field input {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  background: #fff;
+  color: #0d1b2a;
+  font: inherit;
+}
+
+.ot-feedback-field input:focus {
+  outline: 3px solid rgba(21, 101, 192, 0.18);
+  border-color: #1565c0;
+}
+
+.ot-feedback-primary:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+  filter: none;
+}

@@ -1,14 +1,14 @@
-# OVERTRACK 2.0 — Arquitectura Multiempresa
+# VECTARIA — Arquitectura Multiempresa
 
 ## 1. Visión general
 
-OverTrack será una plataforma web multiempresa para la gestión de órdenes de servicio, mantenimiento, evidencias técnicas, checklist, aprobaciones, reportes PDF y trazabilidad operacional.
+Vectaria será una plataforma web multiempresa para la gestión de órdenes de servicio, mantenimiento, evidencias técnicas, checklist, aprobaciones, reportes PDF y trazabilidad operacional.
 
 El sistema permitirá que múltiples empresas utilicen la misma plataforma, manteniendo sus datos separados por empresa y sucursal.
 
 ## 2. Objetivo principal
 
-Transformar OverTrack desde un sistema operativo de taller a una plataforma SaaS multiempresa, donde cada empresa pueda administrar sus usuarios, sucursales, órdenes de servicio y reportes.
+Transformar Vectaria desde un sistema operativo de taller a una plataforma SaaS multiempresa, donde cada empresa pueda administrar sus usuarios, sucursales, órdenes de servicio y reportes.
 
 ## 3. Estructura general
 
@@ -35,7 +35,7 @@ Puede:
 
 ### Administrador Empresa
 
-Rol asignado al cliente responsable de administrar su empresa dentro de OverTrack.
+Rol asignado al cliente responsable de administrar su empresa dentro de Vectaria.
 
 Puede:
 - Ver solo su empresa.
@@ -90,7 +90,7 @@ Esto permitirá separar correctamente los datos entre empresas y sucursales.
 
 ## 7. Estado actual
 
-OverTrack ya cuenta con:
+Vectaria ya cuenta con:
 
 - Login.
 - Roles básicos.
@@ -268,11 +268,11 @@ Ejemplos:
 
 ---
 
-# 11. Arquitectura OverTrack v1.0
+# 11. Arquitectura Vectaria v1.0
 
 ## 11.1 Estructura general del sistema
 
-OverTrack se dividirá en tres grandes niveles:
+Vectaria se dividirá en tres grandes niveles:
 
 1. Super Administrador
 2. Administrador de Empresa
@@ -331,7 +331,7 @@ Funciones principales:
 
 ## 11.4 Operación de Taller
 
-Módulo operativo actual de OverTrack.
+Módulo operativo actual de Vectaria.
 
 Módulos:
 

@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1536 1024" role="img" aria-labelledby="title desc">
+  <title id="title">OverTrack</title>
+  <desc id="desc">Gestión de Órdenes de Trabajo</desc>
+
+  <defs>
+    <clipPath id="over-text">
+      <rect x="60" y="628" width="675" height="190" />
+    </clipPath>
+
+    <clipPath id="tagline-text">
+      <rect x="55" y="812" width="1430" height="100" />
+    </clipPath>
+
+    <filter id="white-text" color-interpolation-filters="sRGB">
+      <feColorMatrix
+        type="matrix"
+        values="0 0 0 0 0.972
+                0 0 0 0 0.984
+                0 0 0 0 1
+                0 0 0 1 0"
+      />
+    </filter>
+
+    <filter id="silver-text" color-interpolation-filters="sRGB">
+      <feColorMatrix
+        type="matrix"
+        values="0 0 0 0 0.690
+                0 0 0 0 0.745
+                0 0 0 0 0.800
+                0 0 0 1 0"
+      />
+    </filter>
+  </defs>
+
+  <image href="overtrack-logo-sidebar.png" width="1536" height="1024" />
+
+  <image
+    href="overtrack-logo-sidebar.png"
+    width="1536"
+    height="1024"
+    clip-path="url(#over-text)"
+    filter="url(#white-text)"
+  />
+
+  <image
+    href="overtrack-logo-sidebar.png"
+    width="1536"
+    height="1024"
+    clip-path="url(#tagline-text)"
+    filter="url(#silver-text)"
+  />
+</svg>

@@ -2,42 +2,105 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Dashboard Órdenes</title>
-  <link rel="icon" type="image/png" href="img/logo_overtrack - pestaña.png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard | Vectaria</title>
+  <link rel="icon" type="image/png" href="img/vectaria-favicon-official.png?v=3">
   <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/brand-overtrack.css">
+  <link rel="stylesheet" href="css/brand-overtrack-light.css">
+  <link rel="stylesheet" href="css/notificaciones.css">
+  <link rel="stylesheet" href="css/desktop-density.css">
 </head>
-<body>
+<body class="dashboard-overtrack">
 
 <div class="app">
 
+  <header class="mobile-topbar">
+    <div class="mobile-topbar-brand" aria-label="Vectaria">
+      <div class="mobile-brand-composite" role="img" aria-label="Vectaria - Gestión operativa">
+        <img class="mobile-brand-layer mobile-brand-base" src="img/vectaria-logo-official.png?v=3" alt="">
+      </div>
+    </div>
+    <button type="button" class="mobile-menu-toggle" aria-controls="dashboardSidebar" aria-expanded="false" aria-label="Abrir menú de navegación">
+      <span aria-hidden="true">☰</span>
+      <span>Menú</span>
+    </button>
+  </header>
+  <button type="button" class="mobile-menu-backdrop" aria-label="Cerrar menú de navegación" tabindex="-1"></button>
+
   <!-- SIDEBAR -->
-  <aside class="sidebar">
+  <aside class="sidebar" id="dashboardSidebar">
     <div class="sidebar-logo">
-      <img src="img/logo_overtrack.png" alt="OverTrack">
+      <img class="sidebar-brand-logo" src="img/vectaria-logo-official.png?v=3" alt="Vectaria - Tu operación, en una misma dirección">
     </div>
 
     <ul>
       <li
         id="menuDashboardOperacional"
+        role="button"
+        tabindex="0"
         onclick="irDashboard()"
       >
-        📊 Dashboard
+        <svg class="ot-icon nav-icon" aria-hidden="true"><use href="img/icons-overtrack.svg#dashboard"></use></svg>
+        <span>Dashboard</span>
       </li>
 
       <li
         id="menuNuevaOT"
+        role="button"
+        tabindex="0"
         onclick="nuevaOT()"
       >
-        ➕ Nueva OT
+        <svg class="ot-icon nav-icon" aria-hidden="true"><use href="img/icons-overtrack.svg#plus-circle"></use></svg>
+        <span>Nueva OT</span>
+      </li>
+      <li
+        id="menuOrdenes"
+        role="button"
+        tabindex="0"
+        onclick="irOrdenes()"
+      >
+        <svg class="ot-icon nav-icon" aria-hidden="true"><use href="img/icons-overtrack.svg#list"></use></svg>
+        <span>Todas las OT</span>
+      </li>
+      <li
+        id="menuInventario"
+        role="button"
+        tabindex="0"
+        style="display:none"
+        onclick="irInventario()"
+      >
+        <svg class="ot-icon nav-icon" aria-hidden="true"><use href="img/icons-overtrack.svg#clipboard"></use></svg>
+        <span>Inventario</span>
+      </li>
+      <li
+        id="menuProgramacion"
+        role="button"
+        tabindex="0"
+        style="display:none"
+        onclick="irProgramacion()"
+      >
+        <svg class="ot-icon nav-icon" aria-hidden="true"><use href="img/icons-overtrack.svg#calendar"></use></svg>
+        <span>Programación</span>
+      </li>
+      <li id="menuSheq" role="button" tabindex="0" style="display:none" onclick="irSheq()">
+        <span class="nav-icon" aria-hidden="true">🛡️</span><span>SHEQ</span>
       </li>
       <li
           id="btnPanelEmpresa"
+          role="button"
+          tabindex="0"
           style="display:none"
           onclick="volverPanelEmpresa()"
       >
-          ⚙ Panel Empresa
+          <svg class="ot-icon nav-icon" aria-hidden="true"><use href="img/icons-overtrack.svg#building-cog"></use></svg>
+          <span>Panel Empresa</span>
       </li>
     </ul>
+
+    <button type="button" class="mobile-menu-logout permitido-bloqueo" onclick="cerrarSesion()">
+      Salir
+    </button>
   </aside>
 
   <!-- CONTENIDO -->
@@ -66,10 +129,11 @@
 </div>
 
 <div class="buscador" id="panelBuscadorOT">
+  <label class="sr-only" for="inputBuscar">Buscar órdenes de trabajo</label>
   <input 
     type="text" 
     id="inputBuscar" 
-    placeholder="🔍 Buscar por OT, equipo o serie..."
+    placeholder="Buscar por OT, equipo o serie..."
     onkeyup="filtrarOTs()"
   >
 </div>
@@ -84,40 +148,40 @@
 
 </div>
 
-<div class="kpis kpis-pro" id="panelKPIs">
+<div class="kpis kpis-pro" id="panelKPIs" aria-busy="true">
 
   <div class="kpi-card total">
-    <div class="kpi-icon">📊</div>
+    <div class="kpi-icon"><svg class="ot-icon" aria-hidden="true"><use href="img/icons-overtrack.svg#clipboard"></use></svg></div>
     <div>
       <span>Total OT</span>
-      <h3 id="kpiTotal">0</h3>
+      <h3 id="kpiTotal" aria-label="Cargando">…</h3>
       <small>Órdenes registradas</small>
     </div>
   </div>
 
   <div class="kpi-card proceso">
-    <div class="kpi-icon">⚙️</div>
+    <div class="kpi-icon"><svg class="ot-icon" aria-hidden="true"><use href="img/icons-overtrack.svg#tools"></use></svg></div>
     <div>
       <span>En Proceso</span>
-      <h3 id="kpiProceso">0</h3>
+      <h3 id="kpiProceso" aria-label="Cargando">…</h3>
       <small>Actualmente activas</small>
     </div>
   </div>
 
   <div class="kpi-card atrasadas">
-    <div class="kpi-icon">⚠️</div>
+    <div class="kpi-icon"><svg class="ot-icon" aria-hidden="true"><use href="img/icons-overtrack.svg#clock-alert"></use></svg></div>
     <div>
       <span>Atrasadas</span>
-      <h3 id="kpiAtrasadas">0</h3>
+      <h3 id="kpiAtrasadas" aria-label="Cargando">…</h3>
       <small>Fuera de plazo</small>
     </div>
   </div>
 
   <div class="kpi-card cerradas">
-    <div class="kpi-icon">✅</div>
+    <div class="kpi-icon"><svg class="ot-icon" aria-hidden="true"><use href="img/icons-overtrack.svg#check-circle"></use></svg></div>
     <div>
       <span>Cerradas</span>
-      <h3 id="kpiCerradas">0</h3>
+      <h3 id="kpiCerradas" aria-label="Cargando">…</h3>
       <small>Finalizadas</small>
     </div>
   </div>
@@ -126,22 +190,27 @@
 
 <div class="card" id="panelOTs">
   <div class="panel-header-pro">
-    <h3>📋 Órdenes de Servicio</h3>
-    <span>Vista operacional del taller</span>
+    <div>
+      <h3><svg class="ot-icon section-icon" aria-hidden="true"><use href="img/icons-overtrack.svg#list"></use></svg>OT activas recientes</h3>
+      <span>Las 6 órdenes abiertas más recientes</span>
+    </div>
+    <button type="button" class="btn-ver-ordenes" onclick="irOrdenes()">Ver todas las OT</button>
   </div>
 
-  <div id="cardsOT" class="cards-ot-grid"></div>
+  <div id="cardsOT" class="cards-ot-grid" aria-busy="true">
+    <p class="sin-alertas estado-carga-dashboard">Cargando órdenes recientes…</p>
+  </div>
 </div>
 
     <div class="charts" id="panelGraficos">
 
   <div class="chart-card">
-    <h3>Estado de Órdenes</h3>
+    <h3><svg class="ot-icon section-icon" aria-hidden="true"><use href="img/icons-overtrack.svg#clipboard"></use></svg>Estado de Órdenes</h3>
     <canvas id="graficoEstados"></canvas>
   </div>
 
   <div class="chart-card">
-    <h3>Progreso Global</h3>
+    <h3><svg class="ot-icon section-icon" aria-hidden="true"><use href="img/icons-overtrack.svg#bar-chart"></use></svg>Progreso Global</h3>
     <canvas id="graficoProgreso"></canvas>
   </div>
 
@@ -152,27 +221,27 @@
 
   <div class="panel-pro">
     <div class="panel-header-pro">
-      <h3>📊 Estado del Taller</h3>
+      <h3><svg class="ot-icon section-icon" aria-hidden="true"><use href="img/icons-overtrack.svg#bar-chart"></use></svg>Estado del Taller</h3>
       <span>Distribución actual</span>
     </div>
 
-    <div class="estado-taller-list">
-      <div><span>Ingreso</span><b id="estadoIngreso">0</b></div>
-      <div><span>Evaluación</span><b id="estadoEvaluacion">0</b></div>
-      <div><span>Mantención</span><b id="estadoOverhaul">0</b></div>
-      <div><span>Pruebas</span><b id="estadoPruebas">0</b></div>
-      <div><span>Despacho</span><b id="estadoDespacho">0</b></div>
+    <div class="estado-taller-list" id="estadoTallerLista" aria-busy="true">
+      <div data-etapa-dashboard="ingreso"><span>Ingreso</span><b id="estadoIngreso">…</b></div>
+      <div data-etapa-dashboard="evaluacion"><span>Evaluación</span><b id="estadoEvaluacion">…</b></div>
+      <div data-etapa-dashboard="mantencion"><span>Mantención</span><b id="estadoOverhaul">…</b></div>
+      <div data-etapa-dashboard="pruebas"><span>Pruebas</span><b id="estadoPruebas">…</b></div>
+      <div data-etapa-dashboard="despacho"><span>Despacho</span><b id="estadoDespacho">…</b></div>
     </div>
   </div>
 
   <div class="panel-pro panel-alertas">
     <div class="panel-header-pro">
-      <h3>⚠ Alertas del Taller</h3>
+      <h3><svg class="ot-icon section-icon" aria-hidden="true"><use href="img/icons-overtrack.svg#alert-triangle"></use></svg>Alertas del Taller</h3>
       <span>Eventos importantes</span>
     </div>
 
     <div id="alertasDashboard" class="alertas-dashboard">
-      <p class="sin-alertas">Sin alertas activas.</p>
+      <p class="sin-alertas">Cargando alertas…</p>
     </div>
   </div>
 
@@ -180,7 +249,7 @@
 
 <div class="panel-pro proximos-despachos" id="panelDespachos">
   <div class="panel-header-pro">
-    <h3>📅 Próximos Despachos</h3>
+    <h3><svg class="ot-icon section-icon" aria-hidden="true"><use href="img/icons-overtrack.svg#calendar"></use></svg>Próximos Despachos</h3>
     <span>Según Carta Gantt</span>
   </div>
 
@@ -195,7 +264,7 @@
 
 <div class="panel-pro gantt-taller-panel" id="panelGantt">
   <div class="panel-header-pro">
-    <h3>📊 Carta Gantt General del Taller</h3>
+    <h3><svg class="ot-icon section-icon" aria-hidden="true"><use href="img/icons-overtrack.svg#gantt"></use></svg>Carta Gantt General del Taller</h3>
     <span>Planificación global</span>
   </div>
 
@@ -263,7 +332,8 @@
 
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script type="module" src="js/dashboard.js"></script>
+<script src="js/components/notificaciones.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.min.js"></script>
+<script type="module" src="js/dashboard.js?v=20261004-2"></script>
 </body>
 </html>

@@ -1,143 +1,78 @@
 <!DOCTYPE html>
 <html lang="es">
-
 <head>
-
-<meta charset="UTF-8">
-
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-<title>Administrador de Empresa | OVERTRACK</title>
-
-<link rel="stylesheet" href="css/empresa-admin.css">
-
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Administrador de Empresa | Vectaria</title>
+  <link rel="icon" type="image/png" href="img/vectaria-favicon-official.png?v=3">
+  <link rel="stylesheet" href="css/empresa-admin.css">
+  <link rel="stylesheet" href="css/empresa-admin-brand.css">
+  <link rel="stylesheet" href="css/notificaciones.css">
+  <link rel="stylesheet" href="css/desktop-density.css">
 </head>
+<body class="empresa-admin-page">
+  <div class="admin-layout">
+    <header class="mobile-topbar">
+      <div class="mobile-topbar-brand" aria-label="Vectaria">
+        <div class="mobile-brand-composite" role="img" aria-label="Vectaria - Gestión operativa">
+          <img class="mobile-brand-layer mobile-brand-base" src="img/vectaria-logo-official.png?v=3" alt="">
+        </div>
+      </div>
+      <button type="button" class="mobile-menu-toggle" aria-controls="empresaAdminSidebar" aria-expanded="false" aria-label="Abrir menú de navegación">
+        <span aria-hidden="true">☰</span>
+        <span>Menú</span>
+      </button>
+    </header>
+    <button type="button" class="mobile-menu-backdrop" aria-label="Cerrar menú de navegación" tabindex="-1"></button>
 
-<body>
+    <aside class="sidebar" id="empresaAdminSidebar">
+      <div class="sidebar-brand">
+        <div class="sidebar-brand-composite" role="img" aria-label="Vectaria - Gestión operativa">
+          <img class="sidebar-brand-layer sidebar-brand-base" src="img/vectaria-logo-official.png?v=3" alt="">
+        </div>
+      </div>
+      <p id="nombreEmpresa">Empresa</p>
 
-<div class="admin-layout">
-
-    <aside class="sidebar">
-
-        <h2>OVERTRACK</h2>
-
-        <p id="nombreEmpresa">Empresa</p>
-
+      <nav aria-label="Administración de empresa">
         <ul>
-            <li
-  data-modulo="dashboard"
-  onclick="cambiarVistaEmpresa('dashboard', this)"
->
-  Dashboard
-</li>
-
-<li
-  data-modulo="usuarios"
-  onclick="cambiarVistaEmpresa('usuarios', this)"
->
-  Usuarios
-</li>
-
-<li
-  data-modulo="sucursales"
-  onclick="cambiarVistaEmpresa('sucursales', this)"
->
-  Sucursales
-</li>
-
-<li
-  data-modulo="clientes"
-  onclick="cambiarVistaEmpresa('clientes', this)"
->
-  Clientes
-</li>
-
-<li
-  data-modulo="equipos"
-  onclick="cambiarVistaEmpresa('equipos', this)"
->
-  Equipos
-</li>
-
-<li
-  id="menuSistemaOperacional"
-  data-modulo="ordenesServicio"
-  onclick="irSistemaOperacional()"
->
-  Operación del Taller
-</li>
-
-<li onclick="cambiarVistaEmpresa('configuracion', this)">
-  Configuración
-</li>
-
-<li
-  id="menuModulosEmpresa"
-  onclick="cambiarVistaEmpresa('modulos', this)"
-  style="display: none;"
->
-  Módulos
-</li>
+          <li id="menuDashboardEmpresa" class="active" role="button" tabindex="0" data-modulo="dashboard" onclick="cambiarVistaEmpresa('dashboard', this)">Dashboard</li>
+          <li id="menuUsuariosEmpresa" role="button" tabindex="0" data-modulo="usuarios" onclick="cambiarVistaEmpresa('usuarios', this)">Usuarios</li>
+          <li id="menuSucursalesEmpresa" role="button" tabindex="0" data-modulo="sucursales" onclick="cambiarVistaEmpresa('sucursales', this)">Sucursales</li>
+          <li id="menuSistemaOperacional" role="button" tabindex="0" data-modulo="ordenesServicio" onclick="irSistemaOperacional()">Operación del Taller</li>
+          <li id="menuProgramacionEmpresa" role="button" tabindex="0" data-modulo="programacion" onclick="irProgramacionSemanal()">Programación</li>
+          <li id="menuSheqEmpresa" role="button" tabindex="0" data-modulo="sheq" onclick="irModuloSheq()">SHEQ</li>
+          <li id="menuConfiguracionEmpresa" role="button" tabindex="0" onclick="cambiarVistaEmpresa('configuracion', this)">Configuración</li>
+          <li id="menuModulosEmpresa" role="button" tabindex="0" onclick="cambiarVistaEmpresa('modulos', this)" style="display:none;">Módulos</li>
         </ul>
+      </nav>
 
-        <button
-            id="btnSalidaEmpresa"
-            class="btn-danger">
-        </button>
-
+      <button id="btnSalidaEmpresa" class="btn-danger" type="button">Cerrar sesión</button>
     </aside>
 
     <main class="main-content">
+      <section class="dashboard-header">
+        <h1 id="tituloEmpresa">Administrador de Empresa</h1>
+        <p id="descripcionPanelEmpresa">Gestión completa de la empresa seleccionada.</p>
+      </section>
 
-        <section class="dashboard-header">
+      <section id="kpiEmpresaGrid" class="kpi-grid"></section>
 
-            <h1 id="tituloEmpresa">
-                Administrador de Empresa
-            </h1>
+      <section class="card">
+        <div id="vistaEmpresaContenido">Cargando...</div>
+      </section>
 
-            <p>
-                Gestión completa de la empresa seleccionada.
-            </p>
-
-        </section>
-
-        <section
-            id="kpiEmpresaGrid"
-            class="kpi-grid">
-        </section>
-
-        <section class="card">
-            <div id="vistaEmpresaContenido">
-                Cargando...
-            </div>
-        </section>
-
-
-        <section id="vistaUsuarios" class="card" style="display:none; margin-top:24px;">
-
+      <section id="vistaUsuarios" class="card" style="display:none; margin-top:24px;">
         <div class="section-header">
-            <h2>Usuarios de la Empresa</h2>
-
-            <button class="btn-primary" onclick="abrirModalUsuario()">
-            + Nuevo Usuario
-            </button>
+          <h2>Usuarios de la Empresa</h2>
+          <button class="btn-primary" onclick="abrirModalUsuario()">+ Nuevo Usuario</button>
         </div>
-
-        <div id="listaUsuariosEmpresa">
-            No hay usuarios registrados.
-        </div>
-
-        </section>
-
+        <div id="listaUsuariosEmpresa">No hay usuarios registrados.</div>
+      </section>
     </main>
+  </div>
 
-</div>
-
-
-
-
-<script type="module" src="js/empresa-admin.js"></script>
-
+  <script src="js/components/notificaciones.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script type="module" src="js/empresa-admin.js"></script>
 </body>
-
 </html>

@@ -9,8 +9,7 @@ const NOMBRES_ETAPAS = {
     ingreso: "Ingreso",
     evaluacion: "Evaluación",
     overhaul: "Mantención",
-    pruebasMecanicas: "Pruebas Mecánicas",
-    pruebasElectricas: "Pruebas Eléctricas",
+    pruebas: "Pruebas",
     despachoPreparacion: "Despacho Preparación",
     despachoFinal: "Despacho Final"
 };

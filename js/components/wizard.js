@@ -1,4 +1,9 @@
 export function abrirWizard({ titulo, pasos, onFinish }) {
+  if (document.querySelector(".wizard-overlay")) {
+    alert("Ya hay un asistente abierto. Ciérralo antes de abrir otro.");
+    return;
+  }
+
   let pasoActual = 0;
 
   // Datos finales recopilados mediante collect()
@@ -169,7 +174,7 @@ export function abrirWizard({ titulo, pasos, onFinish }) {
     // Luego ejecutamos la validación y recopilación
     // definida en cada paso.
     if (paso.collect) {
-      const resultado = paso.collect();
+      const resultado = paso.collect(content);
 
       if (resultado === false) return;
 

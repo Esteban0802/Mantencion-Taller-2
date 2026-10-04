@@ -3,6 +3,8 @@ let getUsuario = null;
 
 let guardarCambiosOTServicio = null;
 let esJefeTallerServicio = null;
+let reportesPDFHabilitadosServicio = null;
+let ganttHabilitadoServicio = null;
 
 let ot = null;
 let usuario = null;
@@ -11,13 +13,33 @@ let etapasGanttColapsadas = {};
 let recalculandoGantt = false;
 let ganttZoom = 100;
 
+const alert = (mensaje) => {
+    const texto = String(mensaje || "");
+    const tipo = /correctamente|guardad[ao]|generad[ao]/i.test(texto)
+        ? "exito"
+        : /error|no existe|no hay os/i.test(texto)
+            ? "error"
+            : "advertencia";
+    const titulo = tipo === "exito"
+        ? "Operación completada"
+        : tipo === "error"
+            ? "No fue posible completar la acción"
+            : "Revisa la planificación";
+
+    if (window.OverTrackUI?.mostrarMensaje) {
+        return window.OverTrackUI.mostrarMensaje({ titulo, mensaje: texto, tipo });
+    }
+
+    window.alert(texto);
+    return Promise.resolve(true);
+};
+
 
 const NOMBRES_ETAPAS = {
     ingreso: "Ingreso",
     evaluacion: "Evaluación",
     overhaul: "Mantención",
-    pruebasMecanicas: "Pruebas Mecánicas",
-    pruebasElectricas: "Pruebas Eléctricas",
+    pruebas: "Pruebas",
     despachoPreparacion: "Despacho Preparación",
     despachoFinal: "Despacho Final"
 };
@@ -36,19 +58,77 @@ export function inicializarModuloGantt(
     esJefeTallerServicio =
         dependencias.esJefeTaller;
 
-    if (typeof getOT !== "function") {
-        throw new Error(
-            "gantt.js requiere una función getOT"
-        );
-    }
+    reportesPDFHabilitadosServicio =
+        dependencias.reportesPDFHabilitados;
 
-    if (typeof guardarCambiosOTServicio !== "function") {
-        throw new Error(
-            "gantt.js requiere guardarCambiosOT"
-        );
-    }
+    ganttHabilitadoServicio =
+        dependencias.ganttHabilitado;
+
+    validarDependencias({
+        getOT,
+        getUsuario,
+        guardarCambiosOT: guardarCambiosOTServicio,
+        esJefeTaller: esJefeTallerServicio,
+        reportesPDFHabilitados: reportesPDFHabilitadosServicio,
+        ganttHabilitado: ganttHabilitadoServicio
+    });
 
     sincronizarContexto();
+
+    exponerFuncionesGlobales();
+
+    console.log(
+        "📦 Módulo Gantt inicializado correctamente"
+    );
+}
+
+
+function validarDependencias(dependencias) {
+
+    Object.entries(dependencias).forEach(
+        ([nombre, valor]) => {
+
+            if (typeof valor !== "function") {
+                throw new Error(
+                    `Gantt: falta la dependencia ${nombre}.`
+                );
+            }
+        }
+    );
+}
+
+
+function exponerFuncionesGlobales() {
+
+    window.abrirModalGantt = abrirModalGantt;
+    window.cerrarModalGantt = cerrarModalGantt;
+    window.cerrarModalGanttVisual =
+        cerrarModalGanttVisual;
+
+    window.volverFormularioGantt =
+        volverFormularioGantt;
+
+    window.generarCartaGantt = generarCartaGantt;
+    window.recalcularGanttAutomatico =
+        recalcularGanttAutomatico;
+
+    window.cargarGanttGuardado = cargarGanttGuardado;
+    window.renderCartaGantt = renderCartaGantt;
+    window.renderCartaGanttProject =
+        renderCartaGanttProject;
+
+    window.toggleEtapaGantt = toggleEtapaGantt;
+    window.zoomGantt = zoomGantt;
+    window.irHoyGantt = irHoyGantt;
+
+    window.actualizarEstadoGanttDesdeChecklist =
+        actualizarEstadoGanttDesdeChecklist;
+
+    window.descargarGanttExcel =
+        descargarGanttExcel;
+
+    window.descargarGanttPDFProfesional =
+        descargarGanttPDFProfesional;
 }
 
 
@@ -78,6 +158,11 @@ function esJefeTaller() {
 export function abrirModalGantt() {
 
     sincronizarContexto();
+
+  if (!ganttHabilitadoServicio()) {
+    alert("El módulo Carta Gantt no está habilitado para esta empresa.");
+    return;
+  }
 
   const modalForm = document.getElementById("modalGantt");
   const modalVisual = document.getElementById("modalGanttVisual");
@@ -164,17 +249,17 @@ function cargarFechasGanttEnFormulario() {
       "ganttOverhaulTermino"
     );
 
-    cargarEtapa(
-      "Pruebas Mecánicas",
-      "ganttPruebasMecanicasInicio",
-      "ganttPruebasMecanicasTermino"
-    );
-
-    cargarEtapa(
-      "Pruebas Eléctricas",
-      "ganttPruebasElectricasInicio",
-      "ganttPruebasElectricasTermino"
-    );
+    const pruebasMecanicasAnterior = getEtapa("Pruebas Mecánicas");
+    const pruebasElectricasAnterior = getEtapa("Pruebas Eléctricas");
+    const etapasPruebasAnteriores = [pruebasMecanicasAnterior, pruebasElectricasAnterior].filter(Boolean);
+    const etapaPruebas = getEtapa("Pruebas") || (etapasPruebasAnteriores.length ? {
+      inicio: etapasPruebasAnteriores.map(etapa => etapa.inicio).sort()[0],
+      termino: etapasPruebasAnteriores.map(etapa => etapa.termino).sort().at(-1)
+    } : null);
+    if (etapaPruebas) {
+      setValue("ganttPruebasInicio", etapaPruebas.inicio);
+      setValue("ganttPruebasTermino", etapaPruebas.termino);
+    }
   }
 }
 
@@ -416,15 +501,9 @@ if (modo === "manual") {
     ),
 
     leerEtapaManual(
-      "Pruebas Mecánicas",
-      "ganttPruebasMecanicasInicio",
-      "ganttPruebasMecanicasTermino"
-    ),
-
-    leerEtapaManual(
-      "Pruebas Eléctricas",
-      "ganttPruebasElectricasInicio",
-      "ganttPruebasElectricasTermino"
+      "Pruebas",
+      "ganttPruebasInicio",
+      "ganttPruebasTermino"
     )
   ];
 
@@ -682,78 +761,34 @@ const overhaulActs =
 actividades.push(...overhaulActs);
 
 // =========================
-// PRUEBAS MECÁNICAS
+// PRUEBAS
 // =========================
 
-const etapaPruebasMecanicas =
-  obtenerEtapaManual(
-    etapasManuales,
-    "Pruebas Mecánicas"
-  );
+const pruebasMecanicasAnterior = obtenerEtapaManual(etapasManuales, "Pruebas Mecánicas");
+const pruebasElectricasAnterior = obtenerEtapaManual(etapasManuales, "Pruebas Eléctricas");
+const etapasPruebasAnteriores = [pruebasMecanicasAnterior, pruebasElectricasAnterior].filter(Boolean);
+const etapaPruebas = obtenerEtapaManual(etapasManuales, "Pruebas") || (etapasPruebasAnteriores.length ? {
+  inicio: etapasPruebasAnteriores.map(etapa => etapa.inicio).sort()[0],
+  termino: etapasPruebasAnteriores.map(etapa => etapa.termino).sort().at(-1)
+} : null);
 
-const inicioPruebasMecanicas =
-  new Date(
-    etapaPruebasMecanicas.inicio + "T00:00:00"
-  );
+const inicioPruebas = new Date(etapaPruebas.inicio + "T00:00:00");
+const diasPruebas = diasEntreFechasHabiles(etapaPruebas.inicio, etapaPruebas.termino);
 
-const diasPruebasMecanicas =
-  diasEntreFechasHabiles(
-    etapaPruebasMecanicas.inicio,
-    etapaPruebasMecanicas.termino
-  );
+agregarEtapaPlanificada("Pruebas", inicioPruebas, diasPruebas);
 
-agregarEtapaPlanificada(
-  "Pruebas Mecánicas",
-  inicioPruebasMecanicas,
-  diasPruebasMecanicas
+const listaPruebas = Array.isArray(ot.pruebas?.general)
+  ? ot.pruebas.general
+  : [...(ot.pruebas?.mecanico || []), ...(ot.pruebas?.electrico || [])];
+
+const pruebasActs = obtenerActividadesDesdeChecklistDistribuido(
+  "Pruebas",
+  listaPruebas,
+  inicioPruebas,
+  diasPruebas
 );
 
-const pruebasMec =
-  obtenerActividadesDesdeChecklistDistribuido(
-    "Pruebas Mecánicas",
-    ot.pruebas?.mecanico,
-    inicioPruebasMecanicas,
-    diasPruebasMecanicas
-  );
-
-actividades.push(...pruebasMec);
-
-// =========================
-// PRUEBAS ELÉCTRICAS
-// =========================
-
-const etapaPruebasElectricas =
-  obtenerEtapaManual(
-    etapasManuales,
-    "Pruebas Eléctricas"
-  );
-
-const inicioPruebasElectricas =
-  new Date(
-    etapaPruebasElectricas.inicio + "T00:00:00"
-  );
-
-const diasPruebasElectricas =
-  diasEntreFechasHabiles(
-    etapaPruebasElectricas.inicio,
-    etapaPruebasElectricas.termino
-  );
-
-agregarEtapaPlanificada(
-  "Pruebas Eléctricas",
-  inicioPruebasElectricas,
-  diasPruebasElectricas
-);
-
-const pruebasElec =
-  obtenerActividadesDesdeChecklistDistribuido(
-    "Pruebas Eléctricas",
-    ot.pruebas?.electrico,
-    inicioPruebasElectricas,
-    diasPruebasElectricas
-  );
-
-actividades.push(...pruebasElec);
+actividades.push(...pruebasActs);
 
 const ultimaActividad =
   actividades
@@ -1589,6 +1624,7 @@ export function descargarGanttExcel() {
   "Evaluación": "5B9BD5",
   "Repuestos": "ED7D31",
   [NOMBRES_ETAPAS.overhaul]: "70AD47",
+  "Pruebas": "7030A0",
   "Pruebas Mecánicas": "7030A0",
   "Pruebas Eléctricas": "8E44AD",
   "Despacho": "00B0F0"
@@ -1643,6 +1679,12 @@ for (let r = 1; r < data.length; r++) {
 export function descargarGanttPDFProfesional() {
 
     sincronizarContexto();
+
+  if (!reportesPDFHabilitadosServicio()) {
+    alert("El módulo Informe PDF no está habilitado para esta empresa.");
+    return;
+  }
+
   if (!ot?.gantt?.actividades?.length) {
     alert("No existe Carta Gantt para exportar");
     return;
@@ -1680,7 +1722,7 @@ export function descargarGanttPDFProfesional() {
 
   pdf.setTextColor(255, 255, 255);
   pdf.setFontSize(18);
-  pdf.text("OVERTRACK - Carta Gantt", 14, 16);
+  pdf.text("VECTARIA - Carta Gantt", 14, 16);
 
   pdf.setFontSize(10);
   pdf.setTextColor(203, 213, 225);
@@ -1746,6 +1788,7 @@ const coloresEtapa = {
   "Evaluación": [91, 155, 213],
   "Repuestos": [237, 125, 49],
   [NOMBRES_ETAPAS.overhaul]: [112, 173, 71],
+  "Pruebas": [112, 48, 160],
   "Pruebas Mecánicas": [112, 48, 160],
   "Pruebas Eléctricas": [142, 68, 173],
   "Despacho": [0, 176, 240]
@@ -1909,12 +1952,11 @@ function calcularPorcentajeEtapaReal(etapa) {
     return calcularPorcentajeChecklist(ot.overhaul);
   }
 
-  if (etapa === "Pruebas Mecánicas") {
-    return calcularPorcentajeChecklist(ot.pruebas?.mecanico);
-  }
-
-  if (etapa === "Pruebas Eléctricas") {
-    return calcularPorcentajeChecklist(ot.pruebas?.electrico);
+  if (etapa === "Pruebas" || etapa === "Pruebas Mecánicas" || etapa === "Pruebas Eléctricas") {
+    const lista = Array.isArray(ot.pruebas?.general)
+      ? ot.pruebas.general
+      : [...(ot.pruebas?.mecanico || []), ...(ot.pruebas?.electrico || [])];
+    return calcularPorcentajeChecklist(lista);
   }
 
   if (etapa === "Repuestos") {
@@ -1946,8 +1988,11 @@ export function actualizarEstadoGanttDesdeChecklist() {
     if (etapa === "Ingreso") lista = ot.ingreso || [];
     if (etapa === "Evaluación") lista = ot.evaluacion || [];
     if (etapa === "Overhaul") lista = ot.overhaul || [];
-    if (etapa === "Pruebas Mecánicas") lista = ot.pruebas?.mecanico || [];
-    if (etapa === "Pruebas Eléctricas") lista = ot.pruebas?.electrico || [];
+    if (etapa === "Pruebas" || etapa === "Pruebas Mecánicas" || etapa === "Pruebas Eléctricas") {
+      lista = Array.isArray(ot.pruebas?.general)
+        ? ot.pruebas.general
+        : [...(ot.pruebas?.mecanico || []), ...(ot.pruebas?.electrico || [])];
+    }
 
     return lista.find(item => item.item === actividad);
   };

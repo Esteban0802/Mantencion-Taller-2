@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Órdenes de Trabajo | Vectaria</title>
+  <link rel="icon" type="image/png" href="img/vectaria-favicon-official.png?v=3">
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/brand-overtrack.css">
+  <link rel="stylesheet" href="css/brand-overtrack-light.css">
+  <link rel="stylesheet" href="css/desktop-density.css">
+</head>
+<body class="dashboard-overtrack ordenes-page">
+<div class="app">
+  <header class="mobile-topbar">
+    <div class="mobile-topbar-brand" aria-label="Vectaria">
+      <div class="mobile-brand-composite" role="img" aria-label="Vectaria - Gestión operativa">
+        <img class="mobile-brand-layer mobile-brand-base" src="img/vectaria-logo-official.png?v=3" alt="">
+      </div>
+    </div>
+    <button type="button" class="mobile-menu-toggle" aria-controls="ordenesSidebar" aria-expanded="false" aria-label="Abrir menú de navegación">
+      <span aria-hidden="true">☰</span><span>Menú</span>
+    </button>
+  </header>
+  <button type="button" class="mobile-menu-backdrop" aria-label="Cerrar menú de navegación" tabindex="-1"></button>
+
+  <aside class="sidebar" id="ordenesSidebar">
+    <div class="sidebar-logo">
+      <img class="sidebar-brand-logo" src="img/vectaria-logo-official.png?v=3" alt="Vectaria - Tu operación, en una misma dirección">
+    </div>
+    <ul>
+      <li role="button" tabindex="0" onclick="location.href='dashboard.html'">
+        <svg class="ot-icon nav-icon" aria-hidden="true"><use href="img/icons-overtrack.svg#dashboard"></use></svg><span>Dashboard</span>
+      </li>
+      <li id="menuNuevaOT" role="button" tabindex="0" onclick="nuevaOT()">
+        <svg class="ot-icon nav-icon" aria-hidden="true"><use href="img/icons-overtrack.svg#plus-circle"></use></svg><span>Nueva OT</span>
+      </li>
+      <li class="active">
+        <svg class="ot-icon nav-icon" aria-hidden="true"><use href="img/icons-overtrack.svg#list"></use></svg><span>Todas las OT</span>
+      </li>
+      <li id="btnPanelEmpresa" role="button" tabindex="0" style="display:none" onclick="volverPanelEmpresa()">
+        <svg class="ot-icon nav-icon" aria-hidden="true"><use href="img/icons-overtrack.svg#building-cog"></use></svg><span>Panel Empresa</span>
+      </li>
+    </ul>
+    <button type="button" class="mobile-menu-logout permitido-bloqueo" id="btnCerrarSesion">Salir</button>
+  </aside>
+
+  <main class="main-content">
+    <div class="header">
+      <div><h2>Órdenes de Trabajo</h2><p class="ordenes-subtitulo">Consulta las OT activas y el historial de órdenes cerradas.</p></div>
+      <div class="header-right"><div class="user-box"><span id="usuarioNombre">Usuario</span><small id="usuarioRol">Rol</small><button id="btnCerrarSesionDesktop" class="btn-logout permitido-bloqueo">Salir</button></div></div>
+    </div>
+
+    <section class="card ordenes-panel">
+      <div class="ordenes-filtros" role="search">
+        <label class="sr-only" for="buscarOrdenes">Buscar órdenes</label>
+        <input id="buscarOrdenes" type="search" placeholder="Buscar por OT, equipo, serie o cliente...">
+        <label class="sr-only" for="estadoOrdenes">Estado</label>
+        <select id="estadoOrdenes">
+          <option value="todas">Todas</option>
+          <option value="activas">Activas</option>
+          <option value="atrasadas">Atrasadas</option>
+          <option value="cerradas">Cerradas</option>
+        </select>
+      </div>
+      <div class="ordenes-resumen"><strong id="totalOrdenesVista">0 órdenes</strong><span id="estadoCargaOrdenes">Cargando...</span></div>
+      <div id="listaOrdenesCompleta" class="ordenes-lista"></div>
+      <div id="ordenesVacio" class="ordenes-vacio" hidden>No hay órdenes que coincidan con esta búsqueda.</div>
+      <nav class="ordenes-paginacion" aria-label="Paginación de órdenes">
+        <button id="paginaAnterior" type="button">Anterior</button>
+        <span id="paginaActual">Página 1</span>
+        <button id="paginaSiguiente" type="button">Siguiente</button>
+      </nav>
+    </section>
+  </main>
+</div>
+<script type="module" src="js/ordenes.js"></script>
+</body>
+</html>

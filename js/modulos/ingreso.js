@@ -2,11 +2,16 @@
 // MÓDULO INGRESO — OVERTRACK
 // ==========================================
 
+import {
+  capturarBorradoresFormulario,
+  restaurarBorradoresFormulario
+} from "./core/utilidades.js";
+
 export function inicializarModuloIngreso(servicios) {
+  let aprobacionIngresoEnCurso = false;
   const {
 
     getOT,
-    getUsuario,
 
     guardarCambiosOT,
     autoguardarCambiosOT,
@@ -14,7 +19,6 @@ export function inicializarModuloIngreso(servicios) {
     renderProgresoEtapa,
     itemCompleto,
 
-    mostrarFotosIngreso,
     renderComentariosItem,
 
     OTBloqueada,
@@ -29,6 +33,7 @@ export function inicializarModuloIngreso(servicios) {
 
     obtenerEstadoOT,
     habilitarTab,
+    navegarSiguienteEtapa,
 
     eliminarArchivoStorage,
     subirArchivoStorage,
@@ -37,10 +42,45 @@ export function inicializarModuloIngreso(servicios) {
 
 } = servicios;
 
+  const alert = (mensaje) => {
+    const texto = String(mensaje || "");
+    const tipo = /correctamente|completad[ao]|guardad[ao]/i.test(texto)
+      ? "exito"
+      : /error|no fue posible|no hay una orden/i.test(texto)
+        ? "error"
+        : "advertencia";
+    const titulo = tipo === "exito"
+      ? "Operación completada"
+      : tipo === "error"
+        ? "No fue posible completar la acción"
+        : "Revisa la información";
+
+    if (window.OverTrackUI?.mostrarMensaje) {
+      return window.OverTrackUI.mostrarMensaje({ titulo, mensaje: texto, tipo });
+    }
+
+    window.alert(texto);
+    return Promise.resolve(true);
+  };
+
+  const confirmarEliminacion = () => {
+    if (window.OverTrackUI?.confirmarAccion) {
+      return window.OverTrackUI.confirmarAccion({
+        titulo: "Eliminar fotografía",
+        mensaje: "La fotografía se eliminará de esta orden de trabajo.",
+        tipo: "advertencia",
+        textoConfirmar: "Eliminar",
+        textoCancelar: "Cancelar",
+        peligrosa: true
+      });
+    }
+
+    return Promise.resolve(window.confirm("¿Eliminar foto?"));
+  };
+
   validarDependencias({
 
     getOT,
-    getUsuario,
 
     guardarCambiosOT,
     autoguardarCambiosOT,
@@ -48,7 +88,6 @@ export function inicializarModuloIngreso(servicios) {
     renderProgresoEtapa,
     itemCompleto,
 
-    mostrarFotosIngreso,
     renderComentariosItem,
 
     OTBloqueada,
@@ -63,6 +102,7 @@ export function inicializarModuloIngreso(servicios) {
 
     obtenerEstadoOT,
     habilitarTab,
+    navegarSiguienteEtapa,
 
     eliminarArchivoStorage,
     subirArchivoStorage,
@@ -74,7 +114,7 @@ export function inicializarModuloIngreso(servicios) {
   // ==========================================
   // CARGAR CHECKLIST DESDE EXCEL
   // ==========================================
-  window.cargarIngreso = function cargarIngreso() {
+  function cargarIngreso() {
     const ot = getOT();
 
     if (!ot) {
@@ -99,9 +139,17 @@ export function inicializarModuloIngreso(servicios) {
       return;
     }
 
+    if (!/\.xlsx?$/i.test(file.name) || file.size > 5 * 1024 * 1024) {
+      alert("Selecciona un archivo Excel válido de máximo 5 MB.");
+      inputExcel.value = "";
+      return;
+    }
+
     const reader = new FileReader();
 
     reader.onload = async function (event) {
+      const checklistAnterior = ot.ingreso;
+      let checklistReemplazado = false;
       try {
         const data = new Uint8Array(
           event.target.result
@@ -135,8 +183,9 @@ export function inicializarModuloIngreso(servicios) {
               String(valor).trim() !== ""
             );
           })
+          .slice(0, 400)
           .map((valor) => ({
-            item: String(valor).trim(),
+            item: String(valor).trim().slice(0, 240),
             ok: false,
             fotos: [],
             comentarios: []
@@ -150,8 +199,10 @@ export function inicializarModuloIngreso(servicios) {
         }
 
         ot.ingreso = checklist;
+        checklistReemplazado = true;
 
-        await guardarCambiosOT();
+        const guardado = await guardarCambiosOT();
+        if (!guardado) throw new Error("No fue posible guardar el checklist en la OT.");
 
         window.renderIngreso();
 
@@ -161,6 +212,7 @@ export function inicializarModuloIngreso(servicios) {
           "✅ Checklist de Ingreso cargado desde ingreso.js"
         );
       } catch (error) {
+        if (checklistReemplazado) ot.ingreso = checklistAnterior;
         console.error(
           "Error procesando Excel de Ingreso:",
           error
@@ -182,12 +234,12 @@ export function inicializarModuloIngreso(servicios) {
     };
 
     reader.readAsArrayBuffer(file);
-  };
+  }
 
   // ==========================================
   // RENDER PRINCIPAL DE INGRESO
   // ==========================================
-  window.renderIngreso = function renderIngreso() {
+  function renderIngreso() {
     const ot = getOT();
 
     const cont =
@@ -307,9 +359,9 @@ export function inicializarModuloIngreso(servicios) {
       mostrarFotosIngreso(i);
       renderComentariosItem(i);
     });
-  };
+  }
 
-window.toggleIngreso = function toggleIngreso(i) {
+function toggleIngreso(i) {
 
     const ot = getOT();
 
@@ -335,10 +387,10 @@ window.toggleIngreso = function toggleIngreso(i) {
         renderCartaGantt();
     }
 
-};
+}
 
 
-window.mostrarFotosIngreso = function mostrarFotosIngreso(i) {
+function mostrarFotosIngreso(i) {
 
     const ot = getOT();
 
@@ -356,6 +408,9 @@ window.mostrarFotosIngreso = function mostrarFotosIngreso(i) {
         cont.className = "foto-box";
 
         const img = document.createElement("img");
+        img.loading = "lazy";
+        img.decoding = "async";
+        img.alt = `Evidencia ${index + 1} del ingreso`;
         img.src = foto;
         img.style.cursor = "pointer";
         img.width = 100;
@@ -375,13 +430,13 @@ window.mostrarFotosIngreso = function mostrarFotosIngreso(i) {
 
     });
 
-};
+}
 
 async function eliminarFotoIngreso(i, index) {
 
     if (OTBloqueada()) return;
 
-    if (!confirm("¿Eliminar foto?")) return;
+    if (!(await confirmarEliminacion())) return;
 
     const ot = getOT();
 
@@ -389,11 +444,15 @@ async function eliminarFotoIngreso(i, index) {
 
     const urlFoto = ot.ingreso[i].fotos[index];
 
-    await eliminarArchivoStorage(urlFoto);
-
     ot.ingreso[i].fotos.splice(index, 1);
 
-    await guardarCambiosOT();
+    const guardado = await guardarCambiosOT();
+    if (!guardado) {
+        ot.ingreso[i].fotos.splice(index, 0, urlFoto);
+        return;
+    }
+
+    await eliminarArchivoStorage(urlFoto);
 
     window.renderIngreso();
 
@@ -410,6 +469,10 @@ async function subirFotoIngreso(e, i) {
     const files = Array.from(e.target.files);
 
     if (!files.length) return;
+
+    const fotosOriginales = [...(ot.ingreso?.[i]?.fotos || [])];
+    const bitacoraOriginal = Array.isArray(ot.bitacora) ? [...ot.bitacora] : null;
+    const urlsSubidasEnEsteIntento = [];
 
     try {
 
@@ -435,6 +498,9 @@ async function subirFotoIngreso(e, i) {
                 i
             );
 
+            if (!urlFoto) throw new Error("La fotografía no obtuvo una URL válida");
+
+            urlsSubidasEnEsteIntento.push(urlFoto);
             ot.ingreso[i].fotos.push(urlFoto);
         }
 
@@ -443,13 +509,29 @@ async function subirFotoIngreso(e, i) {
             `Ingreso: ${files.length} foto(s)`
         );
 
-        await guardarCambiosOT();
+        const guardado = await guardarCambiosOT();
+        if (!guardado) {
+            throw new Error("No fue posible confirmar las fotografías en la OT.");
+        }
 
+        const borradores = capturarBorradoresFormulario("listaIngreso");
         window.renderIngreso();
+        restaurarBorradoresFormulario("listaIngreso", borradores);
 
         e.target.value = "";
 
     } catch (error) {
+
+        await Promise.allSettled(
+            urlsSubidasEnEsteIntento.map(url => eliminarArchivoStorage(url))
+        );
+        if (ot.ingreso?.[i]) ot.ingreso[i].fotos = fotosOriginales;
+        if (bitacoraOriginal) {
+            ot.bitacora = bitacoraOriginal;
+        } else {
+            delete ot.bitacora;
+        }
+        e.target.value = "";
 
         console.error(
             "Error subiendo fotos ingreso:",
@@ -457,7 +539,7 @@ async function subirFotoIngreso(e, i) {
         );
 
         mostrarAlerta(
-            "Error al subir las imágenes de ingreso",
+            `No se completó la carga de ${files.length} fotografía(s). No se agregó ninguna evidencia del lote.`,
             "error"
         );
 
@@ -479,7 +561,9 @@ async function guardarIngreso() {
         return;
     }
 
-    guardarCambiosOT();
+    const guardado = await guardarCambiosOT();
+
+    if (!guardado) return;
 
     mostrarAlerta(
         "Progreso guardado correctamente",
@@ -551,30 +635,54 @@ function validarIngresoCompleto() {
 
 async function aprobarIngreso() {
 
+    if (aprobacionIngresoEnCurso) return;
+
     const ot = getOT();
 
     if (!ot) return;
 
     if (!validarIngresoCompleto()) return;
 
+    aprobacionIngresoEnCurso = true;
+    const botones = Array.from(document.querySelectorAll('[onclick*="aprobarIngreso"]'));
+    botones.forEach(boton => { boton.disabled = true; });
+    const ingresoAprobadoAnterior = ot.ingresoAprobado;
+    const estadoAnterior = ot.estado;
+
+    try {
+
     ot.ingresoAprobado = true;
 
     ot.estado = obtenerEstadoOT(ot);
 
-    await guardarCambiosOT();
+    const guardado = await guardarCambiosOT();
+    if (!guardado) {
+        ot.ingresoAprobado = ingresoAprobadoAnterior;
+        ot.estado = estadoAnterior;
+        return;
+    }
 
-    habilitarTab("evaluacion");
+    navegarSiguienteEtapa("ingreso");
 
     mostrarAlerta(
         "Ingreso completado correctamente",
         "success"
     );
 
+    } finally {
+        aprobacionIngresoEnCurso = false;
+        botones.forEach(boton => { boton.disabled = false; });
+    }
+
 }
 
 
 
 
+window.cargarIngreso = cargarIngreso;
+window.renderIngreso = renderIngreso;
+window.toggleIngreso = toggleIngreso;
+window.mostrarFotosIngreso = mostrarFotosIngreso;
 window.eliminarFotoIngreso = eliminarFotoIngreso;
 window.subirFotoIngreso = subirFotoIngreso;
 window.guardarIngreso = guardarIngreso;

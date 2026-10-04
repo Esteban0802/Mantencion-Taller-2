@@ -14,6 +14,43 @@ let renderIngreso = null;
 let renderEvaluacion = null;
 let renderOverhaul = null;
 let renderChecklist = null;
+const respuestasEnCurso = new Set();
+
+const alert = (mensaje) => {
+    const texto = String(mensaje || "");
+    const tipo = /atendida|correctamente/i.test(texto)
+        ? "exito"
+        : /no se encontró|error/i.test(texto)
+            ? "error"
+            : "advertencia";
+    const titulo = tipo === "exito"
+        ? "Observación actualizada"
+        : tipo === "error"
+            ? "Comentario no disponible"
+            : "Revisa la información";
+
+    if (window.OverTrackUI?.mostrarMensaje) {
+        return window.OverTrackUI.mostrarMensaje({ titulo, mensaje: texto, tipo });
+    }
+
+    window.alert(texto);
+    return Promise.resolve(true);
+};
+
+const confirmarEliminarComentario = () => {
+    if (window.OverTrackUI?.confirmarAccion) {
+        return window.OverTrackUI.confirmarAccion({
+            titulo: "Eliminar comentario",
+            mensaje: "El comentario se eliminará de esta orden de trabajo.",
+            tipo: "advertencia",
+            textoConfirmar: "Eliminar",
+            textoCancelar: "Cancelar",
+            peligrosa: true
+        });
+    }
+
+    return Promise.resolve(window.confirm("¿Eliminar comentario?"));
+};
 
 
 /**
@@ -39,23 +76,78 @@ export function inicializarModuloComentarios(dependencias = {}) {
     renderOverhaul = dependencias.renderOverhaul;
     renderChecklist = dependencias.renderChecklist;
 
-    if (typeof getOT !== "function") {
-        throw new Error(
-            "comentarios.js requiere una función getOT"
-        );
-    }
+    validarDependencias({
+        getOT,
+        getUsuario,
+        guardarCambiosOT,
+        OTBloqueada,
+        esJefeTaller,
+        esUsuarioTaller,
+        puedeEliminarComentario,
+        agregarBitacora,
+        renderIngreso,
+        renderEvaluacion,
+        renderOverhaul,
+        renderChecklist
+    });
 
-    if (typeof getUsuario !== "function") {
-        throw new Error(
-            "comentarios.js requiere una función getUsuario"
-        );
-    }
+    exponerFuncionesGlobales();
 
-    if (typeof guardarCambiosOT !== "function") {
-        throw new Error(
-            "comentarios.js requiere guardarCambiosOT"
-        );
-    }
+    console.log(
+        "📦 Módulo Comentarios inicializado correctamente"
+    );
+}
+
+
+function validarDependencias(dependencias) {
+
+    Object.entries(dependencias).forEach(
+        ([nombre, valor]) => {
+
+            if (typeof valor !== "function") {
+                throw new Error(
+                    `Comentarios: falta la dependencia ${nombre}.`
+                );
+            }
+        }
+    );
+}
+
+
+function exponerFuncionesGlobales() {
+
+    window.responderComentarioJefe =
+        responderComentarioJefe;
+
+    window.agregarComentarioItem =
+        agregarComentarioItem;
+
+    window.renderComentariosItem =
+        renderComentariosItem;
+
+    window.eliminarComentarioIngreso =
+        eliminarComentarioIngreso;
+
+    window.agregarComentarioEvaluacion =
+        agregarComentarioEvaluacion;
+
+    window.renderComentariosEvaluacion =
+        renderComentariosEvaluacion;
+
+    window.eliminarComentarioEvaluacion =
+        eliminarComentarioEvaluacion;
+
+    window.agregarComentarioDespacho =
+        agregarComentarioDespacho;
+
+    window.renderComentariosDespacho =
+        renderComentariosDespacho;
+
+    window.responderComentarioJefeDespacho =
+        responderComentarioJefeDespacho;
+
+    window.eliminarComentarioDespacho =
+        eliminarComentarioDespacho;
 }
 
 
@@ -177,7 +269,7 @@ export function existenComentariosJefePendientes(ot) {
             lista.some(item =>
                 Array.isArray(item?.comentarios) &&
                 item.comentarios.some(comentario =>
-                    comentario?.rol === "jefe_taller" &&
+                    ["jefe_taller", "admin_sucursal"].includes(comentario?.rol) &&
                     comentario?.atendido !== true
                 )
             );
@@ -187,7 +279,7 @@ export function existenComentariosJefePendientes(ot) {
 
         return Array.isArray(comentarios) &&
             comentarios.some(comentario =>
-                comentario?.rol === "jefe_taller" &&
+                ["jefe_taller", "admin_sucursal"].includes(comentario?.rol) &&
                 comentario?.atendido !== true
             );
     };
@@ -196,8 +288,9 @@ export function existenComentariosJefePendientes(ot) {
         revisarLista(ot.ingreso) ||
         revisarLista(ot.evaluacion) ||
         revisarLista(ot.overhaul) ||
-        revisarLista(ot.pruebas?.mecanico) ||
-        revisarLista(ot.pruebas?.electrico) ||
+        revisarLista(Array.isArray(ot.pruebas?.general)
+            ? ot.pruebas.general
+            : [...(ot.pruebas?.mecanico || []), ...(ot.pruebas?.electrico || [])]) ||
         revisarComentariosDirectos(
             ot.despacho?.comentariosPreparacion
         ) ||
@@ -221,7 +314,8 @@ export async function responderComentarioJefe(
     etapa,
     itemIndex,
     comentarioIndex,
-    tipo = null
+    tipo = null,
+    respuestaDirecta = null
 ) {
 
     if (OTBloqueada?.()) return;
@@ -233,7 +327,7 @@ export async function responderComentarioJefe(
         return;
     }
 
-    const respuesta = prompt(
+    const respuesta = respuestaDirecta ?? prompt(
         "Respuesta a la observación del Jefe:"
     );
 
@@ -253,25 +347,50 @@ export async function responderComentarioJefe(
         return;
     }
 
+    const claveRespuesta = `${etapa}:${tipo || "general"}:${itemIndex}:${comentarioIndex}`;
+    if (respuestasEnCurso.has(claveRespuesta)) return;
+    respuestasEnCurso.add(claveRespuesta);
+
     const usuario = obtenerUsuario();
 
-    comentario.atendido = true;
-    comentario.respuestaUsuario =
-        respuesta.trim();
+    const estadoAnterior = {
+        atendido: comentario.atendido,
+        respuestaUsuario: comentario.respuestaUsuario,
+        atendidoPor: comentario.atendidoPor,
+        fechaAtendido: comentario.fechaAtendido,
+        alertaJefe: obtenerOT()?.alertaJefe
+    };
 
-    comentario.atendidoPor =
-        usuario?.nombre || "Usuario Taller";
+    try {
+        comentario.atendido = true;
+        comentario.respuestaUsuario =
+            respuesta.trim();
 
-    comentario.fechaAtendido =
-        new Date().toLocaleString();
+        comentario.atendidoPor =
+            usuario?.nombre || "Usuario Taller";
 
-    actualizarAlertaJefe();
+        comentario.fechaAtendido =
+            new Date().toLocaleString();
 
-    await guardarCambiosOT();
+        actualizarAlertaJefe();
 
-    ejecutarRenderEtapa(etapa, tipo);
+        const guardado = await guardarCambiosOT();
+        if (!guardado) {
+            comentario.atendido = estadoAnterior.atendido;
+            comentario.respuestaUsuario = estadoAnterior.respuestaUsuario;
+            comentario.atendidoPor = estadoAnterior.atendidoPor;
+            comentario.fechaAtendido = estadoAnterior.fechaAtendido;
+            const ot = obtenerOT();
+            if (ot) ot.alertaJefe = estadoAnterior.alertaJefe;
+            return;
+        }
 
-    alert("Observación atendida ✅");
+        ejecutarRenderEtapa(etapa, tipo);
+
+        alert("Observación atendida ✅");
+    } finally {
+        respuestasEnCurso.delete(claveRespuesta);
+    }
 }
 
 
@@ -310,6 +429,10 @@ export async function agregarComentarioItem(i) {
         item.comentarios = [];
     }
 
+    const cantidadComentariosAnterior = item.comentarios.length;
+    const alertaJefeAnterior = ot.alertaJefe;
+    const bitacoraAnterior = Array.isArray(ot.bitacora) ? [...ot.bitacora] : null;
+
     item.comentarios.push(
         crearComentario(nombre, texto)
     );
@@ -329,7 +452,15 @@ export async function agregarComentarioItem(i) {
         inputTexto.value = "";
     }
 
-    await guardarCambiosOT();
+    const guardado = await guardarCambiosOT();
+    if (!guardado) {
+        item.comentarios.splice(cantidadComentariosAnterior);
+        ot.alertaJefe = alertaJefeAnterior;
+        if (bitacoraAnterior) ot.bitacora = bitacoraAnterior;
+        else delete ot.bitacora;
+        if (inputTexto) inputTexto.value = texto;
+        return;
+    }
 
     ejecutarRenderEtapa("ingreso");
 }
@@ -391,15 +522,22 @@ export async function eliminarComentarioIngreso(
 
     if (!Array.isArray(comentarios)) return;
 
-    if (!confirm("¿Eliminar comentario?")) {
+    if (!(await confirmarEliminarComentario())) {
         return;
     }
 
+    const comentarioEliminado = comentarios[comentarioIndex];
+    const alertaJefeAnterior = ot.alertaJefe;
     comentarios.splice(comentarioIndex, 1);
 
     actualizarAlertaJefe();
 
-    await guardarCambiosOT();
+    const guardado = await guardarCambiosOT();
+    if (!guardado) {
+        comentarios.splice(comentarioIndex, 0, comentarioEliminado);
+        ot.alertaJefe = alertaJefeAnterior;
+        return;
+    }
 
     ejecutarRenderEtapa("ingreso");
 }
@@ -446,6 +584,9 @@ export async function agregarComentarioEvaluacion(i) {
         item.comentarios = [];
     }
 
+    const cantidadComentariosAnterior = item.comentarios.length;
+    const alertaJefeAnterior = ot.alertaJefe;
+
     item.comentarios.push(
         crearComentario(nombre, texto)
     );
@@ -458,7 +599,13 @@ export async function agregarComentarioEvaluacion(i) {
         inputTexto.value = "";
     }
 
-    await guardarCambiosOT();
+    const guardado = await guardarCambiosOT();
+    if (!guardado) {
+        item.comentarios.splice(cantidadComentariosAnterior);
+        ot.alertaJefe = alertaJefeAnterior;
+        if (inputTexto) inputTexto.value = texto;
+        return;
+    }
 
     ejecutarRenderEtapa("evaluacion");
 }
@@ -520,15 +667,22 @@ export async function eliminarComentarioEvaluacion(
 
     if (!Array.isArray(comentarios)) return;
 
-    if (!confirm("¿Eliminar comentario?")) {
+    if (!(await confirmarEliminarComentario())) {
         return;
     }
 
+    const comentarioEliminado = comentarios[comentarioIndex];
+    const alertaJefeAnterior = ot.alertaJefe;
     comentarios.splice(comentarioIndex, 1);
 
     actualizarAlertaJefe();
 
-    await guardarCambiosOT();
+    const guardado = await guardarCambiosOT();
+    if (!guardado) {
+        comentarios.splice(comentarioIndex, 0, comentarioEliminado);
+        ot.alertaJefe = alertaJefeAnterior;
+        return;
+    }
 
     ejecutarRenderEtapa("evaluacion");
 }
@@ -707,25 +861,50 @@ export async function responderComentarioJefeDespacho(
         return;
     }
 
+    const claveRespuesta = `despacho:${tipo}:${comentarioIndex}`;
+    if (respuestasEnCurso.has(claveRespuesta)) return;
+    respuestasEnCurso.add(claveRespuesta);
+
     const usuario = obtenerUsuario();
 
-    comentario.atendido = true;
-    comentario.respuestaUsuario =
-        respuesta.trim();
+    const estadoAnterior = {
+        atendido: comentario.atendido,
+        respuestaUsuario: comentario.respuestaUsuario,
+        atendidoPor: comentario.atendidoPor,
+        fechaAtendido: comentario.fechaAtendido,
+        alertaJefe: obtenerOT()?.alertaJefe
+    };
 
-    comentario.atendidoPor =
-        usuario?.nombre || "Usuario Taller";
+    try {
+        comentario.atendido = true;
+        comentario.respuestaUsuario =
+            respuesta.trim();
 
-    comentario.fechaAtendido =
-        new Date().toLocaleString();
+        comentario.atendidoPor =
+            usuario?.nombre || "Usuario Taller";
 
-    actualizarAlertaJefe();
+        comentario.fechaAtendido =
+            new Date().toLocaleString();
 
-    await guardarCambiosOT();
+        actualizarAlertaJefe();
 
-    renderComentariosDespacho(tipo);
+        const guardado = await guardarCambiosOT();
+        if (!guardado) {
+            comentario.atendido = estadoAnterior.atendido;
+            comentario.respuestaUsuario = estadoAnterior.respuestaUsuario;
+            comentario.atendidoPor = estadoAnterior.atendidoPor;
+            comentario.fechaAtendido = estadoAnterior.fechaAtendido;
+            const ot = obtenerOT();
+            if (ot) ot.alertaJefe = estadoAnterior.alertaJefe;
+            return;
+        }
 
-    alert("Observación atendida ✅");
+        renderComentariosDespacho(tipo);
+
+        alert("Observación atendida ✅");
+    } finally {
+        respuestasEnCurso.delete(claveRespuesta);
+    }
 }
 
 export async function eliminarComentarioDespacho(
@@ -735,20 +914,28 @@ export async function eliminarComentarioDespacho(
 
     if (OTBloqueada?.()) return;
 
+    const ot = obtenerOT();
     const lista =
         obtenerComentariosDespacho(tipo);
 
     if (!lista?.[comentarioIndex]) return;
 
-    if (!confirm("¿Eliminar comentario?")) {
+    if (!(await confirmarEliminarComentario())) {
         return;
     }
 
+    const comentarioEliminado = lista[comentarioIndex];
+    const alertaJefeAnterior = ot?.alertaJefe;
     lista.splice(comentarioIndex, 1);
 
     actualizarAlertaJefe();
 
-    await guardarCambiosOT();
+    const guardado = await guardarCambiosOT();
+    if (!guardado) {
+        lista.splice(comentarioIndex, 0, comentarioEliminado);
+        if (ot) ot.alertaJefe = alertaJefeAnterior;
+        return;
+    }
 
     renderComentariosDespacho(tipo);
 }
@@ -768,7 +955,7 @@ function crearTarjetaComentario({
     const tarjeta = document.createElement("div");
 
     tarjeta.className =
-        comentario?.rol === "jefe_taller"
+        ["jefe_taller", "admin_sucursal"].includes(comentario?.rol)
             ? "comentario-card comentario-jefe"
             : "comentario-card";
 
@@ -786,24 +973,26 @@ function crearTarjetaComentario({
     let botonResponder = "";
 
     if (
-        comentario?.rol === "jefe_taller" &&
+        ["jefe_taller", "admin_sucursal"].includes(comentario?.rol) &&
         comentario?.atendido !== true &&
         esUsuarioTaller?.()
     ) {
 
         if (responder) {
             botonResponder = `
-                <button
-                    type="button"
-                    class="btn-success"
-                    onclick="responderComentarioJefe(
-                        '${responder.etapa}',
-                        ${responder.itemIndex},
-                        ${responder.comentarioIndex}
-                    )"
-                >
-                    ✅ Responder observación
-                </button>
+                <div class="respuesta-observacion-form">
+                    <input
+                        type="text"
+                        class="input-respuesta-observacion"
+                        placeholder="Respuesta a la observación"
+                    >
+                    <button
+                        type="button"
+                        class="btn-success btn-responder-observacion"
+                    >
+                        ✅ Enviar respuesta
+                    </button>
+                </div>
             `;
         }
 
@@ -811,11 +1000,7 @@ function crearTarjetaComentario({
             botonResponder = `
                 <button
                     type="button"
-                    class="btn-success"
-                    onclick="responderComentarioJefeDespacho(
-                        '${responderDespacho.tipo}',
-                        ${responderDespacho.comentarioIndex}
-                    )"
+                    class="btn-success btn-responder-observacion-despacho"
                 >
                     ✅ Responder observación
                 </button>
@@ -826,7 +1011,7 @@ function crearTarjetaComentario({
     let bloqueRespuesta = "";
 
     if (
-        comentario?.rol === "jefe_taller" &&
+        ["jefe_taller", "admin_sucursal"].includes(comentario?.rol) &&
         comentario?.atendido === true
     ) {
 
@@ -893,6 +1078,32 @@ function crearTarjetaComentario({
 
         ${botonEliminar}
     `;
+
+    tarjeta.querySelector(".btn-responder-observacion")?.addEventListener("click", () => {
+        const respuestaTexto = tarjeta
+            .querySelector(".input-respuesta-observacion")
+            ?.value?.trim();
+
+        if (!respuestaTexto) {
+            alert("Debes ingresar una respuesta");
+            return;
+        }
+
+        responderComentarioJefe(
+            responder.etapa,
+            responder.itemIndex,
+            responder.comentarioIndex,
+            null,
+            respuestaTexto
+        );
+    });
+
+    tarjeta.querySelector(".btn-responder-observacion-despacho")?.addEventListener("click", () => {
+        responderComentarioJefeDespacho(
+            responderDespacho.tipo,
+            responderDespacho.comentarioIndex
+        );
+    });
 
     return tarjeta;
 }

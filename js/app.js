@@ -1,4 +1,4 @@
-import { protegerPagina, cerrarSesion as cerrarSesionGlobal } from "./session.js";
+import { protegerPagina, cerrarSesion as cerrarSesionGlobal } from "./session.js?v=20261004-1";
 
 import { db, auth, storage } from "./firebase-config.js";
 
@@ -7,7 +7,6 @@ import {
   getOT as getOTContexto,
   setOT as setOTContexto,
   getListaOTs as getListaOTsContexto,
-  setListaOTs as setListaOTsContexto,
   NOMBRES_ETAPAS as NOMBRES_ETAPAS_CONTEXTO
 } from "./modulos/contexto.js";
 
@@ -84,73 +83,38 @@ import {
     inicializarOTService,
     guardarCambiosOT,
     autoguardarCambiosOT,
-    obtenerEstadoOT,
-    mostrarEstadoAutoguardado
+    obtenerEstadoOT
 } from "./modulos/core/otService.js";
+
+import { guardarResumenOT } from "./modulos/core/resumenOT.js";
 
 
 import {
     inicializarModuloComentarios,
-    existenComentariosJefePendientes,
     actualizarAlertaJefe,
     responderComentarioJefe,
 
-    agregarComentarioItem,
     renderComentariosItem,
-    eliminarComentarioIngreso,
-
-    agregarComentarioEvaluacion,
     renderComentariosEvaluacion,
-    eliminarComentarioEvaluacion,
-
-    prepararComentariosDespacho,
-    agregarComentarioDespacho,
-    renderComentariosDespacho,
-    responderComentarioJefeDespacho,
-    eliminarComentarioDespacho
+    renderComentariosDespacho
 } from "./modulos/comentarios.js";
 
 
 import {
-    inicializarModuloRepuestos,
-    cargarRepuestosExcel,
-    abrirModalRepuestos,
-    cerrarModalRepuestos,
-    renderRepuestosModal,
-    guardarRepuestosUsados
+    inicializarModuloRepuestos
 } from "./modulos/repuestos.js";
 
 
 import {
-    inicializarModuloInformePDF,
-    generarInformeFinalPDF,
-    obtenerResumenEjecutivoInforme,
-    obtenerResumenEvidenciasInforme
+    inicializarModuloInformePDF
 } from "./modulos/informePDF.js";
 
 
 import {
     inicializarModuloGantt,
-
-    abrirModalGantt,
-    cerrarModalGantt,
-    cerrarModalGanttVisual,
-    volverFormularioGantt,
-
-    generarCartaGantt,
     recalcularGanttAutomatico,
-    cargarGanttGuardado,
-
     renderCartaGantt,
     renderCartaGanttProject,
-    toggleEtapaGantt,
-
-    descargarGanttExcel,
-    descargarGanttPDFProfesional,
-
-    zoomGantt,
-    irHoyGantt,
-
     actualizarEstadoGanttDesdeChecklist
 } from "./modulos/gantt.js";
 
@@ -181,30 +145,20 @@ window.cerrarSesion = function () {
   cerrarSesionGlobal();
 };
 
-const NOMBRES_ETAPAS = {
-  ingreso: "Ingreso",
-  evaluacion: "Evaluación",
-  overhaul: "Mantención",
-  pruebasMecanicas: "Pruebas Mecánicas",
-  pruebasElectricas: "Pruebas Eléctricas",
-  despachoPreparacion: "Despacho Preparación",
-  despachoFinal: "Despacho Final"
-};
-
 import {
   collection,
-  addDoc,
   doc,
+  setDoc,
   getDoc,
+  getDocs,
+  query,
+  where,
   serverTimestamp
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 import {
   ref,
-  uploadBytes,
-  getDownloadURL,
-  getBytes,
-  deleteObject
+  getBytes
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 
 console.log("🔥 Firebase conectado correctamente");
@@ -213,7 +167,7 @@ console.log(auth);
 console.log(storage);
 
 
-console.log("🧩 Contexto OverTrack cargado correctamente", {
+console.log("🧩 Contexto Vectaria cargado correctamente", {
   ot: getOTContexto(),
   listaOTs: getListaOTsContexto(),
   etapas: NOMBRES_ETAPAS_CONTEXTO
@@ -224,7 +178,248 @@ console.log("🧩 Contexto OverTrack cargado correctamente", {
 // VARIABLES GLOBALES
 // =======================
 let ot = getOTContexto();
-let listaOTs = getListaOTsContexto();
+let aprobacionesActivas = true;
+let reportesPDFActivos = true;
+
+function notificarFlujo(mensaje, titulo = "Atención", tipo = "advertencia") {
+  if (window.OverTrackUI?.mostrarMensaje) {
+    return window.OverTrackUI.mostrarMensaje({ titulo, mensaje, tipo });
+  }
+
+  window.alert(mensaje);
+  return Promise.resolve(true);
+}
+let ganttActivo = true;
+let repuestosActivos = true;
+let plantillasMantenimiento = [];
+let creacionOTEnCurso = false;
+let etapasActivas = {
+  ingreso: true,
+  evaluacion: true,
+  mantencion: true,
+  pruebas: true,
+  despacho: true
+};
+
+const ORDEN_ETAPAS = ["ingreso", "evaluacion", "overhaul", "pruebas", "despacho"];
+const MODULO_POR_TAB = {
+  ingreso: "ingreso",
+  evaluacion: "evaluacion",
+  overhaul: "mantencion",
+  pruebas: "pruebas",
+  despacho: "despacho"
+};
+
+function etapaHabilitada(tab) {
+  const modulo = MODULO_POR_TAB[tab] || tab;
+  return etapasActivas[modulo] !== false;
+}
+
+function obtenerEtapasHabilitadas() {
+  return { ...etapasActivas };
+}
+
+function obtenerSiguienteEtapa(tabActual) {
+  const indice = ORDEN_ETAPAS.indexOf(tabActual);
+  return ORDEN_ETAPAS.slice(indice + 1).find(etapaHabilitada) || null;
+}
+
+function navegarSiguienteEtapa(tabActual) {
+  const siguiente = obtenerSiguienteEtapa(tabActual);
+
+  if (!siguiente) {
+    notificarFlujo(
+      "La etapa quedó completada. La OT ya puede cerrarse desde esta sección por el Jefe de Taller.",
+      "Flujo completado",
+      "exito"
+    );
+    return null;
+  }
+
+  habilitarTab(siguiente);
+  cambiarTab(siguiente);
+  return siguiente;
+}
+
+function configurarInterfazEtapas() {
+  document.querySelectorAll("[data-etapa]").forEach(elemento => {
+    const activo = etapaHabilitada(elemento.dataset.etapa);
+    if (activo) {
+      elemento.style.removeProperty("display");
+    } else {
+      elemento.style.setProperty("display", "none", "important");
+    }
+  });
+
+  document.querySelectorAll(".tabs .tab[data-etapa]").forEach((tab, indice) => {
+    const numero = tab.querySelector(".tab-dot");
+    if (numero && etapaHabilitada(tab.dataset.tab)) {
+      const visibles = [...document.querySelectorAll(".tabs .tab[data-etapa]")]
+        .filter(item => etapaHabilitada(item.dataset.tab));
+      numero.textContent = String(visibles.indexOf(tab) + 2);
+    }
+  });
+
+  // Crear OT siempre ocupa una posición; las demás columnas corresponden
+  // únicamente a las etapas operativas visibles.
+  const timeline = document.querySelector(".tabs-timeline-pro");
+  if (timeline) {
+    const etapasVisibles = ORDEN_ETAPAS.filter(etapaHabilitada).length;
+    timeline.style.setProperty("--columnas-flujo", String(etapasVisibles + 1));
+  }
+
+  const evaluacionRechazada =
+    etapaHabilitada("evaluacion") &&
+    ot?.evaluacionAprobada === true &&
+    ot?.overhaulRequerido === false;
+  const ultimaEtapa = evaluacionRechazada
+    ? (etapaHabilitada("despacho") ? "despacho" : "evaluacion")
+    : ([...ORDEN_ETAPAS].reverse().find(etapaHabilitada) || null);
+  document.querySelectorAll("[data-cierre-etapa]").forEach(boton => {
+    const visible = esJefeTaller() && boton.dataset.cierreEtapa === ultimaEtapa;
+    if (visible) {
+      boton.style.removeProperty("display");
+    } else {
+      boton.style.setProperty("display", "none", "important");
+    }
+  });
+}
+
+function aprobacionesHabilitadas() {
+  return aprobacionesActivas;
+}
+
+function reportesPDFHabilitados() {
+  return reportesPDFActivos;
+}
+
+function ganttHabilitado() {
+  return ganttActivo;
+}
+
+function repuestosHabilitados() {
+  return repuestosActivos;
+}
+
+function configurarInterfazAprobaciones() {
+  const decisionEvaluacion = document.getElementById("decisionEvaluacionJefe");
+  const continuarEvaluacion = document.getElementById("btnContinuarEvaluacionSinAprobacion");
+  const aprobarPruebas = document.getElementById("btnAprobarPruebasJefe");
+  const finalizarPruebas = document.getElementById("btnFinalizarPruebasSinAprobacion");
+
+  if (decisionEvaluacion) decisionEvaluacion.style.display = aprobacionesActivas ? "" : "none";
+  if (continuarEvaluacion) continuarEvaluacion.style.display = aprobacionesActivas ? "none" : "inline-flex";
+  if (aprobarPruebas) aprobarPruebas.style.display = aprobacionesActivas ? "" : "none";
+  if (finalizarPruebas) finalizarPruebas.style.display = aprobacionesActivas ? "none" : "inline-flex";
+}
+
+function configurarInterfazReportesPDF() {
+  const botonInforme = document.getElementById("btnGenerarInformePDF");
+
+  if (botonInforme) {
+    const intervencionOmitida =
+      ot?.evaluacionAprobada === true &&
+      ot?.overhaulRequerido === false;
+
+    const ultimaEtapaActiva = [...ORDEN_ETAPAS]
+      .reverse()
+      .find(etapa => {
+        if (intervencionOmitida && (etapa === "overhaul" || etapa === "pruebas")) {
+          return false;
+        }
+
+        return etapaHabilitada(etapa);
+      });
+
+    const contenedorDestino = ultimaEtapaActiva
+      ? document.querySelector(`#${ultimaEtapaActiva} > .card`)
+      : document.querySelector("#crear > .card");
+
+    if (contenedorDestino && botonInforme.parentElement !== contenedorDestino) {
+      contenedorDestino.appendChild(botonInforme);
+    }
+  }
+
+  document.querySelectorAll("[data-modulo-reportes-pdf]").forEach(elemento => {
+    if (reportesPDFActivos) {
+      elemento.style.removeProperty("display");
+      return;
+    }
+
+    elemento.style.setProperty("display", "none", "important");
+  });
+}
+
+function configurarInterfazGantt() {
+  document.querySelectorAll("[data-modulo-gantt]").forEach(elemento => {
+    if (ganttActivo) {
+      elemento.style.removeProperty("display");
+      return;
+    }
+
+    elemento.style.setProperty("display", "none", "important");
+  });
+}
+
+function configurarInterfazRepuestos() {
+  document.querySelectorAll("[data-modulo-repuestos]").forEach(elemento => {
+    if (repuestosActivos) {
+      elemento.style.removeProperty("display");
+      return;
+    }
+
+    elemento.style.setProperty("display", "none", "important");
+  });
+}
+
+async function cargarConfiguracionAprobaciones() {
+  const empresaId = ot?.empresaId || usuario?.empresaId;
+  if (!empresaId) {
+    aprobacionesActivas = true;
+    reportesPDFActivos = true;
+    ganttActivo = true;
+    repuestosActivos = true;
+    etapasActivas = { ingreso: true, evaluacion: true, mantencion: true, pruebas: true, despacho: true };
+    configurarInterfazAprobaciones();
+    configurarInterfazReportesPDF();
+    configurarInterfazGantt();
+    configurarInterfazRepuestos();
+    configurarInterfazEtapas();
+    return;
+  }
+
+  try {
+    const empresaSnap = await getDoc(doc(db, "empresas", empresaId));
+    const modulosEmpresa = empresaSnap.exists()
+      ? empresaSnap.data()?.modulos || {}
+      : {};
+
+    aprobacionesActivas = modulosEmpresa.aprobaciones !== false;
+    reportesPDFActivos = modulosEmpresa.reportesPDF !== false;
+    ganttActivo = modulosEmpresa.gantt !== false;
+    repuestosActivos = modulosEmpresa.repuestos !== false;
+    etapasActivas = {
+      ingreso: modulosEmpresa.ingreso !== false,
+      evaluacion: modulosEmpresa.evaluacion !== false,
+      mantencion: modulosEmpresa.mantencion !== false,
+      pruebas: modulosEmpresa.pruebas !== false,
+      despacho: modulosEmpresa.despacho !== false
+    };
+  } catch (error) {
+    console.error("No fue posible consultar la configuración de módulos:", error);
+    aprobacionesActivas = true;
+    reportesPDFActivos = true;
+    ganttActivo = true;
+    repuestosActivos = true;
+    etapasActivas = { ingreso: true, evaluacion: true, mantencion: true, pruebas: true, despacho: true };
+  }
+
+  configurarInterfazAprobaciones();
+  configurarInterfazReportesPDF();
+  configurarInterfazGantt();
+  configurarInterfazRepuestos();
+  configurarInterfazEtapas();
+}
 
 
 inicializarUtilidades({
@@ -242,7 +437,8 @@ inicializarBitacora({
 
 inicializarOTService({
     getOT: () => ot,
-    renderHeaderOTPro
+    renderHeaderOTPro,
+    getEtapasHabilitadas: obtenerEtapasHabilitadas
 });
 
 
@@ -273,70 +469,229 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 // =======================
-// COMPRESIÓN DE IMÁGENES
+// CREAR / EDITAR OT
 // =======================
-function comprimirImagen(file, calidad = 0.7, maxWidth = 1600) {
+function generarNumeroOTGenerico() {
+  const ahora = new Date();
+  const fecha = [
+    ahora.getFullYear(),
+    String(ahora.getMonth() + 1).padStart(2, "0"),
+    String(ahora.getDate()).padStart(2, "0")
+  ].join("");
+  const sufijo = Date.now().toString(36).slice(-5).toUpperCase();
 
-  return new Promise((resolve) => {
-
-    const reader = new FileReader();
-
-    reader.readAsDataURL(file);
-
-    reader.onload = (event) => {
-
-      const img = new Image();
-
-      img.src = event.target.result;
-
-      img.onload = () => {
-
-        const canvas = document.createElement("canvas");
-        const ctx = canvas.getContext("2d");
-
-        let width = img.width;
-        let height = img.height;
-
-        // 🔥 REDIMENSIONAR
-        if (width > maxWidth) {
-
-          height *= maxWidth / width;
-          width = maxWidth;
-
-        }
-
-        canvas.width = width;
-        canvas.height = height;
-
-        ctx.drawImage(img, 0, 0, width, height);
-
-        // 🔥 COMPRESIÓN JPEG
-        const compressedBase64 =
-          canvas.toDataURL("image/jpeg", calidad);
-
-        resolve(compressedBase64);
-
-      };
-
-    };
-
-  });
+  return `OT-AUTO-${fecha}-${sufijo}`;
 }
 
-// =======================
-// CREAR OS
-// =======================
+const claveBorradorIdentificacion =
+  `overtrack:borrador-ot:${usuario.empresaId || "sin-empresa"}:${usuario.uid || "sin-usuario"}`;
+
+function guardarBorradorIdentificacion() {
+  if (ot?.id || localStorage.getItem("otActiva")) return;
+  const borrador = {};
+  ["equipo", "serie", "gamaEquipo", "cliente", "os"].forEach(id => {
+    borrador[id] = document.getElementById(id)?.value || "";
+  });
+  borrador.fecha = Date.now();
+  localStorage.setItem(claveBorradorIdentificacion, JSON.stringify(borrador));
+}
+
+function restaurarBorradorIdentificacion() {
+  if (ot?.id || localStorage.getItem("otActiva")) return;
+  try {
+    const borrador = JSON.parse(localStorage.getItem(claveBorradorIdentificacion) || "null");
+    if (!borrador || Date.now() - Number(borrador.fecha || 0) > 7 * 24 * 60 * 60 * 1000) {
+      localStorage.removeItem(claveBorradorIdentificacion);
+      return;
+    }
+    ["equipo", "serie", "cliente", "os"].forEach(id => {
+      const campo = document.getElementById(id);
+      if (campo && !campo.value) campo.value = borrador[id] || "";
+    });
+    const selector = document.getElementById("gamaEquipo");
+    if (selector && [...selector.options].some(opcion => opcion.value === borrador.gamaEquipo)) {
+      selector.value = borrador.gamaEquipo;
+    }
+  } catch (error) {
+    console.warn("No fue posible restaurar el borrador de la OT:", error);
+    localStorage.removeItem(claveBorradorIdentificacion);
+  }
+}
+
+function cargarDatosIdentificacionOT() {
+  if (!ot) return;
+
+  const campos = {
+    equipo: ot.equipo || "",
+    serie: ot.serie || "",
+    gamaEquipo: ot.gamaEquipo || "",
+    cliente: ot.cliente || "",
+    os: ot.os || ""
+  };
+
+  Object.entries(campos).forEach(([id, valor]) => {
+    const input = document.getElementById(id);
+    if (input) input.value = valor;
+  });
+
+  const boton = document.getElementById("btnGuardarDatosOT");
+  if (boton) boton.textContent = "Guardar cambios";
+
+  const selectorGama = document.getElementById("gamaEquipo");
+  if (selectorGama) selectorGama.disabled = true;
+}
+
+function normalizarChecklistPlantilla(items) {
+  return (Array.isArray(items) ? items : []).map(item => ({
+    item: String(item?.item || item || "").trim(),
+    ok: false,
+    fotos: [],
+    comentarios: [],
+    fecha: null
+  })).filter(item => item.item);
+}
+
+async function cargarGamasDisponibles() {
+  const selector = document.getElementById("gamaEquipo");
+  if (!selector || !usuario?.empresaId) return;
+
+  try {
+    const consulta = query(
+      collection(db, "plantillasMantenimiento"),
+      where("empresaId", "==", usuario.empresaId)
+    );
+    const snapshot = await getDocs(consulta);
+    plantillasMantenimiento = snapshot.docs
+      .map(documento => ({ id: documento.id, ...documento.data() }))
+      .filter(plantilla => plantilla.activa !== false)
+      .sort((a, b) => String(a.gama || "").localeCompare(String(b.gama || ""), "es"));
+
+    selector.innerHTML = '<option value="">Seleccionar gama de equipo</option>';
+    plantillasMantenimiento.forEach(plantilla => {
+      const opcion = document.createElement("option");
+      opcion.value = plantilla.id;
+      opcion.textContent = String(plantilla.gama || "Gama sin nombre");
+      selector.appendChild(opcion);
+    });
+
+    if (ot?.plantillaMantenimientoId) selector.value = ot.plantillaMantenimientoId;
+    if (!plantillasMantenimiento.length) {
+      document.getElementById("ayudaGamaEquipo").textContent =
+        "No existen gamas con una plantilla activa. Solicita al administrador que configure una.";
+    }
+  } catch (error) {
+    console.error("No fue posible cargar las gamas de equipo:", error);
+    selector.innerHTML = '<option value="">No fue posible cargar las gamas</option>';
+  }
+}
+
 async function guardarDatosOS() {
 
   const equipo = document.getElementById("equipo").value.trim();
   const serie = document.getElementById("serie").value.trim();
+  const plantillaId = document.getElementById("gamaEquipo")?.value || "";
   const cliente = document.getElementById("cliente").value.trim();
-  const os = document.getElementById("os").value.trim();
+  const osIngresada = document.getElementById("os").value.trim();
 
-  if (!equipo || !serie || !cliente || !os) {
-    alert("Completa todos los campos");
+  if (!equipo || !serie || !cliente || (!ot?.id && !plantillaId)) {
+    notificarFlujo("Completa equipo, serie, gama y cliente para continuar.", "Datos obligatorios", "advertencia");
     return;
   }
+
+  if (OTBloqueada()) {
+    notificarFlujo("La OT está cerrada y solo puede consultarse.", "OT en modo de consulta", "info");
+    return;
+  }
+
+  // Si ya existe una OT, este formulario edita únicamente sus datos de
+  // identificación y conserva intacto todo el avance operacional.
+  if (ot?.id) {
+    if (creacionOTEnCurso) return;
+    creacionOTEnCurso = true;
+    const botonGuardarDatos = document.getElementById("btnGuardarDatosOT");
+    const datosAnteriores = {
+      equipo: ot.equipo,
+      serie: ot.serie,
+      cliente: ot.cliente,
+      os: ot.os,
+      osGenerica: ot.osGenerica
+    };
+
+    if (botonGuardarDatos) {
+      botonGuardarDatos.disabled = true;
+      botonGuardarDatos.textContent = "Guardando...";
+    }
+
+    try {
+      ot.equipo = equipo;
+      ot.serie = serie;
+      ot.cliente = cliente;
+      ot.os = osIngresada || ot.os || generarNumeroOTGenerico();
+      ot.osGenerica = /^OT-AUTO-/.test(ot.os);
+
+      const guardado = await guardarCambiosOT();
+      if (!guardado) {
+        Object.assign(ot, datosAnteriores);
+        return;
+      }
+
+      cargarDatosIdentificacionOT();
+      await notificarFlujo("Los datos de la OT se actualizaron correctamente.", "Cambios guardados", "exito");
+    } finally {
+      creacionOTEnCurso = false;
+      if (botonGuardarDatos) {
+        botonGuardarDatos.disabled = false;
+        botonGuardarDatos.textContent = "Guardar cambios";
+      }
+    }
+    return;
+  }
+
+  const os = osIngresada || generarNumeroOTGenerico();
+  const plantilla = plantillasMantenimiento.find(item => item.id === plantillaId);
+  if (!plantilla) {
+    notificarFlujo("La gama seleccionada no tiene una plantilla activa disponible.", "Plantilla no disponible", "error");
+    return;
+  }
+  const checklists = plantilla.checklists || {};
+  const etapasOT = { ...etapasActivas };
+  const etapasChecklist = [
+    { key: "ingreso", nombre: "Ingreso" },
+    { key: "evaluacion", nombre: "Evaluación" },
+    { key: "mantencion", nombre: "Mantención" },
+    { key: "pruebas", nombre: "Pruebas" }
+  ];
+  const etapasFaltantes = etapasChecklist
+    .filter(etapa => etapasOT[etapa.key] && !normalizarChecklistPlantilla(checklists[etapa.key]).length)
+    .map(etapa => etapa.nombre);
+
+  if (etapasFaltantes.length) {
+    notificarFlujo(
+      `La plantilla seleccionada no contiene las etapas activas: ${etapasFaltantes.join(", ")}. El administrador debe actualizarla.`,
+      "Plantilla incompleta",
+      "error"
+    );
+    return;
+  }
+
+  if (creacionOTEnCurso) return;
+  creacionOTEnCurso = true;
+  const botonGuardarDatos = document.getElementById("btnGuardarDatosOT");
+  if (botonGuardarDatos) {
+    botonGuardarDatos.disabled = true;
+    botonGuardarDatos.textContent = "Creando OT...";
+  }
+
+  const estadoInicial = ORDEN_ETAPAS
+    .filter(etapaHabilitada)
+    .map(etapa => ({
+      ingreso: "INGRESO",
+      evaluacion: "EVALUACION",
+      overhaul: "OVERHAUL",
+      pruebas: "PRUEBAS",
+      despacho: "DESPACHO"
+    }[etapa]))
+    .find(Boolean) || "INGRESO";
 
   try {
 
@@ -345,6 +700,12 @@ async function guardarDatosOS() {
       serie,
       cliente,
       os,
+      osGenerica: !osIngresada,
+
+      gamaEquipo: plantilla.gama,
+      plantillaMantenimientoId: plantilla.id,
+      plantillaMantenimientoNombre: plantilla.nombre,
+      plantillaMantenimientoVersion: Number(plantilla.version || 1),
 
       empresaId: usuario.empresaId,
       sucursalId: usuario.sucursalId,
@@ -352,13 +713,17 @@ async function guardarDatosOS() {
       creadoPorNombre: usuario.nombre,
       creadoPorRol: usuario.rol,
 
-      estado: "INGRESO",
+      estado: estadoInicial,
+
+      etapasHabilitadas: etapasOT,
 
 
-      ingreso: [],
-      evaluacion: [],
-      overhaul: [],
-      pruebas: null,
+      ingreso: etapasOT.ingreso ? normalizarChecklistPlantilla(checklists.ingreso) : [],
+      evaluacion: etapasOT.evaluacion ? normalizarChecklistPlantilla(checklists.evaluacion) : [],
+      overhaul: etapasOT.mantencion ? normalizarChecklistPlantilla(checklists.mantencion) : [],
+      pruebas: {
+        general: etapasOT.pruebas ? normalizarChecklistPlantilla(checklists.pruebas) : []
+      },
       despacho: null,
 
       ingresoAprobado: false,
@@ -368,42 +733,47 @@ async function guardarDatosOS() {
 
       cerrada: false,
 
-      creadoPor: "usuario_taller",
       fechaCreacion: serverTimestamp(),
       fechaActualizacion: serverTimestamp()
     };
 
-    const docRef = await addDoc(collection(db, "ots"), nuevaOT);
+    const claveCreacionPendiente = `overtrack:creacion-ot:${usuario.empresaId}:${usuario.uid}`;
+    const idPendiente = sessionStorage.getItem(claveCreacionPendiente);
+    const docRef = idPendiente
+      ? doc(db, "ots", idPendiente)
+      : doc(collection(db, "ots"));
+
+    sessionStorage.setItem(claveCreacionPendiente, docRef.id);
+    await setDoc(docRef, nuevaOT);
+    await guardarResumenOT(docRef.id, nuevaOT, { actualizarFecha: false }).catch(error => {
+      console.warn("La OT fue creada, pero su resumen se sincronizará más adelante.", error);
+    });
+    sessionStorage.removeItem(claveCreacionPendiente);
+    localStorage.removeItem(claveBorradorIdentificacion);
 
     localStorage.setItem("otActiva", docRef.id);
 
-    alert("OS creada correctamente ✅");
+    await notificarFlujo(
+      osIngresada
+        ? "OT creada correctamente ✅"
+        : `OT creada correctamente con el número automático ${os} ✅`,
+      "OT creada",
+      "exito"
+    );
 
     window.location.href = "flujo.html";
 
   } catch (error) {
-    console.error("Error creando OS:", error);
-    alert("Error al crear la OS en Firebase");
+    console.error("Error creando OT:", error);
+    notificarFlujo("No fue posible crear la OT. Intenta nuevamente.", "Error al crear la OT", "error");
+  } finally {
+    creacionOTEnCurso = false;
+    if (botonGuardarDatos) {
+      botonGuardarDatos.disabled = false;
+      botonGuardarDatos.textContent = "Siguiente";
+    }
   }
 }
-
-window.guardarDatosOS = guardarDatosOS;
-
-
-
-function habilitarTabsPlanificacionJefe() {
-
-  if (!esJefeTaller()) return;
-
-  habilitarTab("ingreso");
-  habilitarTab("evaluacion");
-  habilitarTab("overhaul");
-  habilitarTab("pruebas");
-  habilitarTab("despacho");
-
-  console.log("Tabs desbloqueadas para planificación Jefe de Taller ✅");
-}
-
 
 inicializarModuloComentarios({
 
@@ -441,7 +811,8 @@ inicializarModuloRepuestos({
     guardarCambiosOT,
 
     OTBloqueada,
-    esJefeTaller
+    esJefeTaller,
+    repuestosHabilitados
 });
 
 
@@ -451,8 +822,57 @@ inicializarModuloInformePDF({
     getUsuario: () => usuario,
 
     obtenerEstadoOT,
-    convertirImagenABase64
+    convertirImagenABase64,
+    reportesPDFHabilitados,
+    obtenerEtapasHabilitadas,
+    obtenerConfiguracionEmpresaInforme: async () => {
+      const empresaId = ot?.empresaId || usuario?.empresaId;
+      if (!empresaId) return null;
+      const empresaSnap = await getDoc(doc(db, "empresas", empresaId));
+      return empresaSnap.exists() ? empresaSnap.data() : null;
+    }
 });
+
+function configurarMenuMovilFlujo() {
+  const boton = document.querySelector(".mobile-menu-toggle");
+  const fondo = document.querySelector(".mobile-menu-backdrop");
+  const menu = document.getElementById("flowMobileMenu");
+  if (!boton || !fondo || !menu) return;
+
+  const cambiarEstado = (abierto) => {
+    document.body.classList.toggle("menu-mobile-open", abierto);
+    boton.setAttribute("aria-expanded", String(abierto));
+    boton.setAttribute("aria-label", abierto
+      ? "Cerrar menú de navegación"
+      : "Abrir menú de navegación");
+  };
+
+  boton.addEventListener("click", () => {
+    cambiarEstado(!document.body.classList.contains("menu-mobile-open"));
+  });
+  fondo.addEventListener("click", () => cambiarEstado(false));
+  menu.addEventListener("click", (evento) => {
+    if (evento.target.closest("button")) cambiarEstado(false);
+  });
+  document.addEventListener("keydown", (evento) => {
+    if (evento.key === "Escape") cambiarEstado(false);
+  });
+  window.addEventListener("resize", () => {
+    if (window.innerWidth > 760) cambiarEstado(false);
+  });
+}
+
+document.addEventListener("DOMContentLoaded", async () => {
+  await cargarConfiguracionAprobaciones();
+  await cargarGamasDisponibles();
+  restaurarBorradorIdentificacion();
+  ["equipo", "serie", "gamaEquipo", "cliente", "os"].forEach(id => {
+    const campo = document.getElementById(id);
+    campo?.addEventListener(id === "gamaEquipo" ? "change" : "input", guardarBorradorIdentificacion);
+  });
+});
+
+document.addEventListener("DOMContentLoaded", configurarMenuMovilFlujo);
 
 
 inicializarModuloGantt({
@@ -461,7 +881,9 @@ inicializarModuloGantt({
     getUsuario: () => usuario,
 
     guardarCambiosOT,
-    esJefeTaller
+    esJefeTaller,
+    reportesPDFHabilitados,
+    ganttHabilitado
 });
 
 
@@ -471,7 +893,6 @@ inicializarModuloGantt({
 inicializarModuloIngreso({
 
     getOT: () => ot,
-    getUsuario: () => usuario,
 
     guardarCambiosOT,
     autoguardarCambiosOT,
@@ -479,10 +900,10 @@ inicializarModuloIngreso({
     renderProgresoEtapa,
     itemCompleto,
 
-    mostrarFotosIngreso: (...args) => window.mostrarFotosIngreso(...args),
     renderComentariosItem,
 
     OTBloqueada,
+    esJefeTaller,
 
     agregarBitacora,
 
@@ -494,6 +915,7 @@ inicializarModuloIngreso({
 
     obtenerEstadoOT,
     habilitarTab,
+    navegarSiguienteEtapa,
 
     eliminarArchivoStorage,
     subirArchivoStorage,
@@ -532,8 +954,12 @@ inicializarModuloEvaluacion({
     obtenerEstadoOT,
     habilitarTab,
     cambiarTab,
+    navegarSiguienteEtapa,
 
-    renderComentarioDecisionEvaluacion
+    aprobacionesHabilitadas,
+    agregarBitacora,
+
+    abrirDocumento
 
 });
 
@@ -564,7 +990,8 @@ inicializarModuloOverhaul({
 
   actualizarAlertaJefe,
   obtenerEstadoOT,
-  habilitarTab
+  habilitarTab,
+  navegarSiguienteEtapa
 });
 
 
@@ -598,8 +1025,11 @@ inicializarModuloPruebas({
 
   habilitarTab,
   cambiarTab,
+  navegarSiguienteEtapa,
 
-  responderComentarioJefe
+  responderComentarioJefe,
+  aprobacionesHabilitadas,
+  agregarBitacora
 
 });
 
@@ -612,15 +1042,14 @@ inicializarModuloDespacho({
     guardarCambiosOT,
 
     OTBloqueada,
-
     esJefeTaller,
-    esUsuarioTaller,
-
-    puedeEliminarComentario,
 
     subirArchivoStorage,
+    eliminarArchivoStorage,
 
-    actualizarAlertaJefe
+    abrirDocumento,
+    validarOTCompleta,
+    aplicarModoSoloLectura
 
 });
 
@@ -664,34 +1093,42 @@ function configurarTabsSegunFlujo() {
   deshabilitarTab("pruebas");
   deshabilitarTab("despacho");
 
-  // Ingreso siempre habilitado cuando existe OT
-  habilitarTab("ingreso");
+  if (etapaHabilitada("ingreso")) {
+    habilitarTab("ingreso");
+  }
 
   // Jefe Taller puede planificar/ver todas
   if (esJefeTaller()) {
-    habilitarTab("evaluacion");
-    habilitarTab("overhaul");
-    habilitarTab("pruebas");
-    habilitarTab("despacho");
+    ORDEN_ETAPAS.filter(etapaHabilitada).forEach(habilitarTab);
     return;
   }
 
   // Usuario Taller sigue el flujo real
-  if (ot.ingresoAprobado) {
+  if (ot.ingresoAprobado && etapaHabilitada("evaluacion")) {
     habilitarTab("evaluacion");
   }
 
-  if (ot.evaluacionAprobada && ot.overhaulRequerido === true) {
+  if (etapaHabilitada("overhaul") && ot.evaluacionAprobada && ot.overhaulRequerido === true) {
     habilitarTab("overhaul");
   }
 
-  if (ot.overhaulRequerido === true && ot.overhaulAprobado) {
+  if (etapaHabilitada("pruebas") && ot.overhaulRequerido === true && ot.overhaulAprobado) {
     habilitarTab("pruebas");
   }
 
-  if (ot.pruebasAprobado || ot.overhaulRequerido === false) {
+  if (etapaHabilitada("despacho") && (ot.pruebasAprobado || ot.overhaulRequerido === false)) {
     habilitarTab("despacho");
   }
+
+  // Habilita además la etapa calculada cuando existen etapas omitidas.
+  const tabEstado = {
+    INGRESO: "ingreso",
+    EVALUACION: "evaluacion",
+    OVERHAUL: "overhaul",
+    PRUEBAS: "pruebas",
+    DESPACHO: "despacho"
+  }[obtenerEstadoOT(ot)];
+  if (tabEstado && etapaHabilitada(tabEstado)) habilitarTab(tabEstado);
 }
 
 
@@ -713,154 +1150,6 @@ function configurarTabsSegunFlujo() {
 
 
 
-function estaOTAtrasada(ot) {
-
-  if (!ot) return false;
-
-  // Si está cerrada, no cuenta como atrasada
-  if (ot.cerrada === true || ot.estado === "CERRADA") {
-    return false;
-  }
-
-  // Si no tiene Carta Gantt, no se puede calcular atraso
-  if (!ot.gantt || !ot.gantt.fechaTermino) {
-    return false;
-  }
-
-  const hoy = new Date();
-  hoy.setHours(0, 0, 0, 0);
-
-  const fechaTermino = new Date(ot.gantt.fechaTermino + "T00:00:00");
-  fechaTermino.setHours(0, 0, 0, 0);
-
-  return hoy > fechaTermino;
-}
-
-function diasAtrasoOT(ot) {
-
-  if (!estaOTAtrasada(ot)) return 0;
-
-  const hoy = new Date();
-  hoy.setHours(0, 0, 0, 0);
-
-  const fechaTermino = new Date(ot.gantt.fechaTermino + "T00:00:00");
-  fechaTermino.setHours(0, 0, 0, 0);
-
-  const diferencia =
-    hoy - fechaTermino;
-
-  return Math.floor(
-    diferencia / (1000 * 60 * 60 * 24)
-  );
-}
-
-
-// =======================
-// APLICAR MODO SOLO LECTURA
-// =======================
-
-
-
-
-
-function aprobarEvaluacion() {
-
-  if (!esJefeTaller()) {
-  alert("Solo Jefe de Taller puede aprobar");
-  return;
-}
-
-  // 🔥 VALIDACIÓN COMPLETA
-  if (!window.validarEvaluacionCompleta()) return;
-
-  ot.evaluacionAprobada = true;
-
-  ot.estado = obtenerEstadoOT(ot);
-
-  guardarCambiosOT();
-
-  habilitarTab("overhaul");
-
-  alert("Evaluación aprobada correctamente ✅");
-}
-
-
-
-
-
-
-
-function abrirDocumentoDecisionEvaluacion(index) {
-  const doc = ot?.decisionEvaluacion?.documentos?.[index];
-
-  if (!doc) return;
-
-  abrirDocumento({
-    nombre: doc.nombre,
-    tipo: doc.tipo,
-    url: doc.url
-  });
-}
-
-function renderComentarioDecisionEvaluacion() {
-  const cont = document.getElementById("comentarioDecisionEvaluacionGuardado");
-  if (!cont) return;
-
-  cont.innerHTML = "";
-
-  if (!ot.decisionEvaluacion?.comentario) return;
-
-  const div = document.createElement("div");
-  div.className = "comentario-card comentario-jefe";
-
-  div.innerHTML = `
-    <strong>👨‍💼 ${ot.decisionEvaluacion.usuario || "Jefe Taller"}</strong>
-    <p class="comentario-fecha">${ot.decisionEvaluacion.fecha || ""}</p>
-    <p>${ot.decisionEvaluacion.comentario}</p>
-
-    ${
-  esJefeTaller()
-    ? `<button 
-        class="btn-delete-comment"
-        onclick="eliminarComentarioDecisionEvaluacion()">
-        🗑
-      </button>`
-    : ""
-}
-  `;
-
-  cont.appendChild(div);
-}
-
-async function eliminarComentarioDecisionEvaluacion() {
-  if (OTBloqueada()) return;
-
-  if (!esJefeTaller()) {
-    alert("Solo Jefe de Taller puede eliminar este comentario");
-    return;
-  }
-
-  if (!confirm("¿Eliminar comentario de decisión de evaluación?")) return;
-
-  ot.decisionEvaluacion.comentario = "";
-
-  actualizarAlertaJefe();
-
-  await guardarCambiosOT();
-  renderComentarioDecisionEvaluacion();
-}
-
-function abrirArchivoTemporal(url) {
-  const modal = document.getElementById("modalDoc");
-  const visor = document.getElementById("visorDoc");
-
-  if (!modal || !visor) return;
-
-  visor.src = url;
-  modal.style.display = "block";
-}
-
-
 // =======================
 // INIT
 // =======================
@@ -880,7 +1169,7 @@ window.onload = async () => {
     const otSnap = await getDoc(otRef);
 
     if (!otSnap.exists()) {
-      alert("La OT no existe en Firebase");
+      await notificarFlujo("La orden de trabajo ya no existe o no está disponible.", "OT no disponible", "error");
       localStorage.removeItem("otActiva");
       cambiarTab("crear");
       return;
@@ -894,12 +1183,16 @@ window.onload = async () => {
 
     setOTContexto(ot);
 
+    await cargarConfiguracionAprobaciones();
+
+    cargarDatosIdentificacionOT();
+
 
     console.log("OT cargada desde Firebase:", ot);
 
   } catch (error) {
     console.error("Error cargando OT:", error);
-    alert("Error al cargar la OT desde Firebase");
+    await notificarFlujo("No fue posible cargar la orden de trabajo.", "Error de carga", "error");
     return;
   }
 
@@ -918,8 +1211,8 @@ window.onload = async () => {
 
   if (ot.evaluacion?.length > 0) {
     window.renderEvaluacion();
-    renderDocsDecisionEvaluacionPreview();
-    renderComentarioDecisionEvaluacion();
+    window.renderDocsDecisionEvaluacionPreview();
+    window.renderComentarioDecisionEvaluacion();
   }
 
   // ✅ SI EVALUACIÓN FUE APROBADA PARA OVERHAUL
@@ -932,97 +1225,53 @@ window.onload = async () => {
     habilitarTab("despacho");
   }
 
-  if (ot.overhaul?.length > 0 && ot.overhaulRequerido === true) {
+  if (ot.overhaul?.length > 0 && etapaHabilitada("overhaul")) {
     window.renderOverhaul();
     habilitarTab("overhaul");
   }
 
-  if (ot.overhaulRequerido === true && ot.overhaulAprobado) {
+  if (etapaHabilitada("pruebas") && ot.overhaulAprobado) {
     habilitarTab("pruebas");
   }
 
-  if (ot.pruebas && ot.overhaulRequerido === true) {
-    if (ot.pruebas.mecanico?.length > 0) {
-      renderChecklist("mecanico");
-    }
-
-    if (ot.pruebas.electrico?.length > 0) {
-      renderChecklist("electrico");
-    }
+  if (ot.pruebas && etapaHabilitada("pruebas")) {
+    const pruebas = Array.isArray(ot.pruebas)
+      ? ot.pruebas
+      : Array.isArray(ot.pruebas.general)
+      ? ot.pruebas.general
+      : [...(ot.pruebas.mecanico || []), ...(ot.pruebas.electrico || [])];
+    if (pruebas.length > 0) window.renderChecklist("general");
 
   }
 
-  if (
-    ot.pruebasAprobado ||
-    ot.overhaulRequerido === false
-  ) {
+  if (etapaHabilitada("despacho") && obtenerEstadoOT(ot) === "DESPACHO") {
     habilitarTab("despacho");
   }
 
   if (ot.despacho) {
     if (ot.despacho.preparacion?.length > 0) {
-      renderDocsSeccion("preparacion");
+      window.renderDocsSeccion("preparacion");
     }
 
     if (ot.despacho.final?.length > 0) {
-      renderDocsSeccion("final");
+      window.renderDocsSeccion("final");
     }
 
     renderComentariosDespacho("preparacion");
     renderComentariosDespacho("final");
   }
 
-  // =========================
-  // FORZAR TAB ACTIVO CORRECTO
-  // =========================
-
-  if (!ot.ingreso || ot.ingreso.length === 0) {
-    habilitarTab("ingreso");
-    cambiarTab("ingreso");
-  }
-
-  else if (!ot.ingresoAprobado) {
-    habilitarTab("ingreso");
-    cambiarTab("ingreso");
-  }
-
-  else if (ot.ingresoAprobado && !ot.evaluacionAprobada) {
-    habilitarTab("evaluacion");
-    cambiarTab("evaluacion");
-  }
-
-  // ✅ RECHAZO DE OVERHAUL → DESPACHO
-  else if (ot.evaluacionAprobada && ot.overhaulRequerido === false) {
-    habilitarTab("despacho");
-    cambiarTab("despacho");
-  }
-
-  // ✅ APROBADO PARA OVERHAUL
-  else if (
-    ot.evaluacionAprobada &&
-    ot.overhaulRequerido === true &&
-    !ot.overhaulAprobado
-  ) {
-    habilitarTab("overhaul");
-    cambiarTab("overhaul");
-  }
-
-  else if (
-    ot.overhaulRequerido === true &&
-    ot.overhaulAprobado &&
-    !ot.pruebasAprobado
-  ) {
-    habilitarTab("pruebas");
-    cambiarTab("pruebas");
-  }
-
-  else if (
-    ot.pruebasAprobado ||
-    ot.overhaulRequerido === false
-  ) {
-    habilitarTab("despacho");
-    cambiarTab("despacho");
-  }
+  // Seleccionar la etapa activa considerando únicamente módulos habilitados.
+  const tabPorEstado = {
+    INGRESO: "ingreso",
+    EVALUACION: "evaluacion",
+    OVERHAUL: "overhaul",
+    PRUEBAS: "pruebas",
+    DESPACHO: "despacho"
+  };
+  const tabActiva = tabPorEstado[obtenerEstadoOT(ot)] || "ingreso";
+  habilitarTab(tabActiva);
+  cambiarTab(tabActiva);
 
   configurarTabsSegunFlujo();
 
@@ -1045,200 +1294,14 @@ renderHeaderOTPro();
 
 aplicarModoSoloLectura();
 aplicarPermisosRol();
+configurarInterfazAprobaciones();
+configurarInterfazReportesPDF();
+configurarInterfazGantt();
+configurarInterfazRepuestos();
+configurarInterfazEtapas();
 renderUsuarioActivo();
 };
 
-
-
-function irACrearOS() {
-
-  cambiarTab("crear");
-
-}
-
-function validarOverhaulCompleto() {
-
-  if (!ot.overhaul || ot.overhaul.length === 0) {
-    alert("Debes cargar checklist");
-    return false;
-  }
-
-  const checklist = ot.overhaul.every(i => i.ok);
-  const fotos = ot.overhaul.every(i => i.fotos && i.fotos.length > 0);
-  const comentarios = ot.overhaul.every(i => i.comentarios && i.comentarios.length > 0);
-
-  if (!checklist) {
-    alert("Checklist incompleto");
-    return false;
-  }
-
-  if (!fotos) {
-    alert("Faltan evidencias fotográficas");
-    return false;
-  }
-
-  if (!comentarios) {
-    alert("Faltan comentarios");
-    return false;
-  }
-
-  return true;
-}
-
-
-// =======================
-// REPUESTOS OVERHAUL
-// =======================
-
-
-
-
-
-
-
-
-
-
-
-// =========================
-// CARTA GANTT OVERHAUL
-// =========================
-
-
-
-
-
-// =======================
-// SUBIR DOCUMENTOS POR SECCIÓN
-// =======================
-async function subirDocsSeccion(tipo) {
-
-  if (OTBloqueada()) return;
-
-  const inputId = tipo === "preparacion" ? "docsPreparacion" : "docsFinal";
-  const input = document.getElementById(inputId);
-
-  if (!input || !input.files.length) {
-    alert("Selecciona archivos");
-    return;
-  }
-
-  if (!ot.despacho) {
-    ot.despacho = {
-      preparacion: [],
-      final: []
-    };
-  }
-
-  if (!ot.despacho.preparacion) ot.despacho.preparacion = [];
-  if (!ot.despacho.final) ot.despacho.final = [];
-
-  try {
-
-    for (let file of input.files) {
-
-      const urlArchivo = await subirArchivoStorage(
-        file,
-        tipo === "preparacion" ? "despacho_preparacion" : "despacho_final",
-        "documentos"
-      );
-
-      const nuevoDoc = {
-        nombre: file.name,
-        tipo: file.type,
-        url: urlArchivo,
-        fecha: new Date().toLocaleString()
-      };
-
-      ot.despacho[tipo].push(nuevoDoc);
-    }
-
-    await guardarCambiosOT();
-
-    renderDocsSeccion("preparacion");
-    renderDocsSeccion("final");
-
-    input.value = "";
-
-  } catch (error) {
-    console.error("Error subiendo documento despacho:", error);
-    alert("Error al subir documento");
-  }
-}
-
-// =======================
-// RENDER DOCUMENTOS SECCIÓN
-// =======================
-function renderDocsSeccion(tipo) {
-
-  const contId = tipo === "preparacion"
-    ? "listaDocsPrep"
-    : "listaDocsFinal";
-
-  const cont = document.getElementById(contId);
-  if (!cont) return;
-
-  cont.innerHTML = "";
-  cont.className = "docs-pro-grid";
-
-  if (!ot.despacho || !ot.despacho[tipo]) return;
-
-  ot.despacho[tipo].forEach((doc, index) => {
-
-    const div = document.createElement("div");
-    div.className = "doc-card-pro";
-
-    div.innerHTML = `
-      <div class="doc-card-left">
-
-        <div class="doc-card-icon">
-          📄
-        </div>
-
-        <div class="doc-card-info">
-          <h4>${doc.nombre || "Documento sin nombre"}</h4>
-          <span>Documento de ${tipo === "preparacion" ? "preparación" : "despacho final"}</span>
-        </div>
-
-      </div>
-
-      <div class="doc-card-actions">
-
-        <button 
-          class="btn-doc-view permitido-bloqueo"
-          onclick="abrirDocSeccion(event, '${tipo}', ${index})">
-          👁 Ver
-        </button>
-
-        <button 
-          class="btn-doc-delete"
-          onclick="eliminarDocSeccion(event, '${tipo}', ${index})">
-          🗑 Eliminar
-        </button>
-
-      </div>
-    `;
-
-    cont.appendChild(div);
-  });
-}
-
-function abrirDocSeccion(e, tipo, index) {
-  e.stopPropagation();
-  abrirDocumento(ot.despacho[tipo][index]);
-}
-
-function eliminarDocSeccion(e, tipo, index) {
-  e.stopPropagation();
-
-  const confirmar = confirm("¿Eliminar este documento?");
-  if (!confirmar) return;
-
-  ot.despacho[tipo].splice(index, 1);
-
-  guardarCambiosOT();
-  renderDocsSeccion(tipo);
-}
 
 
 // =======================
@@ -1277,46 +1340,9 @@ window.onclick = function(e) {
 // =======================
 // GUARDAR DESPACHO
 // =======================
-function guardarDespacho() {
-
-  if (!ot) {
-    alert("No hay OT cargada");
-    return;
-  }
-
-  if (!ot.despacho) {
-    alert("No hay datos en despacho");
-    return;
-  }
-
-  guardarCambiosOT();
-
-  alert("Progreso de DESPACHO guardado ✅");
-}
-
-function validarDespachoCompleto() {
-
-  if (!ot.despacho) {
-    alert("Falta información de despacho");
-    return false;
-  }
-
-  const prep = ot.despacho.preparacion?.length > 0;
-  const final = ot.despacho.final?.length > 0;
-
-  if (!prep) {
-    alert("Faltan documentos de preparación");
-    return false;
-  }
-
-  if (!final) {
-    alert("Faltan documentos de despacho final");
-    return false;
-  }
 
 
-  return true;
-}
+
 
 
 
@@ -1331,36 +1357,6 @@ function validarDespachoCompleto() {
 // =======================
 // CERRAR OT
 // =======================
-async function cerrarOT() {
-
-  if (!ot) {
-    alert("No hay OT cargada");
-    return;
-  }
-
-  if (!esJefeTaller()) {
-    alert("Solo Jefe de Taller puede cerrar la OS");
-    return;
-  }
-
-  const confirmar = confirm("¿Seguro que deseas cerrar la OT?");
-  if (!confirmar) return;
-
-  if (!validarOTCompleta()) return;
-
-  ot.estado = "CERRADA";
-  ot.cerrada = true;
-  ot.fechaCierre = new Date().toLocaleString();
-
-  await guardarCambiosOT();
-
-  aplicarModoSoloLectura();
-
-  alert("OT FINALIZADA COMPLETAMENTE ✅");
-
-  localStorage.removeItem("otActiva");
-  window.location.href = "dashboard.html";
-}
 
 // =======================
 // DECISIÓN JEFE TALLER - PRUEBAS
@@ -1374,7 +1370,7 @@ function validarOTCompleta() {
 
   function validarLista(nombreEtapa, lista) {
     if (!lista || lista.length === 0) {
-      alert(`Falta ${nombreEtapa}`);
+      notificarFlujo(`Falta completar la etapa ${nombreEtapa}.`, "OT incompleta", "advertencia");
       return false;
     }
 
@@ -1382,30 +1378,30 @@ function validarOTCompleta() {
       const item = lista[i];
 
       if (!item.ok) {
-        alert(`${nombreEtapa}: falta marcar el ítem ${i + 1}`);
+        notificarFlujo(`${nombreEtapa}: falta marcar el ítem ${i + 1}.`, "Checklist incompleto", "advertencia");
         return false;
       }
 
       if (!item.fotos || item.fotos.length === 0) {
-        alert(`${nombreEtapa}: falta foto en el ítem ${i + 1}`);
+        notificarFlujo(`${nombreEtapa}: falta una fotografía en el ítem ${i + 1}.`, "Evidencia pendiente", "advertencia");
         return false;
       }
 
       const comentariosTecnicos = (item.comentarios || []).filter(c =>
-        c.rol !== "jefe_taller"
+        !["jefe_taller", "admin_sucursal"].includes(c.rol)
       );
 
       if (comentariosTecnicos.length === 0) {
-        alert(`${nombreEtapa}: falta comentario técnico en el ítem ${i + 1}`);
+        notificarFlujo(`${nombreEtapa}: falta un comentario técnico en el ítem ${i + 1}.`, "Comentario pendiente", "advertencia");
         return false;
       }
 
       const obsPendiente = (item.comentarios || []).some(c =>
-        c.rol === "jefe_taller" && c.atendido !== true
+        ["jefe_taller", "admin_sucursal"].includes(c.rol) && c.atendido !== true
       );
 
       if (obsPendiente) {
-        alert(`${nombreEtapa}: hay observaciones del Jefe pendientes en el ítem ${i + 1}`);
+        notificarFlujo(`${nombreEtapa}: hay observaciones del Jefe pendientes en el ítem ${i + 1}.`, "Observaciones pendientes", "advertencia");
         return false;
       }
     }
@@ -1413,52 +1409,83 @@ function validarOTCompleta() {
     return true;
   }
 
-  if (!validarLista("INGRESO", ot.ingreso)) return false;
-  if (!validarLista("EVALUACIÓN", ot.evaluacion)) return false;
-
-  if (!ot.evaluacionAprobada) {
-    alert("Falta decisión del Jefe de Taller en Evaluación");
+  if (etapaHabilitada("ingreso") && !validarLista("INGRESO", ot.ingreso)) {
     return false;
   }
 
-  if (ot.overhaulRequerido !== false) {
-    if (!validarLista("OVERHAUL", ot.overhaul)) return false;
+  if (etapaHabilitada("evaluacion") && !validarLista("EVALUACIÓN", ot.evaluacion)) {
+    return false;
+  }
 
-    if (!validarLista("PRUEBAS MECÁNICAS", ot.pruebas?.mecanico)) return false;
-    if (!validarLista("PRUEBAS ELÉCTRICAS", ot.pruebas?.electrico)) return false;
+  if (
+    etapaHabilitada("evaluacion") &&
+    aprobacionesHabilitadas() &&
+    !ot.evaluacionAprobada
+  ) {
+    notificarFlujo("Falta la decisión del Jefe de Taller en Evaluación.", "Aprobación pendiente", "advertencia");
+    return false;
+  }
 
-    if (!ot.pruebasAprobado) {
-      alert("Falta aprobación de Pruebas por Jefe de Taller");
+  const evaluacionRechazada =
+    etapaHabilitada("evaluacion") &&
+    ot.evaluacionAprobada &&
+    ot.overhaulRequerido === false;
+
+  if (!evaluacionRechazada) {
+    if (
+      etapaHabilitada("overhaul") &&
+      !validarLista("MANTENCIÓN", ot.overhaul)
+    ) {
+      return false;
+    }
+
+    if (etapaHabilitada("pruebas")) {
+      const pruebas = Array.isArray(ot.pruebas)
+        ? ot.pruebas
+        : Array.isArray(ot.pruebas?.general)
+        ? ot.pruebas.general
+        : [...(ot.pruebas?.mecanico || []), ...(ot.pruebas?.electrico || [])];
+      if (!validarLista("PRUEBAS", pruebas)) return false;
+    }
+
+    if (
+      etapaHabilitada("pruebas") &&
+      aprobacionesHabilitadas() &&
+      !ot.pruebasAprobado
+    ) {
+      notificarFlujo("Falta la aprobación de Pruebas por el Jefe de Taller.", "Aprobación pendiente", "advertencia");
       return false;
     }
   }
 
-  if (!ot.despacho) {
-    alert("Falta DESPACHO");
-    return false;
-  }
+  if (etapaHabilitada("despacho")) {
+    if (!ot.despacho) {
+      notificarFlujo("Falta completar la etapa de Despacho.", "OT incompleta", "advertencia");
+      return false;
+    }
 
-  if (!ot.despacho.preparacion || ot.despacho.preparacion.length === 0) {
-    alert("DESPACHO: falta documentación de Preparación");
-    return false;
-  }
+    if (!ot.despacho.preparacion || ot.despacho.preparacion.length === 0) {
+      notificarFlujo("Despacho: falta la documentación de Preparación.", "Documentación pendiente", "advertencia");
+      return false;
+    }
 
-  if (!ot.despacho.final || ot.despacho.final.length === 0) {
-    alert("DESPACHO: falta documentación de Despacho Final");
-    return false;
-  }
+    if (!ot.despacho.final || ot.despacho.final.length === 0) {
+      notificarFlujo("Despacho: falta la documentación de Despacho Final.", "Documentación pendiente", "advertencia");
+      return false;
+    }
 
-  const obsDespachoPrep = (ot.despacho.comentariosPreparacion || []).some(c =>
-    c.rol === "jefe_taller" && c.atendido !== true
-  );
+    const obsDespachoPrep = (ot.despacho.comentariosPreparacion || []).some(c =>
+      ["jefe_taller", "admin_sucursal"].includes(c.rol) && c.atendido !== true
+    );
 
-  const obsDespachoFinal = (ot.despacho.comentariosFinal || []).some(c =>
-    c.rol === "jefe_taller" && c.atendido !== true
-  );
+    const obsDespachoFinal = (ot.despacho.comentariosFinal || []).some(c =>
+      ["jefe_taller", "admin_sucursal"].includes(c.rol) && c.atendido !== true
+    );
 
-  if (obsDespachoPrep || obsDespachoFinal) {
-    alert("DESPACHO: existen observaciones del Jefe pendientes");
-    return false;
+    if (obsDespachoPrep || obsDespachoFinal) {
+      notificarFlujo("Despacho: existen observaciones del Jefe pendientes.", "Observaciones pendientes", "advertencia");
+      return false;
+    }
   }
 
   return true;
@@ -1497,71 +1524,28 @@ async function convertirImagenABase64(url) {
 
 
 
-// =======================
-// GENERAR PDF
-// =======================
-// =======================
-// GENERAR PDF CON FOTOS
-// =======================
-
-
-
-
-
-
-
-
-
-// =======================
-// COMPRIMIR IMAGEN COMO BLOB
-// =======================
-
-
-// =======================
-// SUBIR ARCHIVO A STORAGE
-// =======================
-/*async function subirArchivoStorage(file, etapa, itemIndex) {
-
-  const otId = localStorage.getItem("otActiva");
-
-  if (!otId) {
-    alert("No hay OT activa");
-    return null;
-  }
-
-  const nombreArchivo = `${Date.now()}_${file.name}`;
-
-  const ruta = `ots/${otId}/${etapa}/item_${itemIndex}/${nombreArchivo}`;
-
-  const archivoRef = ref(storage, ruta);
-
-  await uploadBytes(archivoRef, file);
-
-  const url = await getDownloadURL(archivoRef);
-
-  return url;
-}
-
-async function eliminarArchivoStorage(urlArchivo) {
-
-  if (!urlArchivo) return;
-
-  try {
-    const archivoRef = ref(storage, urlArchivo);
-
-    await deleteObject(archivoRef);
-
-    console.log("Archivo eliminado de Firebase Storage ✅");
-
-  } catch (error) {
-    console.warn("No se pudo eliminar archivo de Storage:", error);
-  }
-}*/
-
-
-
 function calcularProgresoOTFlujo(ot) {
   const estado = obtenerEstadoOT(ot);
+
+  const ultimaEtapaActiva = [...ORDEN_ETAPAS].reverse().find(etapaHabilitada);
+  const estadoUltimaEtapa = {
+    ingreso: "INGRESO",
+    evaluacion: "EVALUACION",
+    overhaul: "OVERHAUL",
+    pruebas: "PRUEBAS",
+    despacho: "DESPACHO"
+  }[ultimaEtapaActiva];
+  const ultimaEtapaFinalizada = {
+    ingreso: ot.ingresoAprobado === true,
+    evaluacion: ot.evaluacionAprobada === true,
+    overhaul: ot.overhaulAprobado === true,
+    pruebas: ot.pruebasAprobado === true,
+    despacho: false
+  }[ultimaEtapaActiva];
+
+  if (estado === estadoUltimaEtapa && ultimaEtapaFinalizada) {
+    return 90;
+  }
 
   switch (estado) {
     case "EVALUACION": return 25;
@@ -1618,212 +1602,12 @@ function renderHeaderOTPro() {
 
 
 
-function mostrarAlertasJefe(ot) {
-
-  const lista = document.getElementById("listaAlertasJefe");
-  if (!lista) return;
-
-  lista.innerHTML = "";
-
-  const alertas = new Set();
-
-  // 🔥 INGRESO
-  if (
-    ot.ingreso?.some(item =>
-      item.comentarios?.some(c => c.rol === "jefe_taller")
-    )
-  ) {
-    alertas.add("📥 Ingreso");
-  }
-
-  // 🔥 EVALUACIÓN
-  if (
-    (
-      ot.decisionEvaluacion?.comentario &&
-      ot.decisionEvaluacion.comentario.trim() !== ""
-    ) ||
-    ot.evaluacion?.some(item =>
-      item.comentarios?.some(c => c.rol === "jefe_taller")
-    )
-  ) {
-    alertas.add("📋 Evaluación");
-  }
-
-  // 🔥 OVERHAUL
-  if (
-    ot.overhaul?.some(item =>
-      item.comentarios?.some(c => c.rol === "jefe_taller")
-    )
-  ) {
-    alertas.add("🔧 Overhaul");
-  }
-
-  // 🔥 PRUEBAS MECÁNICAS
-  if (
-    ot.pruebas?.mecanico?.some(item =>
-      item.comentarios?.some(c => c.rol === "jefe_taller")
-    )
-  ) {
-    alertas.add("🛠 Pruebas Mecánicas");
-  }
-
-  // 🔥 PRUEBAS ELÉCTRICAS
-  if (
-    ot.pruebas?.electrico?.some(item =>
-      item.comentarios?.some(c => c.rol === "jefe_taller")
-    )
-  ) {
-    alertas.add("⚡ Pruebas Eléctricas");
-  }
-
-  // 🔥 DESPACHO
-if (
-
-  // comentarios generales
-  ot.despacho?.comentarios?.some(
-    c => c.rol === "jefe_taller"
-  )
-
-  ||
-
-  // preparación
-  ot.despacho?.preparacion?.some(item =>
-    item.comentarios?.some(
-      c => c.rol === "jefe_taller"
-    )
-  )
-
-  ||
-
-  // despacho final
-  ot.despacho?.final?.some(item =>
-    item.comentarios?.some(
-      c => c.rol === "jefe_taller"
-    )
-  )
-
-) {
-
-  alertas.add("📦 Despacho");
-
-}
-
-  if (alertas.size === 0) {
-    lista.innerHTML = `
-      <p class="sin-alertas">
-        No existen comentarios pendientes.
-      </p>
-    `;
-  } else {
-    alertas.forEach(alerta => {
-      const div = document.createElement("div");
-      div.className = "alerta-item";
-      div.innerHTML = alerta;
-      lista.appendChild(div);
-    });
-  }
-
-  document.getElementById("modalAlertasJefe").style.display = "flex";
-}
-
-function cerrarModalAlertas() {
-  document.getElementById("modalAlertasJefe").style.display = "none";
-}
-
 // =======================
 // FUNCIONES GLOBALES PARA HTML
 // =======================
 window.guardarDatosOS = guardarDatosOS;
 
-window.guardarIngreso = guardarIngreso;
-window.aprobarIngreso = aprobarIngreso;
-
-window.guardarEvaluacion = guardarEvaluacion;
-window.aprobarEvaluacion = aprobarEvaluacion;
-
-
-
-window.subirDocsSeccion = subirDocsSeccion;
-window.guardarDespacho = guardarDespacho;
-window.cerrarOT = cerrarOT;
-
 window.cerrarModal = cerrarModal;
 window.cerrarImagen = cerrarImagen;
 
 window.verImagenModal = verImagenModal;
-
-
-window.toggleIngreso = toggleIngreso;
-window.subirFotoIngreso = subirFotoIngreso;
-window.eliminarFotoIngreso = eliminarFotoIngreso;
-window.agregarComentarioItem = agregarComentarioItem;
-window.eliminarComentarioIngreso = eliminarComentarioIngreso;
-
-window.toggleEvaluacion = toggleEvaluacion;
-window.subirFotoEvaluacion = subirFotoEvaluacion;
-window.eliminarFotoEvaluacion = eliminarFotoEvaluacion;
-window.agregarComentarioEvaluacion = agregarComentarioEvaluacion;
-window.eliminarComentarioEvaluacion = eliminarComentarioEvaluacion;
-
-
-window.abrirDocSeccion = abrirDocSeccion;
-window.eliminarDocSeccion = eliminarDocSeccion;
-window.verImagenModal = verImagenModal;
-
-window.aprobarOverhaulDesdeEvaluacion = aprobarOverhaulDesdeEvaluacion;
-window.rechazarOverhaulDesdeEvaluacion = rechazarOverhaulDesdeEvaluacion;
-
-window.renderDocsDecisionEvaluacionPreview = renderDocsDecisionEvaluacionPreview;
-window.abrirArchivoTemporal = abrirArchivoTemporal;
-
-window.abrirDocumentoDecisionEvaluacion = abrirDocumentoDecisionEvaluacion;
-
-window.eliminarComentarioDecisionEvaluacion = eliminarComentarioDecisionEvaluacion;
-
-window.cargarRepuestosExcel = cargarRepuestosExcel;
-window.abrirModalRepuestos = abrirModalRepuestos;
-window.cerrarModalRepuestos = cerrarModalRepuestos;
-window.guardarRepuestosUsados = guardarRepuestosUsados;
-window.renderRepuestosModal = renderRepuestosModal;
-
-window.subirDocsSeccion = subirDocsSeccion;
-
-window.responderComentarioJefe = responderComentarioJefe;
-
-window.agregarComentarioDespacho = agregarComentarioDespacho;
-window.renderComentariosDespacho = renderComentariosDespacho;
-window.responderComentarioJefeDespacho = responderComentarioJefeDespacho;
-window.eliminarComentarioDespacho = eliminarComentarioDespacho;
-
-window.abrirModalGantt = abrirModalGantt;
-window.cerrarModalGantt = cerrarModalGantt;
-window.generarCartaGantt = generarCartaGantt;
-
-window.cerrarModalGanttVisual = cerrarModalGanttVisual;
-window.volverFormularioGantt = volverFormularioGantt;
-
-window.zoomGantt = zoomGantt;
-window.irHoyGantt = irHoyGantt;
-
-window.renderCartaGanttProject = renderCartaGanttProject;
-window.toggleEtapaGantt = toggleEtapaGantt;
-
-window.recalcularGanttAutomatico = recalcularGanttAutomatico;
-
-window.generarPDF = generarInformeFinalPDF;
-
-window.obtenerResumenEjecutivoInforme = obtenerResumenEjecutivoInforme;
-
-window.renderComentariosItem = renderComentariosItem;
-
-window.renderComentariosEvaluacion = renderComentariosEvaluacion;
-
-window.cargarGanttGuardado = cargarGanttGuardado;
-
-window.renderCartaGantt = renderCartaGantt;
-
-window.actualizarEstadoGanttDesdeChecklist = actualizarEstadoGanttDesdeChecklist;
-
-window.descargarGanttExcel = descargarGanttExcel;
-
-window.descargarGanttPDFProfesional = descargarGanttPDFProfesional;

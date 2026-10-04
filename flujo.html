@@ -2,16 +2,29 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Flujo de Trabajo - OverTrack</title>
-  <link rel="icon" type="image/png" href="img/logo_overtrack - pestaña.png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Flujo de Trabajo - Vectaria</title>
+  <link rel="icon" type="image/png" href="img/vectaria-favicon-official.png?v=3">
   <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/brand-overtrack.css">
+  <link rel="stylesheet" href="css/brand-overtrack-light.css">
+  <link rel="stylesheet" href="css/notificaciones.css">
+  <link rel="stylesheet" href="css/desktop-density.css">
 </head>
-<body class="ot-view">
+<body class="ot-view flow-overtrack">
 
 <header class="topbar-overtrack">
-  <div class="brand-overtrack">
-    <img src="img/logo_overtrack - pestaña.png" alt="OverTrack">
-  </div>
+  <a class="brand-overtrack mobile-topbar-brand" href="dashboard.html" aria-label="Volver al Dashboard">
+    <img class="desktop-brand-logo" src="img/vectaria-logo-official.png?v=3" alt="Vectaria - Tu operación, en una misma dirección">
+    <div class="mobile-brand-composite" role="img" aria-label="Vectaria - Gestión operativa">
+      <img class="mobile-brand-layer mobile-brand-base" src="img/vectaria-logo-official.png?v=3" alt="">
+    </div>
+  </a>
+
+  <button type="button" class="mobile-menu-toggle permitido-bloqueo" aria-controls="flowMobileMenu" aria-expanded="false" aria-label="Abrir menú de navegación">
+    <span aria-hidden="true">☰</span>
+    <span>Menú</span>
+  </button>
 
   <div class="user-box">
     <span id="usuarioNombre">Usuario</span>
@@ -25,7 +38,22 @@
   </div>
 </header>
 
+<button type="button" class="mobile-menu-backdrop permitido-bloqueo" aria-label="Cerrar menú de navegación" tabindex="-1"></button>
+<aside class="mobile-flow-menu" id="flowMobileMenu" aria-label="Navegación de la orden">
+  <button type="button" class="permitido-bloqueo mobile-flow-back" onclick="window.location.href='dashboard.html'">
+    ← Volver al Dashboard
+  </button>
+  <button type="button" class="permitido-bloqueo mobile-flow-logout" onclick="cerrarSesion()">
+    Salir
+  </button>
+</aside>
+
 <div class="container">
+
+  <div class="flow-save-status" aria-live="polite" aria-atomic="true">
+    <span id="estadoConexion" class="estado-conexion"></span>
+    <span id="estadoAutoguardado" class="estado-autoguardado"></span>
+  </div>
 
   <!-- HEADER OS ACTIVA PRO -->
 <div id="headerOTPro" class="header-ot-pro" style="display:none;">
@@ -84,58 +112,61 @@
 
   <button class="tab active" data-tab="crear">
     <span class="tab-dot">1</span>
-    <span class="tab-text">Crear OS</span>
+    <span class="tab-text">Crear OT</span>
   </button>
 
-  <button class="tab disabled" data-tab="ingreso">
+  <button class="tab disabled" data-tab="ingreso" data-etapa="ingreso">
     <span class="tab-dot">2</span>
     <span class="tab-text">Ingreso</span>
   </button>
 
-  <button class="tab disabled" data-tab="evaluacion">
+  <button class="tab disabled" data-tab="evaluacion" data-etapa="evaluacion">
     <span class="tab-dot">3</span>
     <span class="tab-text">Evaluación</span>
   </button>
 
-  <button class="tab disabled" data-tab="overhaul">
+  <button class="tab disabled" data-tab="overhaul" data-etapa="mantencion">
     <span class="tab-dot">4</span>
     <span class="tab-text">Mantención</span>
   </button>
 
-  <button class="tab disabled" data-tab="pruebas">
+  <button class="tab disabled" data-tab="pruebas" data-etapa="pruebas">
     <span class="tab-dot">5</span>
     <span class="tab-text">Pruebas</span>
   </button>
 
-  <button class="tab disabled" data-tab="despacho">
+  <button class="tab disabled" data-tab="despacho" data-etapa="despacho">
     <span class="tab-dot">6</span>
     <span class="tab-text">Despacho</span>
   </button>
 
 </div>
 
-  <!---CREAR OS-->
+  <!-- CREAR / EDITAR OT -->
   <div id="crear" class="content active">
     <div class="card">
-      <h2>Crear Orden de Servicio</h2>
+      <h2>Identificación de la máquina</h2>
 
-      <input id="equipo" placeholder="Equipo">
-      <input id="serie" placeholder="Serie">
-      <input id="cliente" placeholder="Cliente">
-      <input id="os" placeholder="Orden Servicio">
+      <input id="equipo" placeholder="Equipo" aria-label="Equipo">
+      <input id="serie" placeholder="Serie" aria-label="Serie">
+      <select id="gamaEquipo" required aria-label="Gama de equipo">
+        <option value="">Seleccionar gama de equipo</option>
+      </select>
+      <input id="cliente" placeholder="Cliente" aria-label="Cliente">
+      <input id="os" placeholder="Número de OT (opcional)" aria-label="Número de orden de trabajo, opcional">
 
-      <button class="btn-primary" onclick="guardarDatosOS()">
-        Continuar a Ingreso →
+      <button id="btnGuardarDatosOT" class="btn-primary" onclick="guardarDatosOS()">
+        Siguiente
       </button>
     </div>
   </div>
 
   <!-- INGRESO -->
-<div id="ingreso" class="content">
+<div id="ingreso" class="content" data-etapa="ingreso">
   <div class="card">
     <h3>Checklist Ingreso</h3>
 
-    <div class="file-actions solo-jefe">
+    <div class="file-actions carga-checklist">
 
       <input type="file" id="excelIngreso" accept=".xlsx,.xls">
 
@@ -149,7 +180,7 @@
 
     <div id="listaIngreso"></div>
 
-    <button class="btn-success" onclick="guardarIngreso()">
+    <button class="btn-success btn-guardar-etapa" onclick="guardarIngreso()">
       💾 Guardar Progreso
     </button>
 
@@ -157,15 +188,19 @@
       Siguiente
     </button>
 
+    <button class="btn-primary solo-jefe" data-cierre-etapa="ingreso" style="display:none;" onclick="cerrarOT()">
+      Cerrar OT
+    </button>
+
   </div>
 </div>
 
   <!-- EVALUACION -->
-  <div id="evaluacion" class="content">
+  <div id="evaluacion" class="content" data-etapa="evaluacion">
     <div class="card">
       <h2>Evaluación</h2>
 
-      <div class="file-actions solo-jefe">
+      <div class="file-actions carga-checklist">
 
         <input type="file" id="excelEvaluacion" accept=".xlsx,.xls">
 
@@ -179,12 +214,21 @@
 
       <div id="listaEvaluacion"></div>
 
-      <button class="btn-success" onclick="guardarEvaluacion()">
+      <button class="btn-success btn-guardar-etapa" onclick="guardarEvaluacion()">
         💾 Guardar Evaluación
       </button>
 
+      <button
+        id="btnContinuarEvaluacionSinAprobacion"
+        class="btn-primary"
+        style="display:none;"
+        onclick="continuarEvaluacionSinAprobacion()"
+      >
+        Siguiente
+      </button>
+
       <!-- DECISIÓN JEFE DE TALLER -->
-      <div class="decision-box solo-jefe">
+      <div id="decisionEvaluacionJefe" class="decision-box solo-jefe">
 
         <h3>Decisión Jefe de Taller</h3>
         <p class="decision-text">
@@ -215,7 +259,7 @@
             class="btn-danger"
             onclick="rechazarOverhaulDesdeEvaluacion()"
           >
-            ❌ Rechazar y pasar a Despacho
+            ❌ Rechazar
           </button>
         </div>
 
@@ -225,26 +269,36 @@
 
       <div id="comentarioDecisionEvaluacionGuardado"></div>
 
+      <button class="btn-primary solo-jefe" data-cierre-etapa="evaluacion" style="display:none;" onclick="cerrarOT()">
+        Cerrar OT
+      </button>
+
     </div>
   </div>
 
   <!-- MANTENCIÓN -->
-  <div id="overhaul" class="content">
+  <div id="overhaul" class="content" data-etapa="mantencion">
   <div class="card">
-    <h2>Mantenciónl</h2>
+    <h2>Mantención</h2>
 
 
-  <div class="file-actions solo-jefe">
+  <div class="file-actions">
 
-  <input type="file" id="excelOverhaul" accept=".xlsx,.xls">
-
-  <div class="overhaul-actions">
+  <div class="carga-checklist">
+    <input
+      type="file"
+      id="excelOverhaul"
+      accept=".xlsx,.xls"
+    >
 
     <button class="btn-primary" onclick="cargarOverhaul()">
       Cargar Checklist
     </button>
+  </div>
 
-    <button class="btn-warning solo-usuario" onclick="abrirModalRepuestos()">
+  <div class="overhaul-actions">
+
+    <button class="btn-warning" onclick="abrirModalRepuestos()" data-modulo-repuestos style="display:none !important">
       Repuestos
     </button>
 
@@ -252,8 +306,10 @@
       id="btnGantt"
       class="btn-primary"
       onclick="abrirModalGantt()"
+      data-modulo-gantt
+      style="display:none !important"
     >
-      📅 Planificación
+      📅 Ver Carta Gantt
     </button>
 
   </div>
@@ -262,7 +318,7 @@
 
 <br>
 
-<div class="solo-jefe">
+<div class="solo-jefe" data-modulo-repuestos style="display:none !important">
   <h3>Cargar listado de repuestos</h3>
 
   <input type="file" id="excelRepuestos" accept=".xlsx,.xls">
@@ -275,12 +331,13 @@
     <div id="progresoOverhaul"></div>
 
     <div id="listaOverhaul"></div>
-
-    <br>
-    <button class="btn-success" onclick="guardarOverhaul()">
+    <button class="btn-success btn-guardar-etapa" onclick="guardarOverhaul()">
         💾 Guardar Mantención
     </button>
-    <button class="btn-primary" onclick="aprobarOverhaul()">SIguiente</button>
+    <button class="btn-primary" onclick="aprobarOverhaul()">Siguiente</button>
+    <button class="btn-primary solo-jefe" data-cierre-etapa="overhaul" style="display:none;" onclick="cerrarOT()">
+      Cerrar OT
+    </button>
   </div>
 </div>
 
@@ -288,51 +345,46 @@
 
 
 <!--PRUEBAS-->
-  <div id="pruebas" class="content">
+  <div id="pruebas" class="content" data-etapa="pruebas">
   <div class="card">
-    <h2>Pruebas Funcionales</h2>
+    <h2>Pruebas</h2>
 
-    <h3>Checklist Mecánico</h3>
+    <h3>Checklist de Pruebas</h3>
 
-<div class="file-actions solo-jefe">
-  <input type="file" id="excelMecanico" accept=".xlsx,.xls">
+<div class="file-actions carga-checklist">
+  <input type="file" id="excelPruebas" accept=".xlsx,.xls">
 
-  <button class="btn-primary" onclick="cargarChecklist('mecanico')">
-    Cargar Mecánico
+  <button class="btn-primary" onclick="cargarChecklist('general')">
+    Cargar Checklist
   </button>
 </div>
 
-<div id="progresoMecanico"></div>
+<div id="progresoPruebas"></div>
 
-<div id="listaMecanico"></div>
-
-<hr>
-
-<h3>Checklist Eléctrico</h3>
-
-<div class="file-actions solo-jefe">
-  <input type="file" id="excelElectrico" accept=".xlsx,.xls">
-
-  <button class="btn-primary" onclick="cargarChecklist('electrico')">
-    Cargar Eléctrico
-  </button>
-</div>
-
-<div id="progresoElectrico"></div>
-
-<div id="listaElectrico"></div>
-
-<br>
-
-<button class="btn-success" onclick="guardarPruebas()">
+<div id="listaPruebas"></div>
+<button class="btn-success btn-guardar-etapa" onclick="guardarPruebas()">
   💾 Guardar Progreso
 </button>
 
 <button
+  id="btnAprobarPruebasJefe"
   class="btn-primary solo-jefe"
   onclick="aprobarPruebas()"
 >
   ✅ Aprobar Pruebas
+</button>
+
+<button
+  id="btnFinalizarPruebasSinAprobacion"
+  class="btn-primary"
+  style="display:none;"
+  onclick="finalizarPruebasSinAprobacion()"
+>
+  Siguiente
+</button>
+
+<button class="btn-primary solo-jefe" data-cierre-etapa="pruebas" style="display:none;" onclick="cerrarOT()">
+  Cerrar OT
 </button>
 
 </div>
@@ -343,7 +395,7 @@
 
 
 <!--DESPACHO-->
-<div id="despacho" class="content">
+<div id="despacho" class="content" data-etapa="despacho">
   <div class="card">
     <h2>Despacho</h2>
 
@@ -403,15 +455,15 @@
 </div>
 
 <hr>
-
-    <br>
-    <button class="btn-success" onclick="guardarDespacho()">
+    <button class="btn-success btn-guardar-etapa" onclick="guardarDespacho()">
         💾 Guardar Despacho
     </button>
-    <button class="btn-primary solo-jefe" onclick="cerrarOT()">Cerrar OT</button>
+    <button class="btn-primary solo-jefe" data-cierre-etapa="despacho" onclick="cerrarOT()">Cerrar OT</button>
     <button
-        onclick="generarPDF()"
+        id="btnGenerarInformePDF"
         class="permitido-bloqueo btn-warning"
+        data-modulo-reportes-pdf
+        style="display:none !important"
       >
         Generar PDF
       </button>
@@ -446,12 +498,12 @@
 <!-- 🔥 VISOR DE IMÁGENES PRO -->
 <div id="modalImagen" class="modal-img">
   <span class="cerrar-img" onclick="cerrarImagen()">×</span>
-  <img class="contenido-img" id="imgExpandida">
+  <img class="contenido-img" id="imgExpandida" alt="Evidencia fotográfica ampliada">
 </div>
 
 </div>
 
-<div id="modalRepuestos" class="modal-repuestos">
+<div id="modalRepuestos" class="modal-repuestos" data-modulo-repuestos style="display:none !important">
   <div class="modal-repuestos-content">
 
     <div class="modal-repuestos-header">
@@ -547,39 +599,28 @@
 
         <div class="gantt-etapa-card">
 
-          <label>Pruebas Mecánicas</label>
+          <label>Pruebas</label>
 
           <div class="gantt-etapa-fechas">
-            <input type="date" id="ganttPruebasMecanicasInicio">
-            <input type="date" id="ganttPruebasMecanicasTermino">
-          </div>
-
-        </div>
-
-        <div class="gantt-etapa-card">
-
-          <label>Pruebas Eléctricas</label>
-
-          <div class="gantt-etapa-fechas">
-            <input type="date" id="ganttPruebasElectricasInicio">
-            <input type="date" id="ganttPruebasElectricasTermino">
+            <input type="date" id="ganttPruebasInicio">
+            <input type="date" id="ganttPruebasTermino">
           </div>
 
         </div>
 
       </div>
 
-      <div class="gantt-field">
+      <div class="gantt-field" data-modulo-repuestos style="display:none !important">
         <label>Fecha solicitud repuestos</label>
         <input type="date" id="ganttFechaSolicitudRepuestos">
       </div>
 
-      <div class="gantt-field">
+      <div class="gantt-field" data-modulo-repuestos style="display:none !important">
         <label>Días espera repuestos</label>
         <input type="number" id="ganttDiasRepuestos" min="0" value="0">
       </div>
 
-      <div class="gantt-field gantt-field-full">
+      <div class="gantt-field gantt-field-full" data-modulo-repuestos style="display:none !important">
         <label>Comentario repuestos</label>
         <textarea
           id="ganttComentarioRepuestos"
@@ -616,7 +657,7 @@
           📊 Descargar Excel
         </button>
 
-        <button class="btn-success" onclick="descargarGanttPDFProfesional()">
+        <button class="btn-success" onclick="descargarGanttPDFProfesional()" data-modulo-reportes-pdf style="display:none !important">
           📄 Descargar PDF
         </button>
 
@@ -632,6 +673,7 @@
 </div>
 
 
+<script src="js/components/notificaciones.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>

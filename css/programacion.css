@@ -1,0 +1,83 @@
+.programacion-page{background:#eef3f8}.programacion-main{min-width:0}.programacion-header{display:flex;justify-content:space-between;align-items:center;gap:20px}.programacion-header h2{margin:0}.programacion-header p{margin:5px 0 0;color:#64748b}.programacion-toolbar{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:18px}.selector-semana,.acciones-programacion{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.selector-semana>div{min-width:210px;text-align:center}.selector-semana strong,.selector-semana span{display:block}.selector-semana div span{margin-top:3px;color:#64748b;font-size:.85rem}.btn-semana{width:40px;height:40px;padding:0;border:1px solid #d6e0eb;background:#fff;color:#0f3153;font-size:1.6rem}.estado-semana{display:inline-flex!important;width:auto;padding:7px 11px;border-radius:999px;font-size:.78rem;font-weight:700}.estado-semana.borrador{color:#0c65b3;background:#e8f3ff}.estado-semana.publicada{color:#267a31;background:#eaf8e9}.btn-programacion-secundario{border:1px solid #bcd0e3;background:#fff;color:#0b5faa}.programacion-filtros{display:flex;justify-content:space-between;align-items:center;gap:14px;margin-bottom:12px;flex-wrap:wrap}.programacion-tabs{display:flex;gap:5px;padding:4px;border:1px solid #d6e0eb;border-radius:11px;background:#fff}.programacion-tabs button{color:#64748b;background:transparent}.programacion-tabs button.active{color:#fff;background:#102c49}.programacion-leyenda{display:flex;gap:14px;flex-wrap:wrap;color:#64748b;font-size:.78rem}.programacion-leyenda span{display:flex;align-items:center;gap:6px}.programacion-leyenda i{display:block;width:9px;height:9px;border-radius:50%}.programacion-leyenda .terreno{background:#1789f7}.programacion-leyenda .interno{background:#79bd42}.programacion-leyenda .capacitacion{background:#e7a331}.programacion-card{padding:0;overflow:hidden}.programacion-mensaje{display:none;padding:18px;color:#64748b}.programacion-tabla-wrap{overflow-x:auto}.programacion-cuadro{min-width:850px;display:grid}.programacion-celda{min-height:96px;padding:9px;border-right:1px solid #dbe4ed;border-bottom:1px solid #dbe4ed;background:#fff}.programacion-celda.encabezado{min-height:62px;display:flex;flex-direction:column;justify-content:center;background:#f7f9fc}.programacion-celda.encabezado strong{color:#12243a}.programacion-celda.encabezado small{margin-top:4px;color:#718096}.programacion-dia{display:flex;flex-direction:column;justify-content:center;background:#f7f9fc}.programacion-dia strong{color:#12243a}.programacion-dia span{margin-top:5px;color:#718096;font-size:.8rem}.bloque-asignacion{min-height:76px;padding:9px 10px;border-radius:9px;border-left:4px solid #1789f7;background:#eaf4ff;cursor:pointer}.bloque-asignacion.interno{border-left-color:#79bd42;background:#eff9e8}.bloque-asignacion.capacitacion{border-left-color:#e7a331;background:#fff7e8}.bloque-asignacion strong{display:block;color:#142033;font-size:.82rem}.bloque-asignacion p{margin:5px 0 0;color:#4e6073;font-size:.78rem;line-height:1.35}.bloque-asignacion small{display:block;margin-top:5px;color:#6f8091}.celda-vacia{min-height:70px;display:grid;place-items:center;color:#a0adba;font-size:.78rem}.programacion-resumen{display:flex;justify-content:space-between;gap:14px;padding:11px 3px 0;color:#64748b;font-size:.78rem}.modal-programacion{position:fixed;inset:0;z-index:1000;display:none;align-items:center;justify-content:center;padding:22px;background:rgba(5,20,35,.7)}.modal-programacion.abierto{display:flex}.modal-programacion-contenido{width:min(760px,100%);max-height:90vh;overflow:auto;padding:24px;border-radius:16px;background:#fff;box-shadow:0 22px 55px rgba(0,0,0,.25)}.modal-programacion-header{display:flex;justify-content:space-between;align-items:flex-start;gap:15px;margin-bottom:20px}.modal-programacion-header h2{margin:0;color:#12243a}.modal-programacion-header p{margin:5px 0 0;color:#64748b}.modal-cerrar{width:38px;height:38px;padding:0;border-radius:50%;background:#edf2f7;color:#31465c;font-size:1.35rem}.form-programacion{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px}.campo{display:flex;flex-direction:column;gap:6px}.campo-ancho{grid-column:1/-1}.campo label{color:#405267;font-size:.82rem;font-weight:700}.campo input,.campo select,.campo textarea{width:100%;max-width:none;margin:0;padding:10px 11px;border:1px solid #cbd8e5;border-radius:8px;font:inherit;background:#fff}.campo select[multiple]{min-height:110px}.campo small{color:#718096}.form-programacion-acciones{display:grid;grid-template-columns:auto 1fr auto auto;align-items:center;gap:9px;padding-top:5px}.modal-correo{width:min(640px,100%)}.correo-programacion{border:1px solid #dce6ef;border-radius:12px;overflow:hidden}.correo-encabezado{padding:20px;color:#fff;background:#0b1d33}.correo-encabezado h3{margin:0}.correo-encabezado p{margin:6px 0 0;color:#c7d7e7}.correo-cuerpo{padding:20px}.correo-dia{padding:12px 0;border-bottom:1px solid #e4ebf2}.correo-dia:last-child{border-bottom:0}.correo-dia strong{color:#12243a}.correo-dia p{margin:5px 0 0;color:#5f7183;line-height:1.45}.correo-vacio{padding:25px;color:#64748b;text-align:center}
+@media(max-width:800px){.programacion-header,.programacion-toolbar,.programacion-resumen{align-items:flex-start;flex-direction:column}.acciones-programacion{width:100%}.acciones-programacion button{flex:1}.programacion-tabs{width:100%;overflow-x:auto}.programacion-tabs button{white-space:nowrap}.form-programacion{grid-template-columns:1fr}.campo-ancho{grid-column:auto}.form-programacion-acciones{grid-template-columns:1fr}.form-programacion-acciones span{display:none}}
+
+/* Formulario alineado con la identidad visual de Vectaria. */
+.programacion-page .modal-programacion-contenido{border:1px solid #d8e4ef;background:#fff;box-shadow:0 24px 70px rgba(8,31,53,.28)}
+.programacion-page .modal-programacion-header{padding-bottom:16px;border-bottom:1px solid #e4edf5}
+.programacion-page .modal-programacion-header h2{color:#102c49}
+.programacion-page .modal-cerrar{border:1px solid #dce7f0;background:#eef5fb;color:#174c78}
+.programacion-page .modal-cerrar:hover{background:#dcecf8;color:#0b65ad}
+.programacion-page .campo label{color:#294963}
+.programacion-page .campo input,
+.programacion-page .campo select,
+.programacion-page .campo textarea{min-height:42px;border:1px solid #c7d8e7!important;background:#f9fcff!important;color:#152c40!important;caret-color:#1475c9;box-shadow:none!important;color-scheme:light}
+.programacion-page .campo textarea{min-height:82px;resize:vertical}
+.programacion-page .campo select[multiple]{min-height:116px;padding:6px}
+.programacion-page .campo select[multiple] option{margin:2px 0;padding:8px 10px;border-radius:6px;color:#15324a;background:#f9fcff}
+.programacion-page .campo select[multiple] option:checked{color:#fff;background:#1475c9 linear-gradient(0deg,#1475c9 0%,#1475c9 100%)}
+.programacion-page .campo input::placeholder,
+.programacion-page .campo textarea::placeholder{color:#8295a7;opacity:1}
+.programacion-page .campo input:hover,
+.programacion-page .campo select:hover,
+.programacion-page .campo textarea:hover{border-color:#82b7df!important}
+.programacion-page .campo input:focus,
+.programacion-page .campo select:focus,
+.programacion-page .campo textarea:focus{outline:3px solid rgba(20,117,201,.15)!important;border-color:#1475c9!important;background:#fff!important}
+.programacion-page .form-programacion-acciones{margin-top:4px;padding-top:16px;border-top:1px solid #e4edf5}
+.programacion-page .form-programacion-acciones .btn-primary{border-color:#1475c9;background:#1475c9;color:#fff}
+.programacion-page .form-programacion-acciones .btn-primary:hover{background:#0d64ae}
+.programacion-page .form-programacion-acciones .btn-programacion-secundario{border-color:#a9c9e2;background:#fff;color:#0b65ad}
+.programacion-page .form-programacion-acciones .btn-programacion-secundario:hover{background:#edf7ff}
+
+/* Evita que los controles excedan las columnas del formulario. */
+.programacion-page .modal-programacion-contenido{
+  box-sizing:border-box;
+  overflow-x:hidden;
+  scrollbar-gutter:stable;
+}
+.programacion-page .form-programacion{
+  width:100%;
+  grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+  column-gap:18px;
+  row-gap:15px;
+}
+.programacion-page .campo{min-width:0;width:100%}
+.programacion-page .campo input,
+.programacion-page .campo select,
+.programacion-page .campo textarea{
+  display:block;
+  box-sizing:border-box!important;
+  width:100%!important;
+  min-width:0!important;
+  max-width:100%!important;
+  margin:0!important;
+  border-radius:10px;
+}
+.programacion-page .campo input,
+.programacion-page .campo select{height:44px}
+.programacion-page .campo select[multiple]{height:112px}
+.programacion-page .form-programacion-acciones .btn-primary{
+  background:#1475c9!important;
+  border-color:#1475c9!important;
+  color:#fff!important;
+}
+
+.programacion-page .bloque-asignacion{min-height:0;padding:11px 12px}
+.programacion-page .asignacion-dato{display:grid;grid-template-columns:72px minmax(0,1fr);gap:8px;padding:4px 0;border-bottom:1px solid rgba(20,117,201,.10);font-size:.78rem;line-height:1.3}
+.programacion-page .asignacion-dato:last-child{border-bottom:0}
+.programacion-page .asignacion-dato strong{color:#23445f;font-size:.72rem;text-transform:uppercase;letter-spacing:.02em}
+.programacion-page .asignacion-dato span{min-width:0;color:#4d6173;overflow-wrap:anywhere}
+@media(max-width:800px){
+  .programacion-page .form-programacion{grid-template-columns:minmax(0,1fr)}
+  .programacion-page .campo-ancho{grid-column:auto}
+}
+
+/* Navegación de la vista previa individual por grupo y persona. */
+.programacion-page .modal-correo{width:min(760px,100%)}
+.programacion-page .correo-programacion{display:flex;flex-direction:column;gap:10px;border:0;border-radius:0;overflow:visible}
+.programacion-page .correo-navegacion,.programacion-page .correo-personas{display:flex;gap:6px;padding:4px;border:1px solid #dce6ef;border-radius:10px;background:#f7f9fc;overflow-x:auto}
+.programacion-page .correo-navegacion button,.programacion-page .correo-personas button{flex:0 0 auto;padding:9px 13px;background:transparent;color:#607287;white-space:nowrap}
+.programacion-page .correo-navegacion button.active{background:#102c49;color:#fff}
+.programacion-page .correo-personas button.active{background:#1684e5;color:#fff}
+.programacion-page .correo-programacion-individual{border:1px solid #dce6ef;border-radius:12px;overflow:hidden}
+.programacion-page .alerta-sheq-programacion{display:grid;grid-template-columns:auto 1fr;gap:8px;margin-top:9px;padding:10px 12px;border:1px solid;border-radius:10px;font-size:.78rem;line-height:1.4}.programacion-page .alerta-sheq-programacion[hidden]{display:none}.programacion-page .alerta-sheq-programacion.vencido{border-color:#f2b8be;color:#9f2431;background:#fff0f2}.programacion-page .alerta-sheq-programacion.proximo{border-color:#ecd58d;color:#7b5b0a;background:#fff9df}.programacion-page .alerta-sheq-programacion strong{white-space:nowrap}.programacion-page .alerta-sheq-programacion span{min-width:0}

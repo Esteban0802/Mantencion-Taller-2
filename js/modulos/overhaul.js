@@ -2,7 +2,13 @@
 // MÓDULO OVERHAUL / MANTENCIÓN — OVERTRACK
 // ==========================================
 
+import {
+  capturarBorradoresFormulario,
+  restaurarBorradoresFormulario
+} from "./core/utilidades.js";
+
 export function inicializarModuloOverhaul(servicios) {
+  let aprobacionOverhaulEnCurso = false;
   const {
     getOT,
     getUsuario,
@@ -29,8 +35,45 @@ export function inicializarModuloOverhaul(servicios) {
 
     actualizarAlertaJefe,
     obtenerEstadoOT,
-    habilitarTab
+    habilitarTab,
+    navegarSiguienteEtapa
   } = servicios;
+
+  const alert = (mensaje) => {
+    const texto = String(mensaje || "");
+    const tipo = /correctamente|completad[ao]|aprobad[ao]|guardad[ao]/i.test(texto)
+      ? "exito"
+      : /error|no fue posible|no hay una orden|no hay ot/i.test(texto)
+        ? "error"
+        : "advertencia";
+    const titulo = tipo === "exito"
+      ? "Operación completada"
+      : tipo === "error"
+        ? "No fue posible completar la acción"
+        : "Revisa la información";
+
+    if (window.OverTrackUI?.mostrarMensaje) {
+      return window.OverTrackUI.mostrarMensaje({ titulo, mensaje: texto, tipo });
+    }
+
+    window.alert(texto);
+    return Promise.resolve(true);
+  };
+
+  const confirmarEliminacion = (elemento) => {
+    if (window.OverTrackUI?.confirmarAccion) {
+      return window.OverTrackUI.confirmarAccion({
+        titulo: `Eliminar ${elemento}`,
+        mensaje: `Este elemento (${elemento}) se eliminará de la orden de trabajo.`,
+        tipo: "advertencia",
+        textoConfirmar: "Eliminar",
+        textoCancelar: "Cancelar",
+        peligrosa: true
+      });
+    }
+
+    return Promise.resolve(window.confirm(`¿Eliminar ${elemento}?`));
+  };
 
   validarDependencias({
     getOT,
@@ -52,7 +95,8 @@ export function inicializarModuloOverhaul(servicios) {
     verImagenModal,
     actualizarAlertaJefe,
     obtenerEstadoOT,
-    habilitarTab
+    habilitarTab,
+    navegarSiguienteEtapa
   });
 
   // ==========================================
@@ -83,9 +127,17 @@ export function inicializarModuloOverhaul(servicios) {
       return;
     }
 
+    if (!/\.xlsx?$/i.test(file.name) || file.size > 5 * 1024 * 1024) {
+      alert("Selecciona un archivo Excel válido de máximo 5 MB.");
+      inputExcel.value = "";
+      return;
+    }
+
     const reader = new FileReader();
 
     reader.onload = async function (event) {
+      const checklistAnterior = ot.overhaul;
+      let checklistReemplazado = false;
       try {
         const data = new Uint8Array(
           event.target.result
@@ -121,8 +173,9 @@ export function inicializarModuloOverhaul(servicios) {
               String(valor).trim() !== ""
             );
           })
+          .slice(0, 400)
           .map((valor) => ({
-            item: String(valor).trim(),
+            item: String(valor).trim().slice(0, 240),
             ok: false,
             fotos: [],
             comentarios: []
@@ -136,8 +189,10 @@ export function inicializarModuloOverhaul(servicios) {
         }
 
         ot.overhaul = checklist;
+        checklistReemplazado = true;
 
-        await guardarCambiosOT();
+        const guardado = await guardarCambiosOT();
+        if (!guardado) throw new Error("No fue posible guardar el checklist en la OT.");
 
         renderOverhaul();
 
@@ -147,6 +202,7 @@ export function inicializarModuloOverhaul(servicios) {
           "✅ Checklist de Mantención cargado desde overhaul.js"
         );
       } catch (error) {
+        if (checklistReemplazado) ot.overhaul = checklistAnterior;
         console.error(
           "Error procesando Excel de Mantención:",
           error
@@ -359,6 +415,9 @@ export function inicializarModuloOverhaul(servicios) {
 
     if (!files.length) return;
 
+    const fotosOriginales = [...(ot.overhaul[i].fotos || [])];
+    const urlsSubidasEnEsteIntento = [];
+
     try {
       if (!ot.overhaul[i].fotos) {
         ot.overhaul[i].fotos = [];
@@ -382,22 +441,36 @@ export function inicializarModuloOverhaul(servicios) {
             i
           );
 
+        if (!urlFoto) throw new Error("La fotografía no obtuvo una URL válida");
+
+        urlsSubidasEnEsteIntento.push(urlFoto);
         ot.overhaul[i].fotos.push(urlFoto);
       }
 
-      await guardarCambiosOT();
+      const guardado = await guardarCambiosOT();
+      if (!guardado) {
+        throw new Error("No fue posible confirmar las fotografías en la OT.");
+      }
 
+      const borradores = capturarBorradoresFormulario("listaOverhaul");
       renderOverhaul();
+      restaurarBorradoresFormulario("listaOverhaul", borradores);
 
       event.target.value = "";
     } catch (error) {
+      await Promise.allSettled(
+        urlsSubidasEnEsteIntento.map(url => eliminarArchivoStorage(url))
+      );
+      ot.overhaul[i].fotos = fotosOriginales;
+      event.target.value = "";
+
       console.error(
         "Error subiendo fotos de Mantención:",
         error
       );
 
       alert(
-        "Error al subir las imágenes de Mantención"
+        `No se completó la carga de ${files.length} fotografía(s). No se agregó ninguna evidencia del lote.`
       );
     }
   }
@@ -429,6 +502,9 @@ export function inicializarModuloOverhaul(servicios) {
       const img =
         document.createElement("img");
 
+      img.loading = "lazy";
+      img.decoding = "async";
+      img.alt = `Evidencia ${index + 1} de mantención`;
       img.src = foto;
       img.width = 100;
       img.style.cursor = "pointer";
@@ -464,7 +540,7 @@ export function inicializarModuloOverhaul(servicios) {
 
     if (!ot?.overhaul?.[i]) return;
 
-    if (!confirm("¿Eliminar foto?")) {
+    if (!(await confirmarEliminacion("fotografía"))) {
       return;
     }
 
@@ -472,14 +548,18 @@ export function inicializarModuloOverhaul(servicios) {
       ot.overhaul[i].fotos[index];
 
     try {
-      await eliminarArchivoStorage(urlFoto);
-
       ot.overhaul[i].fotos.splice(
         index,
         1
       );
 
-      await guardarCambiosOT();
+      const guardado = await guardarCambiosOT();
+      if (!guardado) {
+        ot.overhaul[i].fotos.splice(index, 0, urlFoto);
+        return;
+      }
+
+      await eliminarArchivoStorage(urlFoto);
 
       renderOverhaul();
     } catch (error) {
@@ -530,6 +610,9 @@ export function inicializarModuloOverhaul(servicios) {
       ot.overhaul[i].comentarios = [];
     }
 
+    const cantidadComentariosAnterior = ot.overhaul[i].comentarios.length;
+    const alertaJefeAnterior = ot.alertaJefe;
+
     ot.overhaul[i].comentarios.push({
       nombre,
       texto,
@@ -549,7 +632,15 @@ export function inicializarModuloOverhaul(servicios) {
       ot.alertaJefe = true;
     }
 
-    await guardarCambiosOT();
+    if (inputTexto) inputTexto.value = "";
+
+    const guardado = await guardarCambiosOT();
+    if (!guardado) {
+      ot.overhaul[i].comentarios.splice(cantidadComentariosAnterior);
+      ot.alertaJefe = alertaJefeAnterior;
+      if (inputTexto) inputTexto.value = texto;
+      return;
+    }
 
     renderOverhaul();
   }
@@ -577,7 +668,7 @@ export function inicializarModuloOverhaul(servicios) {
         document.createElement("div");
 
       div.className =
-        comentario.rol === "jefe_taller"
+        ["jefe_taller", "admin_sucursal"].includes(comentario.rol)
           ? "comentario-card comentario-jefe"
           : "comentario-card";
 
@@ -595,7 +686,7 @@ export function inicializarModuloOverhaul(servicios) {
         </p>
 
         ${
-          comentario.rol === "jefe_taller" &&
+          ["jefe_taller", "admin_sucursal"].includes(comentario.rol) &&
           comentario.atendido !== true &&
           esUsuarioTaller()
             ? `
@@ -614,7 +705,7 @@ export function inicializarModuloOverhaul(servicios) {
         }
 
         ${
-          comentario.rol === "jefe_taller" &&
+          ["jefe_taller", "admin_sucursal"].includes(comentario.rol) &&
           comentario.atendido === true
             ? `
               <div class="respuesta-observacion">
@@ -676,10 +767,12 @@ export function inicializarModuloOverhaul(servicios) {
 
     if (!ot?.overhaul?.[i]) return;
 
-    if (!confirm("¿Eliminar registro?")) {
+    if (!(await confirmarEliminacion("comentario"))) {
       return;
     }
 
+    const comentarioEliminado = ot.overhaul[i].comentarios[index];
+    const alertaJefeAnterior = ot.alertaJefe;
     ot.overhaul[i].comentarios.splice(
       index,
       1
@@ -687,7 +780,12 @@ export function inicializarModuloOverhaul(servicios) {
 
     actualizarAlertaJefe();
 
-    await guardarCambiosOT();
+    const guardado = await guardarCambiosOT();
+    if (!guardado) {
+      ot.overhaul[i].comentarios.splice(index, 0, comentarioEliminado);
+      ot.alertaJefe = alertaJefeAnterior;
+      return;
+    }
 
     renderOverhaul();
   }
@@ -703,7 +801,9 @@ export function inicializarModuloOverhaul(servicios) {
       return;
     }
 
-    await guardarCambiosOT();
+    const guardado = await guardarCambiosOT();
+
+    if (!guardado) return;
 
     alert(
       "Progreso de Mantención guardado ✅"
@@ -714,6 +814,7 @@ export function inicializarModuloOverhaul(servicios) {
   // APROBAR
   // ==========================================
   async function aprobarOverhaul() {
+    if (aprobacionOverhaulEnCurso) return;
     const ot = getOT();
 
     if (!ot?.overhaul?.length) {
@@ -763,16 +864,33 @@ export function inicializarModuloOverhaul(servicios) {
       return;
     }
 
+    aprobacionOverhaulEnCurso = true;
+    const botones = Array.from(document.querySelectorAll('[onclick*="aprobarOverhaul"]'));
+    botones.forEach(boton => { boton.disabled = true; });
+    const overhaulAprobadoAnterior = ot.overhaulAprobado;
+    const estadoAnterior = ot.estado;
+
+    try {
+
     ot.overhaulAprobado = true;
     ot.estado = obtenerEstadoOT(ot);
 
-    await guardarCambiosOT();
+    const guardado = await guardarCambiosOT();
+    if (!guardado) {
+      ot.overhaulAprobado = overhaulAprobadoAnterior;
+      ot.estado = estadoAnterior;
+      return;
+    }
 
-    habilitarTab("pruebas");
+    navegarSiguienteEtapa("overhaul");
 
     alert(
       "Mantención aprobada, se habilita PRUEBAS"
     );
+    } finally {
+      aprobacionOverhaulEnCurso = false;
+      botones.forEach(boton => { boton.disabled = false; });
+    }
   }
 
   // ==========================================

@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SHEQ y Acreditaciones | Vectaria</title>
+  <link rel="icon" type="image/png" href="img/vectaria-favicon-official.png?v=3">
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/brand-overtrack.css">
+  <link rel="stylesheet" href="css/brand-overtrack-light.css">
+  <link rel="stylesheet" href="css/notificaciones.css">
+  <link rel="stylesheet" href="css/sheq.css?v=20261004-5">
+  <link rel="stylesheet" href="css/sheq-matriz.css">
+  <link rel="stylesheet" href="css/desktop-density.css">
+</head>
+<body class="dashboard-overtrack sheq-page">
+<div class="app">
+  <header class="mobile-topbar">
+    <div class="mobile-topbar-brand"><img src="img/vectaria-logo-official.png?v=3" alt="Vectaria"></div>
+    <button type="button" class="mobile-menu-toggle" aria-controls="sheqSidebar" aria-expanded="false"><span>☰</span><span>Menú</span></button>
+  </header>
+  <button type="button" class="mobile-menu-backdrop" tabindex="-1" aria-label="Cerrar menú"></button>
+  <aside class="sidebar" id="sheqSidebar">
+    <div class="sidebar-logo"><img class="sidebar-brand-logo" src="img/vectaria-logo-official.png?v=3" alt="Vectaria"></div>
+    <ul>
+      <li id="menuDashboardSheq" onclick="location.href='dashboard.html'"><svg class="ot-icon nav-icon"><use href="img/icons-overtrack.svg#dashboard"></use></svg><span>Dashboard</span></li>
+      <li class="active"><span class="sheq-nav-icon">🛡️</span><span>SHEQ</span></li>
+      <li id="menuProgramacionSheq" onclick="location.href='programacion.html'"><svg class="ot-icon nav-icon"><use href="img/icons-overtrack.svg#calendar"></use></svg><span>Programación</span></li>
+      <li id="menuPanelEmpresaSheq" style="display:none"><svg class="ot-icon nav-icon"><use href="img/icons-overtrack.svg#building-cog"></use></svg><span>Panel Empresa</span></li>
+    </ul>
+    <button type="button" class="mobile-menu-logout" id="btnSalirSheq">Salir</button>
+  </aside>
+
+  <main class="main-content sheq-main">
+    <header class="header sheq-header">
+      <div><h2>SHEQ y Acreditaciones</h2><p>Control de personal, vehículos, contratos, faenas y vigencias documentales.</p></div>
+      <div class="user-box"><span id="usuarioNombre">Usuario</span><small id="usuarioRol">Rol</small><button class="btn-logout" id="btnSalirSheqTop">Salir</button></div>
+    </header>
+
+    <section class="sheq-toolbar card">
+      <div class="sheq-tabs" role="tablist">
+        <button class="active" data-vista="panel">Resumen</button><button data-vista="personal">Personal</button><button data-vista="vehiculos">Vehículos</button><button data-vista="contratos">Contratos y faenas</button><button data-vista="documentos">Documentos</button>
+      </div>
+      <div class="sheq-toolbar-actions"><button class="btn-sheq-secondary" id="btnExportarSheq">Exportar CSV</button><button class="btn-sheq-primary" id="btnNuevoDocumento">+ Documento</button></div>
+    </section>
+
+    <section class="sheq-vista active" data-panel="panel">
+      <div class="sheq-kpis">
+        <article class="sheq-kpi verde"><span>Personal acreditado</span><strong id="kpiPersonalAcreditado">0</strong></article>
+        <article class="sheq-kpi gris"><span>Pendiente de acreditar</span><strong id="kpiPersonalPendiente">0</strong></article>
+        <article class="sheq-kpi rojo"><span>Documentos vencidos</span><strong id="kpiVencidos">0</strong></article>
+        <article class="sheq-kpi amarillo"><span>Próximos a vencer (90 días)</span><strong id="kpiPorVencer">0</strong></article>
+        <article class="sheq-kpi azul"><span>Vehículos habilitados</span><strong id="kpiVehiculos">0</strong></article>
+        <article class="sheq-kpi naranja"><span>Observaciones pendientes</span><strong id="kpiObservaciones">0</strong></article>
+      </div>
+      <div class="sheq-panel-grid">
+        <article class="card sheq-card"><div class="sheq-card-title"><h3>Alertas prioritarias</h3><span id="resumenAlertas">0 alertas</span></div><div id="listaAlertas" class="sheq-alertas"></div></article>
+        <article class="card sheq-card"><div class="sheq-card-title"><h3>Cumplimiento</h3><strong id="porcentajeCumplimiento">0%</strong></div><div class="sheq-progress"><span id="barraCumplimiento"></span></div><div id="resumenCumplimiento" class="sheq-resumen-lista"></div></article>
+      </div>
+    </section>
+
+    <section class="sheq-vista" data-panel="personal">
+      <div class="card sheq-list-card"><div class="sheq-list-header"><div><h3>Personal de la empresa</h3><p>La acreditación se calcula automáticamente para cada contrato o faena.</p></div><input id="buscarPersonalSheq" type="search" placeholder="Buscar por nombre, RUT o cargo"></div><div class="sheq-table-wrap"><table class="sheq-table"><thead><tr><th>Trabajador</th><th>RUT</th><th>Cargo</th><th>Sucursal</th><th>Documentos</th><th>Faenas</th><th>Estado</th><th></th></tr></thead><tbody id="tablaPersonalSheq"></tbody></table></div></div>
+    </section>
+
+    <section class="sheq-vista" data-panel="vehiculos">
+      <div class="card sheq-list-card"><div class="sheq-list-header"><div><h3>Vehículos</h3><p>Vigencias legales, inspecciones y acreditación por contrato.</p></div><button class="btn-sheq-primary" id="btnNuevoVehiculo">+ Vehículo</button></div><div class="sheq-table-wrap"><table class="sheq-table"><thead><tr><th>Patente</th><th>Vehículo</th><th>Sucursal</th><th>Contrato/faena</th><th>Documentos</th><th>Estado</th><th></th></tr></thead><tbody id="tablaVehiculosSheq"></tbody></table></div></div>
+    </section>
+
+    <section class="sheq-vista" data-panel="contratos">
+      <div class="card sheq-list-card"><div class="sheq-list-header"><div><h3>Clientes, contratos y faenas</h3><p>Configura requisitos diferentes para cada operación.</p></div><button class="btn-sheq-primary" id="btnNuevoContrato">+ Contrato</button></div><div id="listaContratosSheq" class="sheq-contracts"></div></div>
+    </section>
+
+    <section class="sheq-vista" data-panel="documentos">
+      <div class="card sheq-list-card"><div class="sheq-list-header"><div><h3>Documentos y vigencias</h3><p>Revisa, aprueba, observa o rechaza antecedentes.</p></div><div class="sheq-filters"><select id="filtroEstadoDocumento"><option value="">Todos los estados</option><option value="aprobado">Aprobados</option><option value="pendiente">Pendientes</option><option value="observado">Observados</option><option value="rechazado">Rechazados</option><option value="vencido">Vencidos</option></select><input id="buscarDocumentoSheq" type="search" placeholder="Buscar documento"></div></div><div class="sheq-table-wrap"><table class="sheq-table"><thead><tr><th>Entidad</th><th>Documento</th><th>Contrato</th><th>Vencimiento</th><th>Estado</th><th>Archivo</th><th></th></tr></thead><tbody id="tablaDocumentosSheq"></tbody></table></div></div>
+    </section>
+  </main>
+</div>
+
+<div class="sheq-modal" id="modalContrato" hidden><section class="sheq-modal-content"><header><div><h2>Contrato o faena</h2><p>Define la operación y sus requisitos documentales.</p></div><button data-cerrar-modal="modalContrato">×</button></header><form id="formContrato" class="sheq-form"><input type="hidden" id="contratoId"><label>Cliente<input id="contratoCliente" required></label><label>Nombre del contrato<input id="contratoNombre" required></label><label>Faena o centro de trabajo<input id="contratoFaena"></label><label>Sucursal<select id="contratoSucursal"><option value="">Todas las sucursales</option></select></label><label>Fecha de inicio<input id="contratoInicio" type="date"></label><label>Fecha de término<input id="contratoTermino" type="date"></label><label class="wide">Personal que debe acreditarse<select id="contratoPersonal" multiple size="6"></select><small>Selecciona las personas asignadas a esta faena. Usa Ctrl o Cmd para seleccionar varias.</small></label><label class="wide">Requisitos para trabajadores<textarea id="contratoRequisitosPersonal" placeholder="Un requisito por línea"></textarea></label><label class="wide">Requisitos para vehículos<textarea id="contratoRequisitosVehiculos" placeholder="Un requisito por línea"></textarea></label><div class="sheq-form-actions wide"><button type="button" class="btn-sheq-secondary" data-cerrar-modal="modalContrato">Cancelar</button><button class="btn-sheq-primary">Guardar contrato</button></div></form></section></div>
+
+<div class="sheq-modal" id="modalVehiculo" hidden><section class="sheq-modal-content"><header><div><h2>Vehículo</h2><p>Registra el vehículo y su asignación operacional.</p></div><button data-cerrar-modal="modalVehiculo">×</button></header><form id="formVehiculo" class="sheq-form"><input type="hidden" id="vehiculoId"><label>Patente<input id="vehiculoPatente" required></label><label>Tipo<select id="vehiculoTipo"><option>Camioneta</option><option>Camión</option><option>Automóvil</option><option>Maquinaria</option><option>Otro</option></select></label><label>Marca<input id="vehiculoMarca"></label><label>Modelo<input id="vehiculoModelo"></label><label>Año<input id="vehiculoAnio" type="number" min="1950" max="2100"></label><label>Propietario<input id="vehiculoPropietario"></label><label>Sucursal<select id="vehiculoSucursal"><option value="">Sin sucursal</option></select></label><label>Contrato o faena<select id="vehiculoContrato"><option value="">Sin contrato</option></select></label><label class="wide">Equipamiento obligatorio<textarea id="vehiculoEquipamiento"></textarea></label><div class="sheq-form-actions wide"><button type="button" class="btn-sheq-secondary" data-cerrar-modal="modalVehiculo">Cancelar</button><button class="btn-sheq-primary">Guardar vehículo</button></div></form></section></div>
+
+<div class="sheq-modal" id="modalDocumento" hidden><section class="sheq-modal-content"><header><div><h2>Documento SHEQ</h2><p>Registra vigencia, revisión y respaldo del antecedente.</p></div><button data-cerrar-modal="modalDocumento">×</button></header><form id="formDocumento" class="sheq-form"><input type="hidden" id="documentoId"><label>Asociado a<select id="documentoEntidadTipo"><option value="persona">Trabajador</option><option value="vehiculo">Vehículo</option></select></label><label>Persona o vehículo<select id="documentoEntidadId" required></select></label><label>Tipo documental<div class="sheq-document-type-picker"><select id="documentoTipo" class="sheq-native-select-hidden" aria-hidden="true" tabindex="-1"><option value="">Seleccionar tipo documental</option><option value="Examen ocupacional">Examen ocupacional</option><option value="Inducción general">Inducción general</option><option value="Inducción específica">Inducción específica</option><option value="Contrato de trabajo">Contrato de trabajo</option><option value="Licencia de conducir">Licencia de conducir</option><option value="Hoja de vida del conductor">Hoja de vida del conductor</option><option value="Curso SHEQ">Curso SHEQ</option><option value="Certificaciones">Certificaciones</option><option value="Revisión técnica">Revisión técnica</option><option value="Permiso de circulación">Permiso de circulación</option><option value="SOAP">SOAP</option><option value="Seguro adicional">Seguro adicional</option><option value="Inspección interna">Inspección interna</option><option value="__otro__">Otro tipo documental…</option></select><button type="button" id="documentoTipoBoton" class="sheq-document-type-trigger" aria-haspopup="listbox" aria-expanded="false"><span>Seleccionar tipo documental</span><b aria-hidden="true">⌄</b></button><div id="documentoTipoMenu" class="sheq-document-type-menu" role="listbox" hidden></div></div></label><label id="documentoTipoOtroCampo" hidden>Especificar otro tipo<input id="documentoTipoOtro" maxlength="120" placeholder="Nombre del tipo documental"></label><label>Contrato o faena<select id="documentoContrato"><option value="">Aplicación general</option></select></label><label>Fecha de emisión<input id="documentoEmision" type="date"></label><label>Fecha de vencimiento<input id="documentoVencimiento" type="date"></label><label>Estado<select id="documentoEstado"><option value="pendiente">Pendiente de revisión</option><option value="aprobado">Aprobado</option><option value="observado">Observado</option><option value="rechazado">Rechazado</option></select></label><label>Archivo<input id="documentoArchivo" type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx"><small id="documentoArchivoActual"></small></label><label class="wide">Observaciones<textarea id="documentoObservaciones"></textarea></label><label class="wide" id="documentoMotivoCampo" hidden>Motivo de la modificación<textarea id="documentoMotivo" placeholder="Explica brevemente qué información se corrigió"></textarea></label><div class="sheq-form-actions wide"><button type="button" class="btn-sheq-secondary" data-cerrar-modal="modalDocumento">Cancelar</button><button class="btn-sheq-primary">Guardar documento</button></div></form></section></div>
+
+<div class="sheq-modal" id="modalMatriz" hidden><section class="sheq-modal-content sheq-modal-matriz"><header><div><h2 id="matrizTitulo">Matriz de acreditación</h2><p id="matrizSubtitulo">Cumplimiento documental por contrato o faena.</p></div><button data-cerrar-modal="modalMatriz">×</button></header><div id="matrizContenido" class="sheq-matriz-contenido"></div><div class="sheq-form-actions"><button type="button" class="btn-sheq-secondary" data-cerrar-modal="modalMatriz">Cerrar</button></div></section></div>
+
+<div class="sheq-modal" id="modalHistorialDocumento" hidden><section class="sheq-modal-content sheq-modal-matriz"><header><div><h2 id="historialDocumentoTitulo">Historial del documento</h2><p>Versiones anteriores, responsables y motivos de modificación.</p></div><button data-cerrar-modal="modalHistorialDocumento">×</button></header><div id="historialDocumentoContenido" class="sheq-historial-contenido"></div><div class="sheq-form-actions"><button type="button" class="btn-sheq-secondary" data-cerrar-modal="modalHistorialDocumento">Cerrar</button></div></section></div>
+
+<script src="js/components/notificaciones.js"></script><script type="module" src="js/sheq.js?v=20261004-5"></script>
+</body></html>

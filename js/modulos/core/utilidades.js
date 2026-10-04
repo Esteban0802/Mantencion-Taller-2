@@ -9,6 +9,55 @@ export function inicializarUtilidades(config) {
   contexto = config;
 }
 
+// Conserva campos aún no enviados cuando una sección debe volver a dibujarse.
+export function capturarBorradoresFormulario(contenedorId) {
+  const contenedor = document.getElementById(contenedorId);
+  if (!contenedor) return { campos: [], foco: null };
+
+  const activo = document.activeElement;
+  const campos = Array.from(
+    contenedor.querySelectorAll(
+      'input:not([type="file"]):not([type="button"]):not([type="submit"]):not([type="checkbox"]):not([type="radio"]), textarea, select'
+    )
+  )
+    .filter(campo => campo.id)
+    .map(campo => ({ id: campo.id, valor: campo.value }));
+
+  const foco = activo && contenedor.contains(activo) && activo.id
+    ? {
+        id: activo.id,
+        inicio: typeof activo.selectionStart === "number" ? activo.selectionStart : null,
+        fin: typeof activo.selectionEnd === "number" ? activo.selectionEnd : null
+      }
+    : null;
+
+  return { campos, foco };
+}
+
+export function restaurarBorradoresFormulario(contenedorId, borradores) {
+  const contenedor = document.getElementById(contenedorId);
+  if (!contenedor || !borradores) return;
+
+  borradores.campos?.forEach(({ id, valor }) => {
+    const campo = document.getElementById(id);
+    if (campo && contenedor.contains(campo)) campo.value = valor;
+  });
+
+  const foco = borradores.foco;
+  if (!foco) return;
+
+  const campoActivo = document.getElementById(foco.id);
+  if (!campoActivo || !contenedor.contains(campoActivo)) return;
+
+  campoActivo.focus({ preventScroll: true });
+  if (
+    foco.inicio !== null && foco.fin !== null &&
+    typeof campoActivo.setSelectionRange === "function"
+  ) {
+    campoActivo.setSelectionRange(foco.inicio, foco.fin);
+  }
+}
+
 // ------------------------------------------
 // VALIDAR OT BLOQUEADA
 // ------------------------------------------
@@ -39,7 +88,7 @@ export function itemCompleto(item) {
   const tieneComentarios =
     item.comentarios &&
     item.comentarios.some(
-      c => c.rol !== "jefe_taller"
+      c => !["jefe_taller", "admin_sucursal"].includes(c.rol)
     );
 
   return (

@@ -2,83 +2,64 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>OverTrack | Super Administrador</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vectaria | Super Administrador</title>
+  <link rel="icon" type="image/png" href="img/vectaria-favicon-official.png?v=3">
   <link rel="stylesheet" href="css/super-admin.css">
+  <link rel="stylesheet" href="css/super-admin-functional.css">
+  <link rel="stylesheet" href="css/super-admin-brand.css">
+  <link rel="stylesheet" href="css/notificaciones.css">
+  <link rel="stylesheet" href="css/desktop-density.css">
 </head>
-<body>
-
+<body class="super-admin-page">
   <div class="admin-layout">
+    <header class="mobile-topbar">
+      <div class="mobile-topbar-brand" aria-label="Vectaria">
+        <div class="mobile-brand-composite" role="img" aria-label="Vectaria - Gestión operativa">
+          <img class="mobile-brand-layer mobile-brand-base" src="img/vectaria-logo-official.png?v=3" alt="">
+        </div>
+      </div>
+      <button type="button" class="mobile-menu-toggle" aria-controls="superAdminSidebar" aria-expanded="false" aria-label="Abrir menú de navegación">
+        <span aria-hidden="true">☰</span>
+        <span>Menú</span>
+      </button>
+    </header>
+    <button type="button" class="mobile-menu-backdrop" aria-label="Cerrar menú de navegación" tabindex="-1"></button>
 
-    <aside class="sidebar">
-      <h2>OVERTRACK</h2>
+    <aside class="sidebar" id="superAdminSidebar">
+      <div class="sidebar-brand">
+        <div class="sidebar-brand-composite" role="img" aria-label="Vectaria - Gestión operativa">
+          <img class="sidebar-brand-layer sidebar-brand-base" src="img/vectaria-logo-official.png?v=3" alt="">
+        </div>
+      </div>
       <p>Super Admin</p>
 
-      <ul>
-        <li class="active">Dashboard</li>
-        <li>Empresas</li>
-        <li>Usuarios</li>
-        <li>Sucursales</li>
-        <li>Planes</li>
-        <li>Configuración</li>
-      </ul>
+      <nav aria-label="Administración global">
+        <ul>
+          <li><button type="button" class="active" data-super-view="dashboard" onclick="cambiarVistaSuperAdmin('dashboard', this)">Dashboard</button></li>
+          <li><button type="button" data-super-view="empresas" onclick="cambiarVistaSuperAdmin('empresas', this)">Empresas</button></li>
+          <li><button type="button" data-super-view="usuarios" onclick="cambiarVistaSuperAdmin('usuarios', this)">Usuarios</button></li>
+          <li><button type="button" data-super-view="sucursales" onclick="cambiarVistaSuperAdmin('sucursales', this)">Sucursales</button></li>
+          <li><button type="button" data-super-view="planes" onclick="cambiarVistaSuperAdmin('planes', this)">Planes</button></li>
+          <li><button type="button" data-super-view="configuracion" onclick="cambiarVistaSuperAdmin('configuracion', this)">Configuración</button></li>
+        </ul>
+      </nav>
 
-      <button onclick="logout()" class="btn-danger">
-        Cerrar sesión
-      </button>
+      <button type="button" onclick="logout()" class="btn-danger sidebar-logout">Cerrar sesión</button>
     </aside>
 
     <main class="main-content">
-
       <header class="dashboard-header">
         <div>
-          <h1>Panel Super Administrador</h1>
-          <p>Gestión global de empresas, usuarios y sucursales.</p>
+          <h1 id="tituloVista">Panel Super Administrador</h1>
+          <p id="descripcionVista">Gestión global de empresas, usuarios y sucursales.</p>
         </div>
       </header>
-
-      <section class="kpi-grid">
-
-        <div class="kpi-card">
-          <h3>Empresas</h3>
-          <strong id="totalEmpresas">0</strong>
-        </div>
-
-        <div class="kpi-card">
-          <h3>Usuarios</h3>
-          <strong id="totalUsuarios">0</strong>
-        </div>
-
-        <div class="kpi-card">
-          <h3>Sucursales</h3>
-          <strong id="totalSucursales">0</strong>
-        </div>
-
-        <div class="kpi-card">
-          <h3>OS Activas</h3>
-          <strong id="totalOS">0</strong>
-        </div>
-
-      </section>
-
-      <section class="card">
-        <div class="section-header">
-          <h2>Empresas registradas</h2>
-
-          <button class="btn-primary" onclick="abrirModalEmpresa()">
-            + Nueva Empresa
-          </button>
-        </div>
-
-        <div id="listaEmpresas"></div>
-      </section>
-
+      <div id="contenidoVista" aria-live="polite"></div>
     </main>
-
   </div>
 
-  
-
+  <script src="js/components/notificaciones.js"></script>
   <script type="module" src="./js/super-admin.js"></script>
-
 </body>
 </html>

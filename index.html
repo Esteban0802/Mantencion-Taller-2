@@ -2,9 +2,13 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>OverTrack | Login</title>
-  <link rel="icon" type="image/png" href="img/logo_overtrack - pestaña.png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vectaria | Iniciar sesión</title>
+  <link rel="icon" type="image/png" href="img/vectaria-favicon-official.png?v=3">
   <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/password-security.css">
+  <link rel="stylesheet" href="css/brand-overtrack.css">
+  <link rel="stylesheet" href="css/desktop-density.css">
 </head>
 <body class="login-overtrack">
 
@@ -13,31 +17,46 @@
   <main class="login-wrapper">
 
     <section class="login-brand">
-      <div class="brand-logo">
-        <img src="img/logo_overtrack.png" alt="OverTrack">
+      <div class="brand-identity">
+        <div class="login-brand-composite" role="img" aria-label="Vectaria - Tu operación, en una misma dirección">
+          <img class="login-brand-layer login-brand-base" src="img/vectaria-logo-official.png?v=3" alt="">
         </div>
-      <p>Gestión, trazabilidad y control operacional de taller.</p>
+      </div>
     </section>
 
     <section class="login-panel">
       <h2>Acceso al sistema</h2>
-      <p class="login-subtitle">Ingresa con tu cuenta de taller</p>
+      <p class="login-subtitle">Ingresa con tu cuenta de empresa</p>
 
-      <label>Correo</label>
-      <input type="email" id="email" placeholder="usuario@empresa.cl">
+      <label for="email">Correo</label>
+      <input type="email" id="email" placeholder="usuario@empresa.cl" autocomplete="username">
 
-      <label>Contraseña</label>
-      <input type="password" id="password" placeholder="••••••••">
+      <label for="password">Contraseña</label>
+      <input type="password" id="password" placeholder="••••••••" autocomplete="current-password">
 
-      <button id="btnLogin" class="btn-login">
+      <button id="btnLogin" class="btn-login" type="button">
         Iniciar sesión →
       </button>
 
-      <p id="loginError" class="login-error"></p>
+      <button id="btnMostrarRecuperacion" class="btn-auth-link" type="button" aria-controls="panelRecuperacion" aria-expanded="false">
+        ¿Olvidaste tu contraseña?
+      </button>
+
+      <div id="panelRecuperacion" class="auth-recovery" hidden>
+        <p>
+          Ingresa tu correo y te enviaremos instrucciones para recuperar el acceso.
+        </p>
+        <button id="btnRecuperarPassword" class="btn-auth-secondary" type="button">
+          Enviar correo de recuperación
+        </button>
+      </div>
+
+      <p id="loginError" class="login-error" aria-live="assertive"></p>
+      <p id="loginMensaje" class="login-message" aria-live="polite"></p>
     </section>
 
   </main>
 
-  <script type="module" src="js/login.js"></script>
+  <script type="module" src="js/login.js?v=20261004-2"></script>
 </body>
 </html>

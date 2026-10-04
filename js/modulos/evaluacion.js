@@ -2,7 +2,14 @@
 // MÓDULO EVALUACIÓN — OVERTRACK
 // ==========================================
 
+import {
+  capturarBorradoresFormulario,
+  restaurarBorradoresFormulario
+} from "./core/utilidades.js";
+
 export function inicializarModuloEvaluacion(servicios) {
+
+  let decisionEvaluacionEnCurso = false;
 
   const {
 
@@ -28,14 +35,54 @@ export function inicializarModuloEvaluacion(servicios) {
     subirArchivoStorage,
     comprimirImagenBlob,
 
+    abrirDocumento,
+
     getUsuario,
     esJefeTaller,
     obtenerEstadoOT,
     habilitarTab,
     cambiarTab,
-    renderComentarioDecisionEvaluacion
+    navegarSiguienteEtapa,
+    aprobacionesHabilitadas,
+    agregarBitacora
 
   } = servicios;
+
+  const alert = (mensaje) => {
+    const texto = String(mensaje || "");
+    const tipo = /correctamente|completad[ao]|aprobad[ao]|rechazad[ao]/i.test(texto)
+      ? "exito"
+      : /error|no fue posible|no hay una orden/i.test(texto)
+        ? "error"
+        : "advertencia";
+    const titulo = tipo === "exito"
+      ? "Operación completada"
+      : tipo === "error"
+        ? "No fue posible completar la acción"
+        : "Revisa la información";
+
+    if (window.OverTrackUI?.mostrarMensaje) {
+      return window.OverTrackUI.mostrarMensaje({ titulo, mensaje: texto, tipo });
+    }
+
+    window.alert(texto);
+    return Promise.resolve(true);
+  };
+
+  const confirmarEliminacion = () => {
+    if (window.OverTrackUI?.confirmarAccion) {
+      return window.OverTrackUI.confirmarAccion({
+        titulo: "Eliminar fotografía",
+        mensaje: "La fotografía se eliminará de esta orden de trabajo.",
+        tipo: "advertencia",
+        textoConfirmar: "Eliminar",
+        textoCancelar: "Cancelar",
+        peligrosa: true
+      });
+    }
+
+    return Promise.resolve(window.confirm("¿Eliminar foto?"));
+  };
 
 
   validarDependencias({
@@ -58,6 +105,8 @@ export function inicializarModuloEvaluacion(servicios) {
 
     verImagenModal,
 
+    abrirDocumento,
+
     eliminarArchivoStorage,
     subirArchivoStorage,
     comprimirImagenBlob,
@@ -67,8 +116,9 @@ export function inicializarModuloEvaluacion(servicios) {
     obtenerEstadoOT,
     habilitarTab,
     cambiarTab,
-    renderComentarioDecisionEvaluacion
-
+    navegarSiguienteEtapa,
+    aprobacionesHabilitadas,
+    agregarBitacora
   });
 
 
@@ -103,10 +153,18 @@ export function inicializarModuloEvaluacion(servicios) {
       return;
     }
 
+    if (!/\.xlsx?$/i.test(file.name) || file.size > 5 * 1024 * 1024) {
+      alert("Selecciona un archivo Excel válido de máximo 5 MB.");
+      inputExcel.value = "";
+      return;
+    }
+
     const reader = new FileReader();
 
 
     reader.onload = async function (event) {
+      const checklistAnterior = ot.evaluacion;
+      let checklistReemplazado = false;
 
       try {
 
@@ -150,9 +208,10 @@ export function inicializarModuloEvaluacion(servicios) {
             );
 
           })
+          .slice(0, 400)
           .map((valor) => ({
 
-            item: String(valor).trim(),
+            item: String(valor).trim().slice(0, 240),
             ok: false,
             fotos: [],
             comentarios: []
@@ -171,9 +230,11 @@ export function inicializarModuloEvaluacion(servicios) {
 
 
         ot.evaluacion = checklist;
+        checklistReemplazado = true;
 
 
-        await guardarCambiosOT();
+        const guardado = await guardarCambiosOT();
+        if (!guardado) throw new Error("No fue posible guardar el checklist en la OT.");
 
 
         window.renderEvaluacion();
@@ -188,6 +249,8 @@ export function inicializarModuloEvaluacion(servicios) {
 
 
       } catch (error) {
+
+        if (checklistReemplazado) ot.evaluacion = checklistAnterior;
 
         console.error(
           "Error procesando Excel de Evaluación:",
@@ -454,6 +517,9 @@ export function inicializarModuloEvaluacion(servicios) {
       const img =
         document.createElement("img");
 
+      img.loading = "lazy";
+      img.decoding = "async";
+      img.alt = `Evidencia ${index + 1} de evaluación`;
       img.src = foto;
       img.style.cursor = "pointer";
       img.width = 100;
@@ -489,7 +555,7 @@ export function inicializarModuloEvaluacion(servicios) {
 
     if (OTBloqueada()) return;
 
-    if (!confirm("¿Eliminar foto?")) return;
+    if (!(await confirmarEliminacion())) return;
 
 
     const ot = getOT();
@@ -504,17 +570,18 @@ export function inicializarModuloEvaluacion(servicios) {
 
 
     try {
-
-      await eliminarArchivoStorage(foto);
-
-
       ot.evaluacion[i].fotos.splice(
         index,
         1
       );
 
+      const guardado = await guardarCambiosOT();
+      if (!guardado) {
+        ot.evaluacion[i].fotos.splice(index, 0, foto);
+        return;
+      }
 
-      await guardarCambiosOT();
+      await eliminarArchivoStorage(foto);
 
 
       window.renderEvaluacion();
@@ -555,6 +622,9 @@ export function inicializarModuloEvaluacion(servicios) {
 
     if (!files.length) return;
 
+    const fotosOriginales = [...(ot.evaluacion?.[i]?.fotos || [])];
+    const urlsSubidasEnEsteIntento = [];
+
 
     try {
 
@@ -591,6 +661,9 @@ export function inicializarModuloEvaluacion(servicios) {
             i
           );
 
+        if (!urlFoto) throw new Error("La fotografía no obtuvo una URL válida");
+
+        urlsSubidasEnEsteIntento.push(urlFoto);
 
         ot.evaluacion[i].fotos.push(
           urlFoto
@@ -599,10 +672,15 @@ export function inicializarModuloEvaluacion(servicios) {
       }
 
 
-      await guardarCambiosOT();
+      const guardado = await guardarCambiosOT();
+      if (!guardado) {
+        throw new Error("No fue posible confirmar las fotografías en la OT.");
+      }
 
 
+      const borradores = capturarBorradoresFormulario("listaEvaluacion");
       window.renderEvaluacion();
+      restaurarBorradoresFormulario("listaEvaluacion", borradores);
 
 
       e.target.value = "";
@@ -610,13 +688,19 @@ export function inicializarModuloEvaluacion(servicios) {
 
     } catch (error) {
 
+      await Promise.allSettled(
+        urlsSubidasEnEsteIntento.map(url => eliminarArchivoStorage(url))
+      );
+      if (ot.evaluacion?.[i]) ot.evaluacion[i].fotos = fotosOriginales;
+      e.target.value = "";
+
       console.error(
         "Error subiendo fotos evaluación:",
         error
       );
 
       alert(
-        "Error al subir las imágenes de evaluación"
+        `No se completó la carga de ${files.length} fotografía(s). No se agregó ninguna evidencia del lote.`
       );
 
     }
@@ -652,17 +736,25 @@ export function inicializarModuloEvaluacion(servicios) {
   window.rechazarOverhaulDesdeEvaluacion =
     rechazarOverhaulDesdeEvaluacion;
 
+  window.continuarEvaluacionSinAprobacion =
+    continuarEvaluacionSinAprobacion;
+
   window.renderDocsDecisionEvaluacionPreview =
     renderDocsDecisionEvaluacionPreview;
+
+  window.abrirDocumentoDecisionEvaluacion =
+    abrirDocumentoDecisionEvaluacion;
+
+  window.abrirArchivoTemporal =
+    abrirArchivoTemporal;
+
+  window.renderComentarioDecisionEvaluacion =
+    renderComentarioDecisionEvaluacion;
 
 
   console.log(
     "📦 Módulo Evaluación inicializado correctamente"
   );
-
-}
-
-
 
 // ==========================================
 // VALIDAR EVALUACIÓN COMPLETA
@@ -727,7 +819,9 @@ async function guardarEvaluacion() {
         return;
     }
 
-    await guardarCambiosOT();
+    const guardado = await guardarCambiosOT();
+
+    if (!guardado) return;
 
     alert(
         "Evaluación guardada correctamente ✅"
@@ -769,6 +863,11 @@ async function aprobarOverhaulDesdeEvaluacion() {
 
     if (OTBloqueada()) return;
 
+    if (!aprobacionesHabilitadas()) {
+        alert("El módulo Aprobaciones está deshabilitado para esta empresa");
+        return;
+    }
+
     if (!esJefeTaller()) {
         alert(
             "Solo Jefe de Taller puede aprobar Mantención desde Evaluación"
@@ -807,6 +906,20 @@ async function aprobarOverhaulDesdeEvaluacion() {
         return;
     }
 
+    if (decisionEvaluacionEnCurso) return;
+    decisionEvaluacionEnCurso = true;
+    const botonesDecision = Array.from(document.querySelectorAll(
+        '[onclick*="aprobarOverhaulDesdeEvaluacion"], [onclick*="rechazarOverhaulDesdeEvaluacion"]'
+    ));
+    botonesDecision.forEach(boton => { boton.disabled = true; });
+    const estadoAnterior = {
+        decisionEvaluacion: ot.decisionEvaluacion,
+        evaluacionAprobada: ot.evaluacionAprobada,
+        overhaulRequerido: ot.overhaulRequerido,
+        estado: ot.estado
+    };
+    const urlsSubidasEnEsteIntento = [];
+
     try {
 
         const documentos = [];
@@ -820,6 +933,8 @@ async function aprobarOverhaulDesdeEvaluacion() {
                 );
 
             documentos.push(docSubido);
+            if (!docSubido?.url) throw new Error("El documento no obtuvo una URL válida.");
+            urlsSubidasEnEsteIntento.push(docSubido.url);
         }
 
         ot.decisionEvaluacion = {
@@ -835,35 +950,28 @@ async function aprobarOverhaulDesdeEvaluacion() {
         };
 
         ot.evaluacionAprobada = true;
-        ot.overhaulRequerido = false;
-
-        // Se saltan Mantención y Pruebas
-        ot.overhaulAprobado = true;
-        ot.pruebasAprobado = true;
-
-        // Preparar Despacho si todavía no existe
-        if (!ot.despacho) {
-            ot.despacho = {
-                preparacion: [],
-                final: []
-            };
-        }
+        ot.overhaulRequerido = true;
 
         ot.estado =
             obtenerEstadoOT(ot);
 
-        await guardarCambiosOT();
+        const guardado = await guardarCambiosOT();
+        if (!guardado) throw new Error("No fue posible confirmar la aprobación en la OT.");
 
         renderComentarioDecisionEvaluacion();
 
-        habilitarTab("despacho");
-        cambiarTab("despacho");
+        navegarSiguienteEtapa("evaluacion");
 
         alert(
-            "Mantención rechazada. La OS pasa a DESPACHO ✅"
+            "Mantención aprobada. Se habilita etapa MANTENCIÓN ✅"
         );
 
     } catch (error) {
+
+        await Promise.allSettled(
+            urlsSubidasEnEsteIntento.map(url => eliminarArchivoStorage(url))
+        );
+        Object.assign(ot, estadoAnterior);
 
         console.error(
             "Error aprobando Mantención:",
@@ -873,6 +981,9 @@ async function aprobarOverhaulDesdeEvaluacion() {
         alert(
             "Error al guardar decisión de evaluación"
         );
+    } finally {
+        decisionEvaluacionEnCurso = false;
+        botonesDecision.forEach(boton => { boton.disabled = false; });
     }
 }
 
@@ -884,6 +995,11 @@ async function aprobarOverhaulDesdeEvaluacion() {
 async function rechazarOverhaulDesdeEvaluacion() {
 
     if (OTBloqueada()) return;
+
+    if (!aprobacionesHabilitadas()) {
+        alert("El módulo Aprobaciones está deshabilitado para esta empresa");
+        return;
+    }
 
     if (!esJefeTaller()) {
         alert(
@@ -927,6 +1043,23 @@ async function rechazarOverhaulDesdeEvaluacion() {
         return;
     }
 
+    if (decisionEvaluacionEnCurso) return;
+    decisionEvaluacionEnCurso = true;
+    const botonesDecision = Array.from(document.querySelectorAll(
+        '[onclick*="aprobarOverhaulDesdeEvaluacion"], [onclick*="rechazarOverhaulDesdeEvaluacion"]'
+    ));
+    botonesDecision.forEach(boton => { boton.disabled = true; });
+    const estadoAnterior = {
+        decisionEvaluacion: ot.decisionEvaluacion,
+        evaluacionAprobada: ot.evaluacionAprobada,
+        overhaulRequerido: ot.overhaulRequerido,
+        overhaulAprobado: ot.overhaulAprobado,
+        pruebasAprobado: ot.pruebasAprobado,
+        despacho: ot.despacho,
+        estado: ot.estado
+    };
+    const urlsSubidasEnEsteIntento = [];
+
     try {
 
         const documentos = [];
@@ -940,6 +1073,8 @@ async function rechazarOverhaulDesdeEvaluacion() {
                 );
 
             documentos.push(docSubido);
+            if (!docSubido?.url) throw new Error("El documento no obtuvo una URL válida.");
+            urlsSubidasEnEsteIntento.push(docSubido.url);
         }
 
         ot.decisionEvaluacion = {
@@ -957,21 +1092,40 @@ async function rechazarOverhaulDesdeEvaluacion() {
         ot.evaluacionAprobada = true;
         ot.overhaulRequerido = false;
 
+        // Se saltan Mantención y Pruebas
+        ot.overhaulAprobado = true;
+        ot.pruebasAprobado = true;
+
+        // Preparar Despacho si todavía no existe
+        if (!ot.despacho) {
+            ot.despacho = {
+                preparacion: [],
+                final: []
+            };
+        }
+
         ot.estado =
             obtenerEstadoOT(ot);
 
-        await guardarCambiosOT();
+        const guardado = await guardarCambiosOT();
+        if (!guardado) throw new Error("No fue posible confirmar el rechazo en la OT.");
 
         renderComentarioDecisionEvaluacion();
 
-        habilitarTab("pruebas");
-        cambiarTab("pruebas");
+        const siguiente = navegarSiguienteEtapa("pruebas");
 
         alert(
-            "Mantención rechazada. Se habilita etapa PRUEBAS ✅"
+            siguiente === "despacho"
+                ? "Mantención rechazada. La OT pasa a Despacho ✅"
+                : "Mantención rechazada. La OT quedó lista para cierre ✅"
         );
 
     } catch (error) {
+
+        await Promise.allSettled(
+            urlsSubidasEnEsteIntento.map(url => eliminarArchivoStorage(url))
+        );
+        Object.assign(ot, estadoAnterior);
 
         console.error(
             "Error rechazando Mantención:",
@@ -981,6 +1135,9 @@ async function rechazarOverhaulDesdeEvaluacion() {
         alert(
             "Error al guardar decisión de evaluación"
         );
+    } finally {
+        decisionEvaluacionEnCurso = false;
+        botonesDecision.forEach(boton => { boton.disabled = false; });
     }
 }
 
@@ -1080,6 +1237,114 @@ function renderDocsDecisionEvaluacionPreview() {
 }
 
 
+// ==========================================
+// ABRIR DOCUMENTO DECISIÓN EVALUACIÓN
+// ==========================================
+function abrirDocumentoDecisionEvaluacion(index) {
+
+    const ot = getOT();
+
+    if (!ot) return;
+
+    const documento =
+        ot.decisionEvaluacion?.documentos?.[index];
+
+    if (!documento) return;
+
+    abrirDocumento({
+        nombre: documento.nombre,
+        tipo: documento.tipo,
+        url: documento.url
+    });
+}
+
+
+
+// ==========================================
+// ABRIR ARCHIVO TEMPORAL
+// ==========================================
+function abrirArchivoTemporal(url) {
+
+    const modal =
+        document.getElementById("modalDoc");
+
+    const visor =
+        document.getElementById("visorDoc");
+
+    if (!modal || !visor) return;
+
+    visor.src = url;
+    modal.style.display = "block";
+}
+
+
+
+// ==========================================
+// RENDER DECISIÓN EVALUACIÓN
+// ==========================================
+function renderComentarioDecisionEvaluacion() {
+
+    const ot = getOT();
+
+    const cont =
+        document.getElementById(
+            "comentarioDecisionEvaluacionGuardado"
+        );
+
+    if (!cont) return;
+
+    const decision =
+        ot?.decisionEvaluacion;
+
+    if (!decision) {
+
+        cont.innerHTML = "";
+
+        return;
+    }
+
+    const documentos =
+        decision.documentos || [];
+
+    cont.innerHTML = `
+        <div class="decision-evaluacion-guardada">
+
+            <div>
+                <strong>Resultado:</strong>
+                ${decision.resultado || "-"}
+            </div>
+
+            <div>
+                <strong>Usuario:</strong>
+                ${decision.usuario || "-"}
+            </div>
+
+            <div>
+                <strong>Fecha:</strong>
+                ${decision.fecha || "-"}
+            </div>
+
+            <div>
+                <strong>Comentario:</strong>
+                ${decision.comentario || "-"}
+            </div>
+
+            ${
+                documentos.length
+                    ? `
+                        <div>
+                            <strong>Documentos:</strong>
+                            ${documentos.length}
+                        </div>
+                    `
+                    : ""
+            }
+
+        </div>
+    `;
+
+    renderDocsDecisionEvaluacionPreview();
+}
 
 
 // ==========================================
@@ -1115,5 +1380,84 @@ function escaparHTML(valor) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
+
+}
+
+
+// ==========================================
+// CONTINUAR SIN APROBACIÓN DEL JEFE
+// ==========================================
+async function continuarEvaluacionSinAprobacion() {
+
+    if (decisionEvaluacionEnCurso) return;
+
+    if (OTBloqueada()) return;
+
+    if (aprobacionesHabilitadas()) {
+        alert("Esta empresa requiere aprobación del Jefe de Taller");
+        return;
+    }
+
+    if (!validarEvaluacionCompleta()) return;
+
+    const ot = getOT();
+    const usuario = getUsuario();
+
+    if (!ot) return;
+
+    decisionEvaluacionEnCurso = true;
+    const botones = Array.from(document.querySelectorAll(
+        '[onclick*="continuarEvaluacionSinAprobacion"]'
+    ));
+    botones.forEach(boton => { boton.disabled = true; });
+    const estadoAnterior = {
+        decisionEvaluacion: ot.decisionEvaluacion,
+        evaluacionAprobada: ot.evaluacionAprobada,
+        overhaulRequerido: ot.overhaulRequerido,
+        estado: ot.estado,
+        bitacora: Array.isArray(ot.bitacora) ? [...ot.bitacora] : null
+    };
+
+    try {
+        ot.decisionEvaluacion = {
+            resultado: "NO REQUERIDA",
+            comentario: "La empresa tiene deshabilitado el módulo Aprobaciones.",
+            documentos: [],
+            usuario: usuario?.nombre || "Usuario",
+            rol: usuario?.rol || "usuario_taller",
+            fecha: new Date().toLocaleString()
+        };
+
+        ot.evaluacionAprobada = true;
+        ot.overhaulRequerido = true;
+        ot.estado = obtenerEstadoOT(ot);
+
+        agregarBitacora(
+            "Evaluación completada sin aprobación",
+            "El módulo Aprobaciones está deshabilitado. La OT continúa a Mantención."
+        );
+
+        const guardado = await guardarCambiosOT();
+        if (!guardado) throw new Error("No fue posible guardar el checklist en la OT.");
+
+        renderComentarioDecisionEvaluacion();
+        navegarSiguienteEtapa("evaluacion");
+
+        alert("Evaluación completada. Se habilita Mantención ✅");
+
+      } catch (error) {
+        ot.decisionEvaluacion = estadoAnterior.decisionEvaluacion;
+        ot.evaluacionAprobada = estadoAnterior.evaluacionAprobada;
+        ot.overhaulRequerido = estadoAnterior.overhaulRequerido;
+        ot.estado = estadoAnterior.estado;
+        if (estadoAnterior.bitacora) ot.bitacora = estadoAnterior.bitacora;
+        else delete ot.bitacora;
+        console.error("Error continuando Evaluación sin aprobación:", error);
+        alert("No fue posible continuar a Mantención");
+    } finally {
+        decisionEvaluacionEnCurso = false;
+        botones.forEach(boton => { boton.disabled = false; });
+    }
+}
 
 }

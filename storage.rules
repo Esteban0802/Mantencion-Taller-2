@@ -1,0 +1,174 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function profile() {
+      return firestore.get(
+        /databases/(default)/documents/usuarios/$(request.auth.uid)
+      ).data;
+    }
+
+    function activeUser() {
+      return signedIn() && profile().activo == true;
+    }
+
+    function companyOperational(empresaId) {
+      let empresa = firestore.get(
+        /databases/(default)/documents/empresas/$(empresaId)
+      ).data;
+      return empresa.activa != false;
+    }
+
+    function isSuperAdmin() {
+      return activeUser() && profile().rol == 'super_admin';
+    }
+
+    function ot(otId) {
+      return firestore.get(
+        /databases/(default)/documents/ots/$(otId)
+      ).data;
+    }
+
+    function canAccessOT(otId) {
+      return activeUser() && (
+        isSuperAdmin() ||
+        (
+          profile().empresaId == ot(otId).empresaId && (
+            profile().rol == 'admin_empresa' ||
+            (
+              profile().sucursalId is string &&
+              profile().sucursalId != '' &&
+              profile().sucursalId == ot(otId).sucursalId
+            )
+          )
+        )
+      );
+    }
+
+    function canManageCompanyBranding(empresaId) {
+      return activeUser() && (
+        isSuperAdmin() ||
+        (
+          profile().rol == 'admin_empresa' &&
+          profile().empresaId == empresaId
+        )
+      );
+    }
+
+    function canReadCompanyBranding(empresaId) {
+      return activeUser() && (
+        isSuperAdmin() || profile().empresaId == empresaId
+      );
+    }
+
+    function canReadSheq(empresaId) {
+      return activeUser() && (
+        isSuperAdmin() ||
+        (profile().empresaId == empresaId && profile().rol in ['admin_empresa', 'admin_sucursal', 'jefe_taller', 'planificador', 'sheq'])
+      );
+    }
+
+    function canManageSheq(empresaId) {
+      return activeUser() && (
+        isSuperAdmin() ||
+        (profile().empresaId == empresaId && profile().rol in ['admin_empresa', 'admin_sucursal', 'sheq'])
+      );
+    }
+
+    function canReadInventory(empresaId, sucursalId) {
+      return activeUser() && (
+        isSuperAdmin() ||
+        (profile().empresaId == empresaId && (
+          profile().rol == 'admin_empresa' ||
+          (profile().sucursalId == sucursalId && profile().rol in ['admin_sucursal', 'jefe_taller', 'usuario_taller', 'planificador', 'bodeguero'])
+        ))
+      );
+    }
+
+    function canManageInventory(empresaId, sucursalId) {
+      return activeUser() && (
+        isSuperAdmin() ||
+        (profile().empresaId == empresaId && (
+          profile().rol == 'admin_empresa' ||
+          (profile().sucursalId == sucursalId && profile().rol in ['admin_sucursal', 'jefe_taller', 'planificador', 'bodeguero'])
+        ))
+      );
+    }
+
+    function validBrandImage() {
+      return request.resource != null &&
+        request.resource.size < 5 * 1024 * 1024 &&
+        request.resource.contentType.matches('image/(png|jpeg|webp)');
+    }
+
+    function validUpload() {
+      return request.resource != null &&
+        request.resource.size < 20 * 1024 * 1024 &&
+        request.resource.contentType != null && (
+          request.resource.contentType.matches('image/(png|jpeg|webp|heic|heif)') ||
+          request.resource.contentType == 'application/pdf' ||
+          request.resource.contentType == 'application/vnd.ms-excel' ||
+          request.resource.contentType == 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+          request.resource.contentType == 'application/msword' ||
+          request.resource.contentType == 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+          request.resource.contentType == 'text/csv' ||
+          request.resource.contentType == 'text/plain'
+        );
+    }
+
+    match /ots/{otId}/{allPaths=**} {
+      allow read: if canAccessOT(otId);
+
+      allow create, update: if canAccessOT(otId) &&
+        (isSuperAdmin() || companyOperational(ot(otId).empresaId)) &&
+        ot(otId).cerrada != true &&
+        validUpload();
+
+      allow delete: if canAccessOT(otId) &&
+        (isSuperAdmin() || companyOperational(ot(otId).empresaId)) &&
+        ot(otId).cerrada != true;
+    }
+
+    match /empresas/{empresaId}/informe/{fileName} {
+      allow read: if canReadCompanyBranding(empresaId);
+      allow create, update: if canManageCompanyBranding(empresaId) &&
+        (isSuperAdmin() || companyOperational(empresaId)) &&
+        validBrandImage();
+      allow delete: if canManageCompanyBranding(empresaId) &&
+        (isSuperAdmin() || companyOperational(empresaId));
+    }
+
+    match /empresas/{empresaId}/plantillas/{allPaths=**} {
+      allow read: if canReadCompanyBranding(empresaId);
+      allow create, update: if canManageCompanyBranding(empresaId) &&
+        (isSuperAdmin() || companyOperational(empresaId)) && validUpload();
+      allow delete: if canManageCompanyBranding(empresaId) &&
+        (isSuperAdmin() || companyOperational(empresaId));
+    }
+
+    match /empresas/{empresaId}/sheq/{allPaths=**} {
+      allow read: if canReadSheq(empresaId);
+      allow create, update: if canManageSheq(empresaId) &&
+        (isSuperAdmin() || companyOperational(empresaId)) && validUpload();
+      allow delete: if canManageSheq(empresaId) &&
+        (isSuperAdmin() || companyOperational(empresaId));
+    }
+
+    match /empresas/{empresaId}/inventario/{sucursalId}/{allPaths=**} {
+      allow read: if canReadInventory(empresaId, sucursalId);
+      allow create, update: if canManageInventory(empresaId, sucursalId) &&
+        (isSuperAdmin() || companyOperational(empresaId)) && validUpload();
+      allow delete: if canManageInventory(empresaId, sucursalId) &&
+        (isSuperAdmin() || companyOperational(empresaId));
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -1,4 +1,4 @@
-import { protegerPagina, cerrarSesion } from "./session.js";
+import { protegerPagina, cerrarSesion } from "./session.js?v=20261004-2";
 
 import {
   obtenerModulosEmpresa,
@@ -23,12 +23,16 @@ const usuario = protegerPagina([
   "admin_empresa",
   "admin_sucursal",
   "jefe_taller",
-  "usuario_taller"
+  "usuario_taller",
+  "supervisor",
+  "tecnico",
+  "planificador"
 ]);
 
 if (!usuario) throw new Error("Acceso no autorizado");
 
 import { db } from "./firebase-config.js";
+import { asegurarResumenesOT } from "./modulos/core/resumenOT.js";
 
 import {
   collection,
@@ -46,6 +50,36 @@ let empresaActualDashboard = null;
 let modulosDashboard = {};
 let cancelarEscuchaOTs = null;
 
+const ETAPAS_DASHBOARD = [
+  { key: "INGRESO", modulo: "ingreso", label: "INGRESO", estadoId: "estadoIngreso", color: "#6c757d" },
+  { key: "EVALUACION", modulo: "evaluacion", label: "EVALUACIÓN", estadoId: "estadoEvaluacion", color: "#f39c12" },
+  { key: "OVERHAUL", modulo: "mantencion", label: "MANTENCIÓN", estadoId: "estadoOverhaul", color: "#007bff" },
+  { key: "PRUEBAS", modulo: "pruebas", label: "PRUEBAS", estadoId: "estadoPruebas", color: "#8e44ad" },
+  { key: "DESPACHO", modulo: "despacho", label: "DESPACHO", estadoId: "estadoDespacho", color: "#16a085" }
+];
+
+function notificarDashboard(mensaje, titulo = "Atención", tipo = "advertencia") {
+  if (window.OverTrackUI?.mostrarMensaje) {
+    return window.OverTrackUI.mostrarMensaje({ titulo, mensaje, tipo });
+  }
+
+  window.alert(mensaje);
+  return Promise.resolve(true);
+}
+
+function etapaDashboardActiva(nombreModulo) {
+  return modulosDashboard[nombreModulo] !== false;
+}
+
+function obtenerEtapasDashboardActivas() {
+  return ETAPAS_DASHBOARD.filter(etapa => etapaDashboardActiva(etapa.modulo));
+}
+
+function obtenerNombreEstado(estado) {
+  if (estado === "CERRADA") return "CERRADA";
+  return ETAPAS_DASHBOARD.find(etapa => etapa.key === estado)?.label || estado;
+}
+
 // =======================
 // ESTADO AUTOMÁTICO
 // =======================
@@ -57,35 +91,41 @@ function obtenerEstadoOT(ot) {
     return "CERRADA";
   }
 
-  if (!ot.ingresoAprobado) return "INGRESO";
+  if (etapaDashboardActiva("ingreso") && !ot.ingresoAprobado) return "INGRESO";
 
-  if (!ot.evaluacionAprobada) return "EVALUACION";
+  if (etapaDashboardActiva("evaluacion") && !ot.evaluacionAprobada) return "EVALUACION";
 
-  if (ot.overhaulRequerido === false) return "DESPACHO";
+  if (etapaDashboardActiva("evaluacion") && ot.overhaulRequerido === false) {
+    return etapaDashboardActiva("despacho") ? "DESPACHO" : "EVALUACION";
+  }
 
-  if (ot.overhaulRequerido === true && !ot.overhaulAprobado) {
+  if (etapaDashboardActiva("mantencion") && !ot.overhaulAprobado) {
     return "OVERHAUL";
   }
 
-  if (!ot.pruebasAprobado) return "PRUEBAS";
+  if (etapaDashboardActiva("pruebas") && !ot.pruebasAprobado) return "PRUEBAS";
 
-  return "DESPACHO";
+  if (etapaDashboardActiva("despacho")) return "DESPACHO";
+
+  return obtenerEtapasDashboardActivas().at(-1)?.key || "INGRESO";
 }
 
 // =======================
 // PROGRESO AUTOMÁTICO
 // =======================
 function calcularProgreso(ot) {
-  const estado = obtenerEstadoOT(ot);
+  if (ot?.cerrada === true || ot?.estado === "CERRADA") return 100;
 
-  switch (estado) {
-    case "EVALUACION": return 25;
-    case "OVERHAUL": return 50;
-    case "PRUEBAS": return 75;
-    case "DESPACHO": return 90;
-    case "CERRADA": return 100;
-    default: return 10;
-  }
+  const etapasActivas = obtenerEtapasDashboardActivas();
+  if (etapasActivas.length === 0) return 0;
+
+  const progresoEtapas = calcularProgresoEtapasOT(ot);
+  const total = etapasActivas.reduce(
+    (suma, etapa) => suma + (progresoEtapas[etapa.key] || 0),
+    0
+  );
+
+  return Math.round(total / etapasActivas.length);
 }
 
 // =======================
@@ -142,37 +182,50 @@ async function cargarConfiguracionEmpresaDashboard() {
       return false;
     }
 
-    /*
-     * El Super Admin no debería trabajar normalmente
-     * desde el dashboard operacional.
-     * Le damos una configuración completa para evitar
-     * romper pruebas antiguas.
-     */
     if (usuario.rol === "super_admin") {
+      const empresaIdOperacion =
+        sessionStorage.getItem("empresaIdOperacionAdmin");
+
+      if (!empresaIdOperacion) {
+        await notificarDashboard("No se encontró la empresa seleccionada.", "Empresa no disponible", "error");
+        window.location.replace("super-admin.html");
+        return false;
+      }
+
+      const empresaRef = doc(
+        db,
+        "empresas",
+        empresaIdOperacion
+      );
+
+      const empresaSnap = await getDoc(empresaRef);
+
+      if (!empresaSnap.exists()) {
+        sessionStorage.removeItem("empresaIdOperacionAdmin");
+        await notificarDashboard("La empresa seleccionada ya no existe.", "Empresa no disponible", "error");
+        window.location.replace("super-admin.html");
+        return false;
+      }
+
       empresaActualDashboard = {
-        id: "",
-        nombre: "OverTrack",
-        modulos: {
-          dashboard: true,
-          ordenesServicio: true,
-          gantt: true,
-          despacho: true,
-          reportesPDF: true,
-          aprobaciones: true,
-          checklists: true,
-          evidencias: true,
-          comentarios: true
-        }
+        id: empresaSnap.id,
+        ...empresaSnap.data()
       };
 
       modulosDashboard =
         obtenerModulosEmpresa(empresaActualDashboard);
 
+      window.empresaActualDashboard =
+        empresaActualDashboard;
+
+      window.modulosDashboard =
+        modulosDashboard;
+
       return true;
     }
 
     if (!usuario.empresaId) {
-      alert("El usuario no tiene una empresa asignada.");
+      await notificarDashboard("El usuario no tiene una empresa asignada.", "Acceso incompleto", "error");
       cerrarSesion();
       return false;
     }
@@ -186,7 +239,7 @@ async function cargarConfiguracionEmpresaDashboard() {
     const empresaSnap = await getDoc(empresaRef);
 
     if (!empresaSnap.exists()) {
-      alert("No se encontró la empresa asociada al usuario.");
+      await notificarDashboard("No se encontró la empresa asociada al usuario.", "Empresa no disponible", "error");
       cerrarSesion();
       return false;
     }
@@ -213,8 +266,10 @@ async function cargarConfiguracionEmpresaDashboard() {
       error
     );
 
-    alert(
-      "No fue posible cargar la configuración de la empresa."
+    await notificarDashboard(
+      "No fue posible cargar la configuración de la empresa.",
+      "Error de carga",
+      "error"
     );
 
     return false;
@@ -235,6 +290,12 @@ function mostrarElemento(id, mostrar, displayVisible = "") {
 
 function aplicarModulosDashboard() {
   if (!empresaActualDashboard) return;
+
+  document.querySelectorAll("[data-etapa-dashboard]").forEach(elemento => {
+    elemento.style.display = etapaDashboardActiva(elemento.dataset.etapaDashboard)
+      ? ""
+      : "none";
+  });
 
   const tieneDashboard =
     puedeVerDashboard(
@@ -295,7 +356,7 @@ function aplicarModulosDashboard() {
 
   mostrarElemento(
     "panelGraficos",
-    tieneReportes,
+    tieneDashboard && tieneOrdenes,
     "grid"
   );
 
@@ -323,6 +384,10 @@ function configurarNavegacionPorPermisos() {
     document.getElementById(
       "menuDashboardOperacional"
     );
+  const menuOrdenes = document.getElementById("menuOrdenes");
+  const menuInventario = document.getElementById("menuInventario");
+  const menuProgramacion = document.getElementById("menuProgramacion");
+  const menuSheq = document.getElementById("menuSheq");
 
   if (btnPanelEmpresa) {
     btnPanelEmpresa.style.display =
@@ -353,6 +418,29 @@ function configurarNavegacionPorPermisos() {
         ? ""
         : "none";
   }
+
+  if (menuOrdenes) {
+    menuOrdenes.style.display = puedeVerOrdenesServicio(usuario, empresaActualDashboard)
+      ? ""
+      : "none";
+  }
+
+  if (menuInventario) {
+    menuInventario.style.display = moduloActivo(empresaActualDashboard, "inventario")
+      ? ""
+      : "none";
+  }
+
+  if (menuProgramacion) {
+    menuProgramacion.style.display = moduloActivo(empresaActualDashboard, "programacion")
+      ? ""
+      : "none";
+  }
+  if (menuSheq) {
+    menuSheq.style.display = moduloActivo(empresaActualDashboard, "sheq") && ["super_admin", "admin_empresa", "admin_sucursal", "jefe_taller", "planificador", "sheq"].includes(usuario.rol)
+      ? ""
+      : "none";
+  }
 }
 
 
@@ -377,7 +465,7 @@ function renderizarDashboardOperacional(lista = listaOTs) {
     moduloActivo(empresaActualDashboard, "reportesPDF");
 
   if (tieneOrdenes) {
-    renderTabla(lista);
+    renderTabla(obtenerOTsRecientes(lista));
   }
 
   if (tieneDashboard && tieneOrdenes) {
@@ -386,7 +474,7 @@ function renderizarDashboardOperacional(lista = listaOTs) {
     renderAlertasDashboard(lista);
   }
 
-  if (tieneOrdenes && tieneReportes) {
+  if (tieneDashboard && tieneOrdenes) {
     renderGraficos(lista);
   } else {
     destruirGraficosDashboard();
@@ -398,6 +486,43 @@ function renderizarDashboardOperacional(lista = listaOTs) {
 
   if (tieneOrdenes && tieneGantt) {
     renderGanttTaller(lista);
+  }
+
+  actualizarEstadoCargaDashboard(false);
+}
+
+function actualizarEstadoCargaDashboard(cargando, error = false) {
+  const panelKPIs = document.getElementById("panelKPIs");
+  const cardsOT = document.getElementById("cardsOT");
+  const estadoTaller = document.getElementById("estadoTallerLista");
+
+  [panelKPIs, cardsOT, estadoTaller].forEach(elemento => {
+    if (!elemento) return;
+    elemento.setAttribute("aria-busy", cargando ? "true" : "false");
+  });
+
+  if (!error) return;
+
+  ["kpiTotal", "kpiProceso", "kpiAtrasadas", "kpiCerradas"].forEach(id => {
+    const elemento = document.getElementById(id);
+    if (elemento) {
+      elemento.textContent = "—";
+      elemento.setAttribute("aria-label", "Información no disponible");
+    }
+  });
+
+  ETAPAS_DASHBOARD.forEach(etapa => {
+    const elemento = document.getElementById(etapa.estadoId);
+    if (elemento) elemento.textContent = "—";
+  });
+
+  if (cardsOT) {
+    cardsOT.innerHTML = '<p class="sin-alertas estado-error-dashboard">No fue posible cargar las órdenes. Intenta actualizar la página.</p>';
+  }
+
+  const alertas = document.getElementById("alertasDashboard");
+  if (alertas) {
+    alertas.innerHTML = '<p class="sin-alertas estado-error-dashboard">No fue posible cargar las alertas.</p>';
   }
 }
 
@@ -436,7 +561,7 @@ function mostrarDashboardSinOrdenes() {
 
 
 
-function escucharOTsTiempoReal() {
+async function escucharOTsTiempoReal() {
   const usuarioActivo = JSON.parse(localStorage.getItem("usuarioActivo"));
 
   if (!usuarioActivo) {
@@ -445,30 +570,55 @@ function escucharOTsTiempoReal() {
   }
 
   if (!usuarioActivo.empresaId && usuarioActivo.rol !== "super_admin") {
-    alert("Usuario sin empresa asignada.");
-    window.location.replace("index.html");
+    notificarDashboard("Usuario sin empresa asignada.", "Acceso incompleto", "error")
+      .then(() => window.location.replace("index.html"));
     return;
   }
 
-  let q;
+  let restricciones = [];
 
   if (usuarioActivo.rol === "super_admin") {
-    q = query(
-      collection(db, "ots"),
-      orderBy("fechaCreacion", "desc")
-    );
+    if (!empresaActualDashboard?.id) {
+      notificarDashboard("No se encontró la empresa seleccionada.", "Empresa no disponible", "error");
+      return;
+    }
 
-    console.log("Dashboard GLOBAL super_admin");
+    restricciones = [where("empresaId", "==", empresaActualDashboard.id)];
+
+    console.log(
+      "Dashboard empresa (super_admin):",
+      empresaActualDashboard.id
+    );
 
   } else {
-    q = query(
-      collection(db, "ots"),
-      where("empresaId", "==", usuarioActivo.empresaId),
-      orderBy("fechaCreacion", "desc")
-    );
+    restricciones = [
+      where("empresaId", "==", usuarioActivo.empresaId)
+    ];
+
+    if (usuarioActivo.rol !== "admin_empresa") {
+      if (!usuarioActivo.sucursalId) {
+        notificarDashboard("Tu usuario no tiene una sucursal asignada.", "Sucursal requerida", "error");
+        return;
+      }
+      restricciones.push(where("sucursalId", "==", usuarioActivo.sucursalId));
+    }
 
     console.log("Dashboard empresa:", usuarioActivo.empresaId);
   }
+
+  let coleccionListado = "otsResumen";
+  try {
+    await asegurarResumenesOT(restricciones);
+  } catch (error) {
+    console.warn("No fue posible preparar los resúmenes de OT; se usará la colección completa.", error);
+    coleccionListado = "ots";
+  }
+
+  const q = query(
+    collection(db, coleccionListado),
+    ...restricciones,
+    orderBy("fechaCreacion", "desc")
+  );
 
   onSnapshot(q, (snapshot) => {
     listaOTs = snapshot.docs.map(docSnap => ({
@@ -482,7 +632,7 @@ function escucharOTsTiempoReal() {
 
   }, (error) => {
     console.error("Error escuchando OTs:", error);
-    alert("Error al cargar OTs desde Firebase");
+    actualizarEstadoCargaDashboard(false, true);
   });
 }
 
@@ -492,6 +642,8 @@ function escucharOTsTiempoReal() {
 function estaOTAtrasada(o) {
 
   if (!o) return false;
+
+  if (!etapaDashboardActiva("gantt")) return false;
 
   if (o.cerrada === true || o.estado === "CERRADA") {
     return false;
@@ -535,13 +687,15 @@ function renderTabla(lista = listaOTs) {
 
   cont.innerHTML = "";
 
+  if (lista.length === 0) {
+    cont.innerHTML = '<p class="sin-alertas">No hay órdenes activas recientes.</p>';
+    return;
+  }
+
   lista.forEach((o) => {
 
     const estado = obtenerEstadoOT(o);
-    const estadoVisible =
-      estado === "OVERHAUL"
-        ? "MANTENCIÓN"
-        : estado;
+    const estadoVisible = obtenerNombreEstado(estado);
     const progreso = calcularProgreso(o);
     
 
@@ -627,8 +781,9 @@ function renderTabla(lista = listaOTs) {
       <div class="ot-card-actions">
 
         <button
+          type="button"
           class="btn-card-open"
-          onclick="abrirOT(${listaOTs.indexOf(o)})"
+          data-ot-index="${listaOTs.indexOf(o)}"
         >
           Abrir OT
         </button>
@@ -637,6 +792,10 @@ function renderTabla(lista = listaOTs) {
     `;
 
     cont.appendChild(card);
+
+    card.querySelector(".btn-card-open")?.addEventListener("click", () => {
+      abrirOT(listaOTs.indexOf(o));
+    });
   });
 }
 
@@ -650,22 +809,38 @@ function calcularPorcentajeLista(lista = []) {
   return Math.round((completados / lista.length) * 100);
 }
 
+function obtenerListaPruebas(ot) {
+  if (Array.isArray(ot?.pruebas?.general)) return ot.pruebas.general;
+  return [
+    ...(Array.isArray(ot?.pruebas?.mecanico) ? ot.pruebas.mecanico : []),
+    ...(Array.isArray(ot?.pruebas?.electrico) ? ot.pruebas.electrico : [])
+  ];
+}
+
 function calcularProgresoEtapasOT(ot) {
-  const ingreso = calcularPorcentajeLista(ot.ingreso || []);
-  const evaluacion = calcularPorcentajeLista(ot.evaluacion || []);
-  const mantencion = calcularPorcentajeLista(ot.overhaul || []);
+  if (ot?.cerrada === true || ot?.estado === "CERRADA") {
+    return {
+      INGRESO: 100,
+      EVALUACION: 100,
+      OVERHAUL: 100,
+      PRUEBAS: 100,
+      DESPACHO: 100
+    };
+  }
 
-  const pruebasMecanicas = calcularPorcentajeLista(ot.pruebas?.mecanico || []);
-  const pruebasElectricas = calcularPorcentajeLista(ot.pruebas?.electrico || []);
+  const ingreso = ot.ingresoAprobado
+    ? 100
+    : calcularPorcentajeLista(ot.ingreso || []);
+  const evaluacion = ot.evaluacionAprobada
+    ? 100
+    : calcularPorcentajeLista(ot.evaluacion || []);
+  const mantencion = ot.overhaulAprobado
+    ? 100
+    : calcularPorcentajeLista(ot.overhaul || []);
 
-  const pruebasListas = [
-    pruebasMecanicas,
-    pruebasElectricas
-  ].filter(p => p > 0);
-
-  const pruebas = pruebasListas.length
-    ? Math.round(pruebasListas.reduce((a, b) => a + b, 0) / pruebasListas.length)
-    : 0;
+  const pruebas = ot.pruebasAprobado
+    ? 100
+    : calcularPorcentajeLista(obtenerListaPruebas(ot));
 
   const despachoPreparacion = calcularPorcentajeLista(ot.despacho?.preparacion || []);
   const despachoFinal = calcularPorcentajeLista(ot.despacho?.final || []);
@@ -691,13 +866,7 @@ function calcularProgresoEtapasOT(ot) {
 
 
 function renderMiniGantt(ot) {
-  const etapas = [
-    { key: "INGRESO", label: "INGRESO" },
-    { key: "EVALUACION", label: "EVALUACIÓN" },
-    { key: "OVERHAUL", label: "MANTENCIÓN" },
-    { key: "PRUEBAS", label: "PRUEBAS" },
-    { key: "DESPACHO", label: "DESPACHO" }
-  ];
+  const etapas = obtenerEtapasDashboardActivas();
 
   const progresoEtapas = calcularProgresoEtapasOT(ot);
 
@@ -730,6 +899,24 @@ function renderMiniGantt(ot) {
 function renderBadgesOT(o, estado, atrasada, diasAtraso) {
 
   const badges = [];
+  const revisionPendiente = obtenerEtapaListaParaRevision(o);
+  const requiereCorreccion = Boolean(o.alertaJefe && obtenerResumenObservacionesJefe(o));
+
+  if (revisionPendiente) {
+    badges.push(`
+      <span class="ot-badge badge-azul">
+        ${esAutoridadSucursal() ? "✓ Revisar" : "◷ En revisión"}: ${revisionPendiente}
+      </span>
+    `);
+  }
+
+  if (requiereCorreccion && esTecnicoTaller()) {
+    badges.push(`
+      <span class="ot-badge badge-amarillo">
+        ⚠ Requiere corrección
+      </span>
+    `);
+  }
 
   if (atrasada) {
     badges.push(`
@@ -763,8 +950,10 @@ function renderBadgesOT(o, estado, atrasada, diasAtraso) {
     `);
   }
 
-  if (o.alertaJefe) {
-    const resumenObs = obtenerResumenObservacionesJefe(o)
+  const resumenObservaciones = obtenerResumenObservacionesJefe(o);
+
+  if (o.alertaJefe && resumenObservaciones) {
+    const resumenObs = resumenObservaciones
       .replace(/`/g, "'")
       .replace(/"/g, "&quot;");
 
@@ -791,34 +980,36 @@ function obtenerResumenObservacionesJefe(ot) {
 
     lista.forEach(item => {
       (item.comentarios || []).forEach(c => {
-        if (c.rol === "jefe_taller" && c.atendido !== true) {
+        if (["jefe_taller", "admin_sucursal"].includes(c.rol) && c.atendido !== true) {
           observaciones.push(`${etapa}: ${c.texto}`);
         }
       });
     });
   };
 
-  revisarItems("Ingreso", ot.ingreso);
-  revisarItems("Evaluación", ot.evaluacion);
-  revisarItems("Mantención", ot.overhaul);
-  revisarItems("Pruebas Mecánicas", ot.pruebas?.mecanico);
-  revisarItems("Pruebas Eléctricas", ot.pruebas?.electrico);
+  if (etapaDashboardActiva("ingreso")) revisarItems("Ingreso", ot.ingreso);
+  if (etapaDashboardActiva("evaluacion")) revisarItems("Evaluación", ot.evaluacion);
+  if (etapaDashboardActiva("mantencion")) revisarItems("Mantención", ot.overhaul);
 
-  (ot.despacho?.comentariosPreparacion || []).forEach(c => {
-    if (c.rol === "jefe_taller" && c.atendido !== true) {
-      observaciones.push(`Despacho Preparación: ${c.texto}`);
-    }
-  });
+  if (etapaDashboardActiva("pruebas")) {
+    revisarItems("Pruebas", obtenerListaPruebas(ot));
+  }
 
-  (ot.despacho?.comentariosFinal || []).forEach(c => {
-    if (c.rol === "jefe_taller" && c.atendido !== true) {
-      observaciones.push(`Despacho Final: ${c.texto}`);
-    }
-  });
+  if (etapaDashboardActiva("despacho")) {
+    (ot.despacho?.comentariosPreparacion || []).forEach(c => {
+      if (["jefe_taller", "admin_sucursal"].includes(c.rol) && c.atendido !== true) {
+        observaciones.push(`Despacho Preparación: ${c.texto}`);
+      }
+    });
 
-  return observaciones.length
-    ? observaciones.join(" | ")
-    : "Sin detalle de observación";
+    (ot.despacho?.comentariosFinal || []).forEach(c => {
+      if (["jefe_taller", "admin_sucursal"].includes(c.rol) && c.atendido !== true) {
+        observaciones.push(`Despacho Final: ${c.texto}`);
+      }
+    });
+  }
+
+  return observaciones.join(" | ");
 }
 
 
@@ -891,6 +1082,7 @@ function animarNumero(id, valorFinal) {
     );
 
     el.textContent = valor;
+    el.setAttribute("aria-label", String(valor));
 
     if (progreso < 1) {
       requestAnimationFrame(actualizar);
@@ -927,14 +1119,8 @@ function calcularKPIs(lista = listaOTs) {
 }
 
 function renderEstadoTaller(lista = listaOTs) {
-
-  const estados = {
-    INGRESO: 0,
-    EVALUACION: 0,
-    OVERHAUL: 0,
-    PRUEBAS: 0,
-    DESPACHO: 0
-  };
+  const etapasActivas = obtenerEtapasDashboardActivas();
+  const estados = Object.fromEntries(etapasActivas.map(etapa => [etapa.key, 0]));
 
   lista.forEach(ot => {
     const estado = obtenerEstadoOT(ot);
@@ -944,22 +1130,35 @@ function renderEstadoTaller(lista = listaOTs) {
     }
   });
 
-  const ingreso = document.getElementById("estadoIngreso");
-  const evaluacion = document.getElementById("estadoEvaluacion");
-  const overhaul = document.getElementById("estadoOverhaul");
-  const pruebas = document.getElementById("estadoPruebas");
-  const despacho = document.getElementById("estadoDespacho");
+  etapasActivas.forEach(etapa => {
+    const contador = document.getElementById(etapa.estadoId);
+    if (contador) contador.textContent = estados[etapa.key] || 0;
+  });
+}
 
-  if (ingreso) ingreso.textContent = estados.INGRESO;
-  if (evaluacion) evaluacion.textContent = estados.EVALUACION;
-  if (overhaul) overhaul.textContent = estados.OVERHAUL;
-  if (pruebas) pruebas.textContent = estados.PRUEBAS;
-  if (despacho) despacho.textContent = estados.DESPACHO;
+function obtenerOTsRecientes(lista = []) {
+  return lista
+    .filter(ot => obtenerEstadoOT(ot) !== "CERRADA")
+    .sort((a, b) => obtenerMarcaTiempoOT(b) - obtenerMarcaTiempoOT(a))
+    .slice(0, 6);
+}
+
+function obtenerMarcaTiempoOT(ot) {
+  const valor = ot?.fechaActualizacion || ot?.actualizadoEn || ot?.fechaCreacion;
+  if (valor?.toMillis) return valor.toMillis();
+  if (valor?.toDate) return valor.toDate().getTime();
+
+  const fecha = valor ? new Date(valor) : null;
+  return fecha && !Number.isNaN(fecha.getTime()) ? fecha.getTime() : 0;
 }
 
 
 
 function esperaRepuestosActiva(ot) {
+  if (!etapaDashboardActiva("repuestos") || !etapaDashboardActiva("gantt")) {
+    return false;
+  }
+
   if (!ot?.gantt) return false;
 
   const dias = Number(ot.gantt.diasRepuestos || 0);
@@ -980,50 +1179,80 @@ function esperaRepuestosActiva(ot) {
 
 
 function renderAlertasDashboard(lista = listaOTs) {
-
   const cont = document.getElementById("alertasDashboard");
   if (!cont) return;
 
   cont.innerHTML = "";
 
+  if (lista.length === 0) {
+    cont.innerHTML = '<p class="sin-alertas">Sin alertas activas.</p>';
+    return;
+  }
   const alertas = [];
 
   lista.forEach(ot => {
-
     const estado = obtenerEstadoOT(ot);
+    const indiceOT = listaOTs.indexOf(ot);
+    const etapaRevision = obtenerEtapaListaParaRevision(ot);
+    const resumenCorreccion = obtenerResumenObservacionesJefe(ot);
+
+    if (esAutoridadSucursal() && etapaRevision) {
+      alertas.push({
+        tipo: "revision",
+        indiceOT,
+        titulo: "Etapa lista para revisión",
+        texto: `${ot.os || "OS sin número"} · ${etapaRevision}`,
+        accion: "Revisar OT"
+      });
+    }
+
+    if (esTecnicoTaller() && ot.alertaJefe && resumenCorreccion) {
+      alertas.push({
+        tipo: "correccion",
+        indiceOT,
+        titulo: "Corrección solicitada",
+        texto: `${ot.os || "OS sin número"} · ${resumenCorreccion}`,
+        accion: "Corregir etapa"
+      });
+    }
 
     if (estaOTAtrasada(ot)) {
       alertas.push({
         tipo: "atraso",
-        texto: `⚠ ${ot.os || "OS sin número"} atrasada ${diasAtrasoOT(ot)} día(s)`
+        indiceOT,
+        titulo: "Orden atrasada",
+        texto: `${ot.os || "OS sin número"} · ${diasAtrasoOT(ot)} día(s) de atraso`,
+        accion: "Abrir OT"
       });
     }
 
     if (esperaRepuestosActiva(ot) && estado !== "CERRADA") {
       alertas.push({
         tipo: "repuestos",
-        texto: `📦 ${ot.os || "OS sin número"} tiene espera de repuestos`
+        indiceOT,
+        titulo: "Espera de repuestos",
+        texto: ot.os || "OS sin número",
+        accion: "Abrir OT"
       });
     }
 
-    if (estado === "PRUEBAS" && !ot.pruebasAprobado) {
-      alertas.push({
-        tipo: "pruebas",
-        texto: `🧪 ${ot.os || "OS sin número"} tiene pruebas pendientes de aprobación`
-      });
-    }
-
-    if (estado === "DESPACHO" && !ot.cerrada) {
+    if (etapaDashboardActiva("despacho") && estado === "DESPACHO" && !ot.cerrada) {
       alertas.push({
         tipo: "despacho",
-        texto: `🚚 ${ot.os || "OS sin número"} está pendiente de cierre/despacho`
+        indiceOT,
+        titulo: "Pendiente de cierre",
+        texto: `${ot.os || "OS sin número"} · Despacho`,
+        accion: "Abrir OT"
       });
     }
 
-    if (ot.alertaJefe) {
+    if (esAutoridadSucursal() && ot.alertaJefe && resumenCorreccion) {
       alertas.push({
         tipo: "jefe",
-        texto: `👨‍💼 ${ot.os || "OS sin número"} tiene observaciones del Jefe de Taller`
+        indiceOT,
+        titulo: "Respuesta técnica pendiente",
+        texto: ot.os || "OS sin número",
+        accion: "Ver observación"
       });
     }
   });
@@ -1034,11 +1263,49 @@ function renderAlertasDashboard(lista = listaOTs) {
   }
 
   alertas.slice(0, 6).forEach(alerta => {
-    const div = document.createElement("div");
-    div.className = "alerta-dashboard-item";
-    div.textContent = alerta.texto;
-    cont.appendChild(div);
+    const boton = document.createElement("button");
+    boton.type = "button";
+    boton.className = `alerta-dashboard-item alerta-${alerta.tipo}`;
+    const contenido = document.createElement("span");
+    contenido.className = "alerta-dashboard-contenido";
+    const titulo = document.createElement("strong");
+    titulo.textContent = alerta.titulo;
+    const detalle = document.createElement("small");
+    detalle.textContent = alerta.texto;
+    const accion = document.createElement("span");
+    accion.className = "alerta-dashboard-accion";
+    accion.textContent = `${alerta.accion} →`;
+    contenido.append(titulo, detalle);
+    boton.append(contenido, accion);
+    boton.addEventListener("click", () => abrirOT(alerta.indiceOT));
+    cont.appendChild(boton);
   });
+}
+
+function esAutoridadSucursal() {
+  return ["jefe_taller", "admin_sucursal"].includes(usuario?.rol);
+}
+
+function esTecnicoTaller() {
+  return usuario?.rol === "usuario_taller";
+}
+
+function obtenerEtapaListaParaRevision(ot) {
+  const estado = obtenerEstadoOT(ot);
+  const progreso = calcularProgresoEtapasOT(ot);
+  const etapas = [
+    { estado: "INGRESO", modulo: "ingreso", nombre: "Ingreso", aprobada: ot.ingresoAprobado },
+    { estado: "EVALUACION", modulo: "evaluacion", nombre: "Evaluación", aprobada: ot.evaluacionAprobada },
+    { estado: "OVERHAUL", modulo: "mantencion", nombre: "Mantención", aprobada: ot.overhaulAprobado },
+    { estado: "PRUEBAS", modulo: "pruebas", nombre: "Pruebas", aprobada: ot.pruebasAprobado }
+  ];
+  const etapa = etapas.find(item =>
+    item.estado === estado &&
+    etapaDashboardActiva(item.modulo) &&
+    item.aprobada !== true &&
+    progreso[item.estado] === 100
+  );
+  return etapa?.nombre || "";
 }
 
 function renderProximosDespachos(lista = listaOTs) {
@@ -1285,15 +1552,25 @@ function volverPanelEmpresa() {
       empresaActualDashboard
     )
   ) {
-    alert(
-      "No tienes permiso para acceder al Panel de Empresa."
+    notificarDashboard(
+      "No tienes permiso para acceder al Panel de Empresa.",
+      "Acceso restringido",
+      "advertencia"
     );
 
     return;
   }
 
+  const empresaId = empresaActualDashboard?.id;
+
+  if (!empresaId) {
+    notificarDashboard("No se encontró la empresa seleccionada.", "Empresa no disponible", "error")
+      .then(() => { window.location.href = "super-admin.html"; });
+    return;
+  }
+
   window.location.href =
-    `empresa-admin.html?id=${empresaActualDashboard.id}`;
+    `empresa-admin.html?id=${encodeURIComponent(empresaId)}`;
 }
 
 window.volverPanelEmpresa = volverPanelEmpresa;
@@ -1345,8 +1622,10 @@ function abrirOT(index) {
       empresaActualDashboard
     )
   ) {
-    alert(
-      "No tienes permiso para abrir Órdenes de Servicio."
+    notificarDashboard(
+      "No tienes permiso para abrir Órdenes de Servicio.",
+      "Acceso restringido",
+      "advertencia"
     );
 
     return;
@@ -1355,7 +1634,7 @@ function abrirOT(index) {
   const ot = listaOTs[index];
 
   if (!ot) {
-    alert("No se encontró la OT");
+    notificarDashboard("No se encontró la orden de trabajo.", "OT no disponible", "error");
     return;
   }
 
@@ -1376,8 +1655,10 @@ function nuevaOT() {
       empresaActualDashboard
     )
   ) {
-    alert(
-      "No tienes permiso para crear Órdenes de Servicio."
+    notificarDashboard(
+      "No tienes permiso para crear Órdenes de Servicio.",
+      "Acceso restringido",
+      "advertencia"
     );
 
     return;
@@ -1396,12 +1677,32 @@ function irDashboard() {
   window.location.href = "dashboard.html";
 }
 
+function irOrdenes() {
+  window.location.href = "ordenes.html";
+}
+
+function irInventario() {
+  window.location.href = "inventario.html";
+}
+
+function irProgramacion() {
+  window.location.href = "programacion.html";
+}
+
+function irSheq() {
+  window.location.href = "sheq.html";
+}
+
 
 window.volverPanelEmpresa = volverPanelEmpresa;
 
 
 
 window.irDashboard = irDashboard;
+window.irOrdenes = irOrdenes;
+window.irInventario = irInventario;
+window.irProgramacion = irProgramacion;
+window.irSheq = irSheq;
 
 function filtrarOTs() {
   const texto = document.getElementById("inputBuscar").value.toLowerCase();
@@ -1444,21 +1745,23 @@ function destruirGraficosDashboard() {
 
 function renderGraficos(lista = listaOTs) {
 
-  const estadosCount = {
-    INGRESO: 0,
-    EVALUACION: 0,
-    OVERHAUL: 0,
-    PRUEBAS: 0,
-    DESPACHO: 0,
-    CERRADA: 0
-  };
+  const estadosGraficos = [
+    ...obtenerEtapasDashboardActivas(),
+    { key: "CERRADA", label: "CERRADA", color: "#2ecc71" }
+  ];
+
+  const estadosCount = Object.fromEntries(
+    estadosGraficos.map(etapa => [etapa.key, 0])
+  );
 
   let progresoTotal = 0;
 
   lista.forEach(ot => {
 
     const estado = obtenerEstadoOT(ot);
-    estadosCount[estado]++;
+    if (estadosCount[estado] !== undefined) {
+      estadosCount[estado]++;
+    }
 
     progresoTotal += calcularProgreso(ot);
   });
@@ -1473,19 +1776,10 @@ function renderGraficos(lista = listaOTs) {
 chartEstados = new Chart(document.getElementById("graficoEstados"), {
   type: "doughnut",
   data: {
-    labels: Object.keys(estadosCount).map(estado =>
-      estado === "OVERHAUL" ? "MANTENCIÓN" : estado
-    ),
+    labels: estadosGraficos.map(etapa => etapa.label),
     datasets: [{
-      data: Object.values(estadosCount),
-      backgroundColor: [
-        "#6c757d",  // gris ingreso
-        "#f39c12",  // evaluacion
-        "#007bff",  // overhaul
-        "#8e44ad",  // pruebas
-        "#16a085",  // despacho
-        "#2ecc71"   // cerrada
-      ],
+      data: estadosGraficos.map(etapa => estadosCount[etapa.key]),
+      backgroundColor: estadosGraficos.map(etapa => etapa.color),
       borderColor: "#ffffff", // 🔥 bordes blancos
       borderWidth: 2
     }]
@@ -1494,7 +1788,7 @@ chartEstados = new Chart(document.getElementById("graficoEstados"), {
     plugins: {
       legend: {
         labels: {
-          color: "#ffffff" // 🔥 texto blanco
+          color: "#405766"
         }
       }
     }
@@ -1507,15 +1801,38 @@ chartEstados = new Chart(document.getElementById("graficoEstados"), {
     data: {
       labels: ["Progreso Promedio"],
       datasets: [{
+        label: "Progreso promedio",
         data: [promedio],
-        backgroundColor: ["#00c853"]
+        backgroundColor: ["#1565c0"],
+        borderRadius: 8
       }]
     },
     options: {
       scales: {
         y: {
           beginAtZero: true,
-          max: 100
+          max: 100,
+          ticks: {
+            color: "#607d8b"
+          },
+          grid: {
+            color: "rgba(96, 125, 139, 0.12)"
+          }
+        },
+        x: {
+          ticks: {
+            color: "#607d8b"
+          },
+          grid: {
+            display: false
+          }
+        }
+      },
+      plugins: {
+        legend: {
+          labels: {
+            color: "#405766"
+          }
         }
       }
     }
@@ -1587,7 +1904,7 @@ function mostrarAlertasJefe(ot) {
     return Array.isArray(items) && items.some(item =>
       Array.isArray(item.comentarios) &&
       item.comentarios.some(c =>
-        c.rol === "jefe_taller" &&
+        ["jefe_taller", "admin_sucursal"].includes(c.rol) &&
         c.atendido !== true
       )
     );
@@ -1596,34 +1913,33 @@ function mostrarAlertasJefe(ot) {
   const tienePendientesDirectos = (comentarios) => {
     return Array.isArray(comentarios) &&
       comentarios.some(c =>
-        c.rol === "jefe_taller" &&
+        ["jefe_taller", "admin_sucursal"].includes(c.rol) &&
         c.atendido !== true
       );
   };
 
-  if (tienePendientesJefe(ot.ingreso)) {
+  if (etapaDashboardActiva("ingreso") && tienePendientesJefe(ot.ingreso)) {
     alertas.add("📥 Ingreso");
   }
 
-  if (tienePendientesJefe(ot.evaluacion)) {
+  if (etapaDashboardActiva("evaluacion") && tienePendientesJefe(ot.evaluacion)) {
     alertas.add("📋 Evaluación");
   }
 
-  if (tienePendientesJefe(ot.overhaul)) {
+  if (etapaDashboardActiva("mantencion") && tienePendientesJefe(ot.overhaul)) {
     alertas.add("🔧 Overhaul");
   }
 
-  if (tienePendientesJefe(ot.pruebas?.mecanico)) {
-    alertas.add("🛠 Pruebas Mecánicas");
-  }
-
-  if (tienePendientesJefe(ot.pruebas?.electrico)) {
-    alertas.add("⚡ Pruebas Eléctricas");
+  if (etapaDashboardActiva("pruebas") && tienePendientesJefe(obtenerListaPruebas(ot))) {
+    alertas.add("🧪 Pruebas");
   }
 
   if (
-    tienePendientesDirectos(ot.despacho?.comentariosPreparacion) ||
-    tienePendientesDirectos(ot.despacho?.comentariosFinal)
+    etapaDashboardActiva("despacho") &&
+    (
+      tienePendientesDirectos(ot.despacho?.comentariosPreparacion) ||
+      tienePendientesDirectos(ot.despacho?.comentariosFinal)
+    )
   ) {
     alertas.add("📦 Despacho");
   }
@@ -1661,3 +1977,40 @@ function cerrarModalAlertas() {
 
 window.mostrarAlertasJefe = mostrarAlertasJefe;
 window.cerrarModalAlertas = cerrarModalAlertas;
+
+function configurarMenuMovilDashboard() {
+  const boton = document.querySelector(".mobile-menu-toggle");
+  const fondo = document.querySelector(".mobile-menu-backdrop");
+  const sidebar = document.getElementById("dashboardSidebar");
+  if (!boton || !fondo || !sidebar) return;
+
+  const cambiarEstado = (abierto) => {
+    document.body.classList.toggle("menu-mobile-open", abierto);
+    boton.setAttribute("aria-expanded", String(abierto));
+    boton.setAttribute("aria-label", abierto
+      ? "Cerrar menú de navegación"
+      : "Abrir menú de navegación");
+  };
+
+  boton.addEventListener("click", () => {
+    cambiarEstado(!document.body.classList.contains("menu-mobile-open"));
+  });
+  fondo.addEventListener("click", () => cambiarEstado(false));
+  sidebar.addEventListener("click", (evento) => {
+    if (evento.target.closest("li") || evento.target.closest(".mobile-menu-logout")) cambiarEstado(false);
+  });
+  sidebar.addEventListener("keydown", (evento) => {
+    const opcion = evento.target.closest('[role="button"]');
+    if (!opcion || (evento.key !== "Enter" && evento.key !== " ")) return;
+    evento.preventDefault();
+    opcion.click();
+  });
+  document.addEventListener("keydown", (evento) => {
+    if (evento.key === "Escape") cambiarEstado(false);
+  });
+  window.addEventListener("resize", () => {
+    if (window.innerWidth > 1024) cambiarEstado(false);
+  });
+}
+
+document.addEventListener("DOMContentLoaded", configurarMenuMovilDashboard);
