@@ -10,7 +10,8 @@ import {
   orderBy,
   onSnapshot,
   doc,
-  getDoc
+  getDoc,
+  writeBatch
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 const usuario = protegerPagina(["super_admin", "admin_empresa", "admin_sucursal", "jefe_taller", "usuario_taller", "supervisor", "tecnico", "planificador"]);
@@ -134,7 +135,10 @@ function renderizar() {
           <div><small>Cliente</small><strong>${textoSeguro(ot.cliente || "Sin cliente")}</strong></div>
           <div><small>Actualización</small><strong>${textoSeguro(fechaVisible(ot))}</strong></div>
         </div>
-        <button type="button" class="btn-card-open" data-ot-id="${textoSeguro(ot.id)}">${estaCerrada(ot) ? "Consultar OT" : "Abrir OT"}</button>
+        <div class="orden-item-acciones">
+          <button type="button" class="btn-card-open" data-ot-id="${textoSeguro(ot.id)}">${estaCerrada(ot) ? "Consultar OT" : "Abrir OT"}</button>
+          ${usuario.rol === "jefe_taller" ? `<button type="button" class="btn-card-delete" data-eliminar-ot="${textoSeguro(ot.id)}">Eliminar OS</button>` : ""}
+        </div>
       </article>`;
   }).join("");
 
@@ -195,6 +199,25 @@ function nuevaOT() {
   window.location.href = "flujo.html";
 }
 
+async function eliminarOT(id) {
+  if (usuario.rol !== "jefe_taller" || !id) return;
+  const confirmar = window.OverTrackUI?.confirmarAccion
+    ? await window.OverTrackUI.confirmarAccion({
+        titulo: "Eliminar orden de servicio",
+        mensaje: "La OS y su registro en el historial se eliminarán definitivamente. Esta acción no se puede deshacer.",
+        tipo: "advertencia",
+        textoConfirmar: "Eliminar OS",
+        textoCancelar: "Cancelar",
+        peligrosa: true
+      })
+    : window.confirm("¿Eliminar definitivamente esta OS?");
+  if (!confirmar) return;
+  const lote = writeBatch(db);
+  lote.delete(doc(db, "ots", id));
+  lote.delete(doc(db, "otsResumen", id));
+  await lote.commit();
+}
+
 function volverPanelEmpresa() {
   const destino = usuario.rol === "super_admin"
     ? `empresa-admin.html?id=${encodeURIComponent(empresaActual.id)}`
@@ -213,6 +236,14 @@ function configurarInterfaz() {
   document.getElementById("paginaAnterior").addEventListener("click", () => { pagina--; renderizar(); window.scrollTo({ top: 0, behavior: "smooth" }); });
   document.getElementById("paginaSiguiente").addEventListener("click", () => { pagina++; renderizar(); window.scrollTo({ top: 0, behavior: "smooth" }); });
   document.getElementById("listaOrdenesCompleta").addEventListener("click", evento => {
+    const eliminar = evento.target.closest("[data-eliminar-ot]");
+    if (eliminar) {
+      eliminarOT(eliminar.dataset.eliminarOt).catch(error => {
+        console.error("No fue posible eliminar la OS:", error);
+        alert("No fue posible eliminar la OS.");
+      });
+      return;
+    }
     const boton = evento.target.closest("[data-ot-id]");
     if (boton) abrirOT(boton.dataset.otId);
   });

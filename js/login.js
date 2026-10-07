@@ -96,7 +96,7 @@ switch (usuario.rol) {
     break;
 
   case "admin_empresa":
-    window.location.href = `empresa-admin.html?id=${usuario.empresaId}`;
+    window.location.href = "dashboard.html";
     break;
 
   case "admin_sucursal":
@@ -110,8 +110,11 @@ switch (usuario.rol) {
   case "usuario_taller":
   case "supervisor":
   case "tecnico":
-  case "planificador":
     window.location.href = "dashboard.html";
+    break;
+
+  case "planificador":
+    window.location.href = "programacion.html";
     break;
 
   case "bodeguero":

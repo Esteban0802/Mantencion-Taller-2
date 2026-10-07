@@ -1,4 +1,4 @@
-import { auth, db } from "./firebase-config.js";
+import { app, auth, db } from "./firebase-config.js";
 import { protegerPagina, cerrarSesion } from "./session.js?v=20261004-2";
 import { moduloActivo } from "./modulos.js";
 import {
@@ -17,11 +17,14 @@ import {
   getDocs,
   query,
   serverTimestamp,
-  setDoc,
   updateDoc,
   where,
   writeBatch
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-functions.js";
+
+const functions = getFunctions(app, "us-central1");
+const publicarProgramacionSegura = httpsCallable(functions, "publicarProgramacion");
 
 const usuario = protegerPagina([
   "super_admin",
@@ -37,7 +40,8 @@ const usuario = protegerPagina([
 
 if (!usuario) throw new Error("Acceso no autorizado");
 
-const PUEDE_EDITAR = ["super_admin", "admin_empresa", "admin_sucursal", "jefe_taller", "planificador"].includes(usuario.rol);
+const PUEDE_EDITAR = ["super_admin", "planificador"].includes(usuario.rol);
+const PUEDE_VER_PROGRAMACION_COMPLETA = ["super_admin", "admin_empresa", "admin_sucursal", "jefe_taller", "planificador"].includes(usuario.rol);
 const DIAS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
 const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
 
@@ -47,8 +51,10 @@ let semanaInicio = obtenerLunes(new Date());
 let grupoActivo = "tecnico";
 let usuariosEmpresa = [];
 let sucursalesEmpresa = [];
+let asignacionesEmpresa = [];
 let asignacionesSemana = [];
 let documentosSheq = [];
+let vehiculosSheq = [];
 let estadoSemanaActual = "borrador";
 
 const $ = id => document.getElementById(id);
@@ -160,7 +166,7 @@ async function cargarEmpresa() {
 }
 
 async function cargarUsuariosYSucursales() {
-  if (!PUEDE_EDITAR) {
+  if (!PUEDE_VER_PROGRAMACION_COMPLETA) {
     const perfilSnap = await getDoc(doc(db, "usuarios", usuario.uid));
     usuariosEmpresa = perfilSnap.exists()
       ? [{ id: perfilSnap.id, ...perfilSnap.data() }]
@@ -181,25 +187,164 @@ async function cargarUsuariosYSucursales() {
   actualizarSelectoresAsignacion();
 }
 
-function opcionUsuario(item, seleccionado = false, noDisponible = false) {
-  const estado = noDisponible ? " · no disponible actualmente" : "";
-  return `<option value="${escapar(item.id)}"${seleccionado ? " selected" : ""}>${escapar(nombreUsuario(item))} · ${escapar(etiquetaRol(item))}${estado}</option>`;
+function opcionUsuario(item, seleccionado = false, noDisponible = false, deshabilitado = false) {
+  const estado = noDisponible ? " · ya asignado en esta fecha" : "";
+  return `<option value="${escapar(item.id)}"${seleccionado ? " selected" : ""}${deshabilitado ? " disabled" : ""}>${escapar(nombreUsuario(item))} · ${escapar(etiquetaRol(item))}${estado}</option>`;
 }
 
-function actualizarSelectoresAsignacion({ usuarioSeleccionado = "", supervisorSeleccionado = "", sheqSeleccionado = "" } = {}) {
+function idsOcupadosEnFecha(fecha, asignacionExcluida = "") {
+  const ocupados = new Set();
+  if (!fecha) return ocupados;
+  asignacionesEmpresa.forEach(item => {
+    if (item.id === asignacionExcluida || item.fecha !== fecha) return;
+    [
+      ...(item.usuarioIds || []),
+      ...(item.supervisorIds || []),
+      ...(item.sheqIds || [])
+    ].forEach(id => ocupados.add(id));
+  });
+  return ocupados;
+}
+
+function idsUsuariosSeleccionados() {
+  return [...new Set(Array.from(document.querySelectorAll(".asignacion-usuario-select"))
+    .map(selector => selector.value)
+    .filter(Boolean))];
+}
+
+function opcionesTrabajador(trabajadores, seleccionado = "", trabajadoresGuardados = [], idsOcupados = new Set()) {
+  const disponibles = [...trabajadores];
+  trabajadoresGuardados.forEach(item => {
+    if (!disponibles.some(disponible => disponible.id === item.id)) disponibles.push(item);
+  });
+  const etiquetaInicial = disponibles.length ? "Selecciona un trabajador" : "No hay trabajadores disponibles";
+  return `<option value="">${etiquetaInicial}</option>${disponibles
+    .map(item => {
+      const fueraDelGrupo = !trabajadores.some(disponible => disponible.id === item.id);
+      const ocupado = idsOcupados.has(item.id);
+      return opcionUsuario(item, item.id === seleccionado, fueraDelGrupo || ocupado, ocupado);
+    })
+    .join("")}`;
+}
+
+function crearFilaTrabajador(trabajadores, seleccionado = "", trabajadoresGuardados = [], removible = true, idsOcupados = new Set()) {
+  const fila = document.createElement("div");
+  fila.className = "fila-asignacion-usuario";
+  fila.innerHTML = `<select class="asignacion-usuario-select" required>${opcionesTrabajador(trabajadores, seleccionado, trabajadoresGuardados, idsOcupados)}</select>${removible ? '<button type="button" class="btn-quitar-trabajador" aria-label="Quitar trabajador">Quitar</button>' : ""}`;
+  return fila;
+}
+
+function renderSelectoresTrabajadores(trabajadores, idsSeleccionados = [], trabajadoresGuardados = [], idsOcupados = new Set()) {
+  const lista = $("listaAsignacionUsuarios");
+  const ids = idsSeleccionados.length ? idsSeleccionados : [""];
+  lista.innerHTML = "";
+  ids.forEach((id, indice) => {
+    const fila = crearFilaTrabajador(trabajadores, id, trabajadoresGuardados, indice > 0, idsOcupados);
+    const selector = fila.querySelector("select");
+    if (indice === 0) selector.id = "asignacionUsuarios";
+    lista.appendChild(fila);
+  });
+}
+
+function ordenesServicioAsignacion(asignacion = {}) {
+  if (Array.isArray(asignacion.ordenesServicio) && asignacion.ordenesServicio.length) {
+    return asignacion.ordenesServicio.map((item, indice) => ({
+      numero: String(item.numero || "").trim(),
+      equipo: String(item.equipo || "").trim(),
+      actividad: String(item.actividad || (indice === 0 ? asignacion.actividad || "" : "")).trim(),
+      observacion: String(item.observacion || "").trim(),
+      cerrada: item.cerrada === true
+    }));
+  }
+  if (asignacion.ot || asignacion.equipo || asignacion.actividad) {
+    return [{ numero: asignacion.ot || "", equipo: asignacion.equipo || "", actividad: asignacion.actividad || "", observacion: "", cerrada: false }];
+  }
+  return [];
+}
+
+function crearFilaOs(item = {}, removible = true) {
+  const fila = document.createElement("div");
+  fila.className = `fila-asignacion-os${item.cerrada ? " os-cerrada" : ""}`;
+  fila.innerHTML = `<input type="text" class="asignacion-os-numero" placeholder="Número de OS" value="${escapar(item.numero || "")}" required><input type="text" class="asignacion-os-equipo" placeholder="Equipo, modelo o serie" value="${escapar(item.equipo || "")}"><input type="text" class="asignacion-os-actividad" placeholder="Actividad" value="${escapar(item.actividad || "")}" required><input type="text" class="asignacion-os-observacion" placeholder="Observación" value="${escapar(item.observacion || "")}"><label class="control-cerrar-os"><input type="checkbox" class="asignacion-os-cerrada"${item.cerrada ? " checked" : ""}><span>Cerrar OS</span></label>${removible ? '<button type="button" class="btn-quitar-os" aria-label="Quitar OS">Quitar</button>' : ""}`;
+  return fila;
+}
+
+function renderOrdenesServicio(items = []) {
+  const lista = $("listaAsignacionOs");
+  lista.innerHTML = "";
+  items.forEach((item, indice) => {
+    const fila = crearFilaOs(item, true);
+    if (indice === 0) {
+      fila.querySelector(".asignacion-os-numero").id = "asignacionOt";
+      fila.querySelector(".asignacion-os-equipo").id = "asignacionEquipo";
+      fila.querySelector(".asignacion-os-actividad").id = "asignacionActividad";
+    }
+    lista.appendChild(fila);
+  });
+}
+
+function ordenesServicioFormulario() {
+  return Array.from(document.querySelectorAll(".fila-asignacion-os"))
+    .map(fila => ({
+      numero: fila.querySelector(".asignacion-os-numero")?.value.trim() || "",
+      equipo: fila.querySelector(".asignacion-os-equipo")?.value.trim() || "",
+      actividad: fila.querySelector(".asignacion-os-actividad")?.value.trim() || "",
+      observacion: fila.querySelector(".asignacion-os-observacion")?.value.trim() || "",
+      cerrada: fila.querySelector(".asignacion-os-cerrada")?.checked === true
+    }))
+    .filter(item => item.numero || item.equipo || item.actividad || item.observacion);
+}
+
+function nombreVehiculo(item) {
+  return [item.patente, item.marca, item.modelo].filter(Boolean).join(" · ") || "Vehículo";
+}
+
+function prepararSelectorVehiculos(seleccionado = "") {
+  const select = $("asignacionVehiculo");
+  if (!select) return;
+  select.innerHTML = `<option value="">Sin vehículo asignado</option>${vehiculosSheq
+    .map(item => `<option value="${escapar(item.id)}"${item.id === seleccionado ? " selected" : ""}>${escapar(nombreVehiculo(item))}</option>`)
+    .join("")}`;
+}
+
+function actualizarResumenTrabajadores() {
+  const contenedor = $("resumenAsignacionUsuarios");
+  if (!contenedor) return;
+  const seleccionados = idsUsuariosSeleccionados();
+  if (!seleccionados.length) {
+    contenedor.textContent = "Ningún trabajador seleccionado.";
+    return;
+  }
+  const nombres = seleccionados
+    .map(id => usuariosEmpresa.find(item => item.id === id))
+    .filter(Boolean)
+    .map(nombreUsuario);
+  contenedor.textContent = `${seleccionados.length} trabajador(es) seleccionado(s): ${nombres.join(", ")}.`;
+}
+
+function actualizarSelectoresAsignacion({ usuariosSeleccionados = [], usuarioSeleccionado = "", supervisorSeleccionado = "", sheqSeleccionado = "" } = {}) {
   const grupo = $("asignacionGrupo").value || "tecnico";
+  const fecha = $("asignacionFecha").value;
+  const idsOcupados = idsOcupadosEnFecha(fecha, $("asignacionId").value);
+  const idsSeleccionados = new Set([
+    ...usuariosSeleccionados,
+    ...(usuarioSeleccionado ? [usuarioSeleccionado] : [])
+  ].filter(Boolean));
   const trabajadores = usuariosDisponiblesPorGrupo(usuariosEmpresa, grupo);
   const supervisores = usuariosDisponiblesPorGrupo(usuariosEmpresa, "supervisor");
   const asesoresSheq = usuariosDisponiblesPorGrupo(usuariosEmpresa, "sheq");
-  const trabajadorGuardado = usuariosEmpresa.find(item => item.id === usuarioSeleccionado);
+  const trabajadoresGuardados = usuariosEmpresa.filter(item => idsSeleccionados.has(item.id));
   const supervisorGuardado = usuariosEmpresa.find(item => item.id === supervisorSeleccionado);
   const sheqGuardado = usuariosEmpresa.find(item => item.id === sheqSeleccionado);
 
-  $("asignacionUsuarios").innerHTML = `<option value="">${trabajadores.length ? "Selecciona un trabajador" : "No hay trabajadores disponibles"}</option>${trabajadores
-    .map(item => opcionUsuario(item, item.id === usuarioSeleccionado))
-    .join("")}${trabajadorGuardado && !trabajadores.some(item => item.id === trabajadorGuardado.id)
-      ? opcionUsuario(trabajadorGuardado, true, true)
-      : ""}`;
+  renderSelectoresTrabajadores(trabajadores, [...idsSeleccionados], trabajadoresGuardados, idsOcupados);
+  const cantidadOcupados = trabajadores.filter(item => idsOcupados.has(item.id)).length;
+  const ayuda = $("ayudaAsignacionUsuarios");
+  if (ayuda) {
+    ayuda.textContent = cantidadOcupados
+      ? `${cantidadOcupados} trabajador(es) ya tiene(n) una asignación en esta fecha y aparecen deshabilitados.`
+      : "Todos los trabajadores mostrados están disponibles en esta fecha.";
+  }
 
   $("asignacionSupervisor").innerHTML = `<option value="">Sin supervisor asignado</option>${supervisores
     .map(item => opcionUsuario(item, item.id === supervisorSeleccionado))
@@ -212,41 +357,71 @@ function actualizarSelectoresAsignacion({ usuarioSeleccionado = "", supervisorSe
     .join("")}${sheqGuardado && !asesoresSheq.some(item => item.id === sheqGuardado.id)
       ? opcionUsuario(sheqGuardado, true, true)
       : ""}`;
+  actualizarResumenTrabajadores();
   actualizarAlertaSheqTrabajador();
 }
 
 async function cargarDocumentosSheq() {
   documentosSheq = [];
+  vehiculosSheq = [];
   if (!PUEDE_EDITAR || !moduloActivo(empresa, "sheq")) return;
   try {
-    const snap = await getDocs(query(collection(db, "sheqDocumentos"), where("empresaId", "==", empresaId)));
-    documentosSheq = snap.docs.map(item => ({ id: item.id, ...item.data() }));
+    const [documentosSnap, vehiculosSnap] = await Promise.all([
+      getDocs(query(collection(db, "sheqDocumentos"), where("empresaId", "==", empresaId))),
+      getDocs(query(collection(db, "sheqVehiculos"), where("empresaId", "==", empresaId)))
+    ]);
+    documentosSheq = documentosSnap.docs.map(item => ({ id: item.id, ...item.data() }));
+    vehiculosSheq = vehiculosSnap.docs
+      .map(item => ({ id: item.id, ...item.data() }))
+      .sort((a, b) => nombreVehiculo(a).localeCompare(nombreVehiculo(b), "es"));
+    prepararSelectorVehiculos();
   } catch (error) {
-    console.warn("No se pudieron consultar las vigencias SHEQ para Programación:", error);
+    console.warn("No se pudieron consultar los datos SHEQ para Programación:", error);
   }
 }
 
 function actualizarAlertaSheqTrabajador() {
   const contenedor = $("alertaSheqProgramacion");
   if (!contenedor) return;
-  const usuarioId = $("asignacionUsuarios")?.value || "";
-  const documentos = documentosSheq
-    .filter(item => item.entidadTipo === "persona" && item.entidadId === usuarioId)
-    .map(documento => ({ documento, estado: estadoDocumentoAcreditacion(documento) }));
-  const vencidos = documentos.filter(item => item.estado.key === "vencido");
-  const proximos = documentos.filter(item => ["aviso", "proximo", "critico"].includes(item.estado.key));
-  if (!usuarioId || (!vencidos.length && !proximos.length)) {
+  const usuarioIds = [...new Set([
+    ...idsUsuariosSeleccionados(),
+    $("asignacionSupervisor")?.value || "",
+    $("asignacionSheq")?.value || ""
+  ].filter(Boolean))];
+  const alertasPersonas = usuarioIds.flatMap(usuarioId => {
+    const perfil = usuariosEmpresa.find(item => item.id === usuarioId);
+    return documentosSheq
+      .filter(item => item.entidadTipo === "persona" && item.entidadId === usuarioId)
+      .map(documento => ({
+        documento,
+        estado: estadoDocumentoAcreditacion(documento),
+        nombre: nombreUsuario(perfil || {})
+      }));
+  });
+  const vehiculoId = $("asignacionVehiculo")?.value || "";
+  const vehiculo = vehiculosSheq.find(item => item.id === vehiculoId);
+  const alertasVehiculo = vehiculoId ? documentosSheq
+    .filter(item => item.entidadTipo === "vehiculo" && item.entidadId === vehiculoId)
+    .map(documento => ({
+      documento,
+      estado: estadoDocumentoAcreditacion(documento),
+      nombre: nombreVehiculo(vehiculo || {})
+    })) : [];
+  const alertas = [...alertasPersonas, ...alertasVehiculo];
+  const vencidos = alertas.filter(item => item.estado.key === "vencido");
+  const proximos = alertas.filter(item => ["aviso", "proximo", "critico"].includes(item.estado.key));
+  if ((!usuarioIds.length && !vehiculoId) || (!vencidos.length && !proximos.length)) {
     contenedor.hidden = true;
     contenedor.innerHTML = "";
     return;
   }
-  const perfil = usuariosEmpresa.find(item => item.id === usuarioId);
   const afectados = vencidos.length ? vencidos : proximos;
-  const nombres = afectados.slice(0, 3).map(item => item.documento.tipoDocumento || "Documento").join(", ");
+  const entidadesAfectadas = [...new Set(afectados.map(item => item.nombre))];
+  const nombres = afectados.slice(0, 3).map(item => `${item.nombre}: ${item.documento.tipoDocumento || "Documento"}`).join(", ");
   const restantes = afectados.length > 3 ? ` y ${afectados.length - 3} más` : "";
   const esVencido = vencidos.length > 0;
   contenedor.className = `alerta-sheq-programacion ${esVencido ? "vencido" : "proximo"}`;
-  contenedor.innerHTML = `<strong>${esVencido ? "Alerta SHEQ" : "Aviso SHEQ"}</strong><span>${escapar(nombreUsuario(perfil || {}))} tiene ${afectados.length} documento(s) ${esVencido ? "vencido(s)" : "próximo(s) a vencer"}: ${escapar(nombres)}${escapar(restantes)}. La asignación puede continuar.</span>`;
+  contenedor.innerHTML = `<strong>${esVencido ? "Alerta SHEQ" : "Aviso SHEQ"}</strong><span>${entidadesAfectadas.length} persona(s) o vehículo(s) presenta(n) ${afectados.length} documento(s) ${esVencido ? "vencido(s)" : "próximo(s) a vencer"}: ${escapar(nombres)}${escapar(restantes)}. La asignación puede continuar.</span>`;
   contenedor.hidden = false;
 }
 
@@ -270,10 +445,10 @@ async function cargarSemana() {
   }
 
   const asignacionesSnap = await getDocs(query(collection(db, "programaciones"), where("empresaId", "==", empresaId)));
-  asignacionesSemana = asignacionesSnap.docs
+  asignacionesEmpresa = asignacionesSnap.docs
     .map(item => ({ id: item.id, ...item.data() }))
-    .filter(item => item.fecha >= inicio && item.fecha <= fin)
     .sort((a, b) => `${a.fecha}_${a.cliente || ""}`.localeCompare(`${b.fecha}_${b.cliente || ""}`));
+  asignacionesSemana = asignacionesEmpresa.filter(item => item.fecha >= inicio && item.fecha <= fin);
   renderCuadro();
 }
 
@@ -317,16 +492,18 @@ function asignacionesCelda(fecha, usuarioId) {
 }
 
 function renderBloque(asignacion) {
+  const ordenes = ordenesServicioAsignacion(asignacion).filter(item => item.numero || item.equipo || item.actividad || item.observacion);
+  const vehiculo = vehiculosSheq.find(item => item.id === asignacion.vehiculoId);
   const filas = [
     ["Cliente", asignacion.cliente],
-    ["Actividad", asignacion.actividad],
-    ["OT", asignacion.ot],
-    ["Equipo", asignacion.equipo],
+    ["Modalidad", [asignacion.contrato ? "Contrato" : "", asignacion.fixPrice ? "Fix Price" : ""].filter(Boolean).join(" · ")],
+    ["Vehículo", asignacion.vehiculoNombre || (vehiculo ? nombreVehiculo(vehiculo) : "")],
     ["Indicación", asignacion.observaciones]
   ].filter(([, valor]) => valor);
   return `
     <article class="bloque-asignacion ${escapar(asignacion.tipo || "terreno")}" data-asignacion-id="${escapar(asignacion.id)}" tabindex="0">
       ${filas.map(([etiqueta, valor]) => `<div class="asignacion-dato"><strong>${etiqueta}</strong><span>${escapar(valor)}</span></div>`).join("")}
+      ${ordenes.length ? `<div class="asignacion-os-lista">${ordenes.map(item => `<div class="asignacion-os-item${item.cerrada ? " os-cerrada" : ""}"><strong>OS</strong><span>${escapar([item.numero, item.equipo, item.actividad, item.observacion ? `Obs: ${item.observacion}` : ""].filter(Boolean).join(" · "))}${item.cerrada ? ' · <b class="indicacion-cerrar-os">Cerrar OS</b>' : ""}</span></div>`).join("")}</div>` : ""}
     </article>
   `;
 }
@@ -391,6 +568,8 @@ function limpiarFormulario() {
   $("asignacionFecha").value = fechaISO(semanaInicio);
   $("asignacionGrupo").value = grupoActivo === "mi-semana" ? "tecnico" : grupoActivo;
   actualizarSelectoresAsignacion();
+  renderOrdenesServicio();
+  prepararSelectorVehiculos();
   $("tituloModalAsignacion").textContent = "Nueva asignación";
   $("btnEliminarAsignacion").style.display = "none";
   actualizarAlertaSheqTrabajador();
@@ -399,9 +578,9 @@ function limpiarFormulario() {
 function abrirNuevaAsignacion() {
   limpiarFormulario();
   if (grupoActivo === "mi-semana") {
-    Array.from($("asignacionUsuarios").options).forEach(option => {
-      option.selected = option.value === usuario.uid;
-    });
+    $("asignacionUsuarios").value = usuario.uid;
+    actualizarResumenTrabajadores();
+    actualizarAlertaSheqTrabajador();
   }
   abrirModal("modalAsignacion");
 }
@@ -419,15 +598,16 @@ function abrirAsignacion(id) {
   $("asignacionFecha").value = asignacion.fecha || "";
   $("asignacionGrupo").value = asignacion.grupo || "tecnico";
   actualizarSelectoresAsignacion({
-    usuarioSeleccionado: asignacion.usuarioIds?.[0] || "",
+    usuariosSeleccionados: asignacion.usuarioIds || [],
     supervisorSeleccionado: asignacion.supervisorIds?.[0] || "",
     sheqSeleccionado: asignacion.sheqIds?.[0] || ""
   });
   $("asignacionTipo").value = asignacion.tipo || "terreno";
   $("asignacionCliente").value = asignacion.cliente || "";
-  $("asignacionActividad").value = asignacion.actividad || "";
-  $("asignacionOt").value = asignacion.ot || "";
-  $("asignacionEquipo").value = asignacion.equipo || "";
+  $("asignacionContrato").checked = asignacion.contrato === true;
+  $("asignacionFixPrice").checked = asignacion.fixPrice === true;
+  renderOrdenesServicio(ordenesServicioAsignacion(asignacion));
+  prepararSelectorVehiculos(asignacion.vehiculoId || "");
   $("asignacionObservaciones").value = asignacion.observaciones || "";
   actualizarAlertaSheqTrabajador();
   $("tituloModalAsignacion").textContent = "Editar asignación";
@@ -439,7 +619,7 @@ async function guardarAsignacion(evento) {
   evento.preventDefault();
   if (!PUEDE_EDITAR) return;
 
-  const usuarioIds = Array.from($("asignacionUsuarios").selectedOptions).map(option => option.value);
+  const usuarioIds = idsUsuariosSeleccionados();
   const supervisorId = $("asignacionSupervisor").value;
   const sheqId = $("asignacionSheq").value;
   if (!usuarioIds.length) {
@@ -448,25 +628,52 @@ async function guardarAsignacion(evento) {
   }
 
   const fecha = $("asignacionFecha").value;
-  const conflicto = asignacionesSemana.find(item =>
-    item.id !== $("asignacionId").value &&
-    item.fecha === fecha &&
-    item.usuarioIds?.some(id => usuarioIds.includes(id))
-  );
+  const participantesSeleccionados = [
+    ...usuarioIds.map(id => ({ id, rol: "Técnico" })),
+    ...(supervisorId ? [{ id: supervisorId, rol: "Supervisor" }] : []),
+    ...(sheqId ? [{ id: sheqId, rol: "SHEQ" }] : [])
+  ];
+  const idsParticipantesSeleccionados = new Set(participantesSeleccionados.map(item => item.id));
+  const idsConConflicto = new Set();
+  asignacionesEmpresa.forEach(item => {
+    if (item.id === $("asignacionId").value || item.fecha !== fecha) return;
+    const idsAsignados = [
+      ...(item.usuarioIds || []),
+      ...(item.supervisorIds || []),
+      ...(item.sheqIds || [])
+    ];
+    idsAsignados.forEach(id => {
+      if (idsParticipantesSeleccionados.has(id)) idsConConflicto.add(id);
+    });
+  });
 
-  if (conflicto) {
+  if (idsConConflicto.size) {
+    const personasConConflicto = participantesSeleccionados
+      .filter((item, indice, lista) => idsConConflicto.has(item.id) && lista.findIndex(otro => otro.id === item.id) === indice)
+      .map(item => {
+        const perfil = usuariosEmpresa.find(usuarioEmpresa => usuarioEmpresa.id === item.id);
+        return `${nombreUsuario(perfil || {})} (${item.rol})`;
+      });
+    const nombresConConflicto = personasConConflicto
+      .join(", ");
+    const mensajeConflicto = idsConConflicto.size === 1
+      ? `${nombresConConflicto || "La persona seleccionada"} ya tiene otra asignación durante este día. Puedes volver al formulario o guardar ambas actividades.`
+      : `${nombresConConflicto || "Algunas personas seleccionadas"} ya tienen otra asignación durante este día. Puedes volver al formulario o guardar ambas actividades.`;
     const continuar = window.OverTrackUI?.confirmarAccion
       ? await window.OverTrackUI.confirmarAccion({
           titulo: "Asignación existente",
-          mensaje: "El trabajador seleccionado ya tiene otra asignación durante este día. Puedes volver al formulario o guardar ambas actividades.",
+          mensaje: mensajeConflicto,
           tipo: "advertencia",
           textoConfirmar: "Guardar de todas formas",
           textoCancelar: "Volver al formulario"
         })
-      : confirm("El trabajador ya tiene otra asignación ese día. ¿Guardar de todas formas?");
+      : confirm(`${mensajeConflicto} ¿Deseas guardar de todas formas?`);
     if (!continuar) return;
   }
 
+  const ordenesServicio = ordenesServicioFormulario();
+  const vehiculoId = $("asignacionVehiculo").value;
+  const vehiculo = vehiculosSheq.find(item => item.id === vehiculoId);
   const datos = {
     empresaId,
     semanaInicio: fechaISO(obtenerLunes(new Date(`${fecha}T12:00:00`))),
@@ -477,9 +684,14 @@ async function guardarAsignacion(evento) {
     sheqIds: sheqId ? [sheqId] : [],
     tipo: $("asignacionTipo").value,
     cliente: $("asignacionCliente").value.trim(),
-    actividad: $("asignacionActividad").value.trim(),
-    ot: $("asignacionOt").value.trim(),
-    equipo: $("asignacionEquipo").value.trim(),
+    contrato: $("asignacionContrato").checked,
+    fixPrice: $("asignacionFixPrice").checked,
+    actividad: ordenesServicio[0]?.actividad || "",
+    ordenesServicio,
+    ot: ordenesServicio[0]?.numero || "",
+    equipo: ordenesServicio[0]?.equipo || "",
+    vehiculoId,
+    vehiculoNombre: vehiculo ? nombreVehiculo(vehiculo) : "",
     observaciones: $("asignacionObservaciones").value.trim(),
     actualizadoPor: usuario.uid,
     fechaActualizacion: serverTimestamp()
@@ -543,24 +755,34 @@ async function publicarSemana() {
     return;
   }
 
-  if (!confirm("¿Publicar esta semana? En esta primera versión todavía no se enviarán correos reales.")) return;
+  const mensajePublicacion = empresa?.envioCorreosProgramacion === true
+    ? "¿Publicar esta semana? La primera publicación enviará la programación completa; las siguientes notificarán solo los cambios a las personas afectadas."
+    : "¿Publicar esta semana en modo de prueba? La programación quedará visible, pero no se enviarán correos.";
+  if (!confirm(mensajePublicacion)) return;
 
   const inicio = fechaISO(semanaInicio);
+  const boton = $("btnPublicarSemana");
+  boton.disabled = true;
+  boton.textContent = "Publicando...";
   try {
-    await setDoc(doc(db, "programacionSemanas", `${empresaId}_${inicio}`), {
-      empresaId,
-      semanaInicio: inicio,
-      estado: "publicada",
-      publicadoPor: usuario.uid,
-      fechaPublicacion: serverTimestamp(),
-      cantidadAsignaciones: asignacionesSemana.length
-    }, { merge: true });
+    const respuesta = await publicarProgramacionSegura({ empresaId, semanaInicio: inicio });
+    const resultado = respuesta.data || {};
     estadoSemanaActual = "publicada";
     actualizarEncabezadoSemana();
-    alert("Semana publicada. El envío de correos se conectará después de aprobar esta versión.");
+    const resumen = resultado.modoPrueba
+      ? `Semana publicada en modo de prueba. Se detectaron ${resultado.cambios || 0} cambio(s) para ${resultado.destinatariosPotenciales || 0} usuario(s), pero no se enviaron correos.`
+      : resultado.primeraPublicacion
+        ? `Programación completa preparada para ${resultado.destinatarios || 0} destinatario(s).`
+        : resultado.cambios
+          ? `${resultado.cambios} cambio(s) preparado(s) para ${resultado.destinatarios || 0} destinatario(s).`
+          : "Semana publicada sin cambios que notificar.";
+    alert(`${resumen}${resultado.sinCorreo ? ` ${resultado.sinCorreo} usuario(s) no tiene(n) un correo válido.` : ""}`);
   } catch (error) {
     console.error("No fue posible publicar la semana:", error);
-    alert("No fue posible publicar la semana.");
+    alert(error?.message || "No fue posible publicar la semana.");
+  } finally {
+    boton.disabled = false;
+    actualizarEncabezadoSemana();
   }
 }
 
@@ -578,6 +800,34 @@ function personasVistaCorreo(grupo) {
   return usuariosEmpresa.filter(item =>
     (item.activo !== false && grupoUsuario(item) === grupo) || idsConAsignacion.has(item.id)
   );
+}
+
+function detalleOperacionalCorreo(asignacion) {
+  const detalles = ordenesServicioAsignacion(asignacion)
+    .filter(item => item.numero || item.equipo || item.actividad || item.observacion)
+    .map(item => `OS ${[item.numero, item.equipo, item.actividad, item.observacion ? `Obs: ${item.observacion}` : ""].filter(Boolean).join(" · ")}${item.cerrada ? " · Cerrar OS" : ""}`);
+  const modalidad = [asignacion.contrato ? "Contrato" : "", asignacion.fixPrice ? "Fix Price" : ""].filter(Boolean).join(" · ");
+  if (modalidad) detalles.unshift(`Modalidad ${modalidad}`);
+  if (asignacion.vehiculoNombre) detalles.push(`Vehículo ${asignacion.vehiculoNombre}`);
+  return detalles.map(item => `<br>${escapar(item)}`).join("");
+}
+
+function companerosAsignacionCorreo(asignacion, destinatarioId) {
+  const participantes = [
+    ...(asignacion.usuarioIds || []).map(id => ({ id, rol: "Técnico" })),
+    ...(asignacion.supervisorIds || []).map(id => ({ id, rol: "Supervisor" })),
+    ...(asignacion.sheqIds || []).map(id => ({ id, rol: "SHEQ" }))
+  ];
+  const vistos = new Set();
+  const companeros = participantes
+    .filter(item => item.id !== destinatarioId && !vistos.has(item.id) && vistos.add(item.id))
+    .map(item => {
+      const perfil = usuariosEmpresa.find(usuarioEmpresa => usuarioEmpresa.id === item.id);
+      return `${nombreUsuario(perfil || {})} (${item.rol})`;
+    });
+  return companeros.length
+    ? `<br><strong>Trabajará con:</strong> ${escapar(companeros.join(", "))}`
+    : "";
 }
 
 function renderVistaCorreo(grupo = "tecnico", personaId = "") {
@@ -604,7 +854,7 @@ function renderVistaCorreo(grupo = "tecnico", personaId = "") {
         <div class="correo-encabezado"><h3>Programación individual · Semana ${numeroSemana(semanaInicio)}</h3><p>${escapar(nombreUsuario(persona))} · ${escapar(etiquetaRol(persona))} · ${escapar(empresa?.nombre || "Empresa")}</p></div>
         <div class="correo-cuerpo">
           ${asignaciones.length ? asignaciones.map(item => `
-            <div class="correo-dia"><strong>${escapar(DIAS[Math.max(0, Math.round((new Date(`${item.fecha}T12:00:00`) - semanaInicio) / 86400000))])} ${escapar(fechaCorta(new Date(`${item.fecha}T12:00:00`)))}</strong><p>${escapar(item.cliente || "Sin cliente")}<br>${escapar(item.actividad || "Actividad programada")}${item.equipo || item.ot ? `<br>${escapar([item.equipo, item.ot].filter(Boolean).join(" · "))}` : ""}${item.observaciones ? `<br>${escapar(item.observaciones)}` : ""}</p></div>
+            <div class="correo-dia"><strong>${escapar(DIAS[Math.max(0, Math.round((new Date(`${item.fecha}T12:00:00`) - semanaInicio) / 86400000))])} ${escapar(fechaCorta(new Date(`${item.fecha}T12:00:00`)))}</strong><p>${escapar(item.cliente || "Sin cliente")}${detalleOperacionalCorreo(item)}${companerosAsignacionCorreo(item, persona.id)}${item.observaciones ? `<br>${escapar(item.observaciones)}` : ""}</p></div>
           `).join("") : '<div class="correo-vacio">Esta persona todavía no tiene asignaciones durante la semana seleccionada.</div>'}
         </div>
       </div>
@@ -632,9 +882,10 @@ function configurarInterfaz() {
   const esUsuarioSheq = usuario.rol === "sheq";
   const esBodeguero = usuario.rol === "bodeguero";
   $("menuDashboardProgramacion").style.display = esUsuarioSheq || esBodeguero ? "none" : "";
-  $("menuSheqProgramacion").style.display = esUsuarioSheq ? "" : "none";
-  $("menuInventarioProgramacion").style.display = esBodeguero ? "" : "none";
-  if (!PUEDE_EDITAR) {
+  $("menuOrdenesProgramacion").style.display = esUsuarioSheq || esBodeguero ? "none" : "";
+  $("menuSheqProgramacion").style.display = ["sheq", "planificador", "admin_empresa", "admin_sucursal"].includes(usuario.rol) ? "" : "none";
+  $("menuInventarioProgramacion").style.display = ["planificador", "admin_empresa", "admin_sucursal", "bodeguero"].includes(usuario.rol) ? "" : "none";
+  if (!PUEDE_VER_PROGRAMACION_COMPLETA) {
     grupoActivo = "mi-semana";
     document.querySelectorAll("[data-grupo]").forEach(boton => {
       const esMiSemana = boton.dataset.grupo === "mi-semana";
@@ -655,11 +906,59 @@ function configurarInterfaz() {
   $("btnVistaCorreo").addEventListener("click", abrirVistaCorreo);
   $("btnPublicarSemana").addEventListener("click", publicarSemana);
   $("formAsignacion").addEventListener("submit", guardarAsignacion);
+  $("asignacionFecha").addEventListener("change", () => {
+    const ocupados = idsOcupadosEnFecha($("asignacionFecha").value, $("asignacionId").value);
+    const seleccionadosDisponibles = idsUsuariosSeleccionados().filter(id => !ocupados.has(id));
+    actualizarSelectoresAsignacion({
+      usuariosSeleccionados: seleccionadosDisponibles,
+      supervisorSeleccionado: $("asignacionSupervisor").value,
+      sheqSeleccionado: $("asignacionSheq").value
+    });
+  });
   $("asignacionGrupo").addEventListener("change", () => actualizarSelectoresAsignacion({
     supervisorSeleccionado: $("asignacionSupervisor").value,
     sheqSeleccionado: $("asignacionSheq").value
   }));
-  $("asignacionUsuarios").addEventListener("change", actualizarAlertaSheqTrabajador);
+  $("listaAsignacionUsuarios").addEventListener("change", evento => {
+    if (!evento.target.matches(".asignacion-usuario-select")) return;
+    const repetido = evento.target.value && Array.from(document.querySelectorAll(".asignacion-usuario-select"))
+      .some(selector => selector !== evento.target && selector.value === evento.target.value);
+    if (repetido) {
+      evento.target.value = "";
+      alert("Este trabajador ya fue agregado a la asignación.");
+    }
+    actualizarResumenTrabajadores();
+    actualizarAlertaSheqTrabajador();
+  });
+  $("listaAsignacionUsuarios").addEventListener("click", evento => {
+    const boton = evento.target.closest(".btn-quitar-trabajador");
+    if (!boton) return;
+    boton.closest(".fila-asignacion-usuario")?.remove();
+    actualizarResumenTrabajadores();
+    actualizarAlertaSheqTrabajador();
+  });
+  $("btnAgregarTrabajador").addEventListener("click", () => {
+    const grupo = $("asignacionGrupo").value || "tecnico";
+    const trabajadores = usuariosDisponiblesPorGrupo(usuariosEmpresa, grupo);
+    const ocupados = idsOcupadosEnFecha($("asignacionFecha").value, $("asignacionId").value);
+    $("listaAsignacionUsuarios").appendChild(crearFilaTrabajador(trabajadores, "", [], true, ocupados));
+    $("listaAsignacionUsuarios").lastElementChild?.querySelector("select")?.focus();
+  });
+  $("btnAgregarOs").addEventListener("click", () => {
+    $("listaAsignacionOs").appendChild(crearFilaOs());
+    $("listaAsignacionOs").lastElementChild?.querySelector(".asignacion-os-numero")?.focus();
+  });
+  $("listaAsignacionOs").addEventListener("change", evento => {
+    if (!evento.target.matches(".asignacion-os-cerrada")) return;
+    evento.target.closest(".fila-asignacion-os")?.classList.toggle("os-cerrada", evento.target.checked);
+  });
+  $("listaAsignacionOs").addEventListener("click", evento => {
+    const boton = evento.target.closest(".btn-quitar-os");
+    if (boton) boton.closest(".fila-asignacion-os")?.remove();
+  });
+  $("asignacionVehiculo").addEventListener("change", actualizarAlertaSheqTrabajador);
+  $("asignacionSupervisor").addEventListener("change", actualizarAlertaSheqTrabajador);
+  $("asignacionSheq").addEventListener("change", actualizarAlertaSheqTrabajador);
   $("btnEliminarAsignacion").addEventListener("click", eliminarAsignacion);
 
   document.querySelectorAll("[data-cerrar-modal]").forEach(boton => {
@@ -687,6 +986,7 @@ function configurarInterfaz() {
 }
 
 window.volverDashboard = () => { window.location.href = "dashboard.html"; };
+window.volverOrdenes = () => { window.location.href = "ordenes.html"; };
 window.volverSheq = () => { window.location.href = "sheq.html"; };
 window.volverInventario = () => { window.location.href = "inventario.html"; };
 window.volverPanelEmpresa = () => { window.location.href = `empresa-admin.html?id=${empresaId}`; };

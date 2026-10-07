@@ -44,6 +44,69 @@ function correoValido(valor) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(valor);
 }
 
+function escaparHtml(valor) {
+  return String(valor ?? "")
+    .replaceAll("&", "&amp;").replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;").replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function programacionPublicable(documento) {
+  const datos = documento.data ? documento.data() : documento;
+  return {
+    id: documento.id || datos.id || "",
+    fecha: texto(datos.fecha, 10),
+    grupo: texto(datos.grupo, 30),
+    usuarioIds: Array.isArray(datos.usuarioIds) ? datos.usuarioIds : [],
+    supervisorIds: Array.isArray(datos.supervisorIds) ? datos.supervisorIds : [],
+    sheqIds: Array.isArray(datos.sheqIds) ? datos.sheqIds : [],
+    tipo: texto(datos.tipo, 40),
+    cliente: texto(datos.cliente, 180),
+    contrato: datos.contrato === true,
+    fixPrice: datos.fixPrice === true,
+    ordenesServicio: Array.isArray(datos.ordenesServicio) ? datos.ordenesServicio.map(item => ({
+      numero: texto(item.numero, 100), equipo: texto(item.equipo, 180),
+      actividad: texto(item.actividad, 300), observacion: texto(item.observacion, 500), cerrada: item.cerrada === true
+    })) : [{ numero: texto(datos.ot, 100), equipo: texto(datos.equipo, 180), actividad: texto(datos.actividad, 300), observacion: "", cerrada: false }],
+    vehiculoNombre: texto(datos.vehiculoNombre, 240),
+    observaciones: texto(datos.observaciones, 1000)
+  };
+}
+
+function idsProgramacion(item) {
+  return [...new Set([...(item.usuarioIds || []), ...(item.supervisorIds || []), ...(item.sheqIds || [])])];
+}
+
+function detalleProgramacionHtml(item, accion = "", companeros = []) {
+  const ordenes = (item.ordenesServicio || []).filter(os => os.numero || os.equipo || os.actividad || os.observacion)
+    .map(os => `<li><strong>OS:</strong> ${escaparHtml([os.numero, os.equipo, os.actividad, os.observacion ? `Obs: ${os.observacion}` : ""].filter(Boolean).join(" · "))}${os.cerrada ? " · <strong>Cerrar OS</strong>" : ""}</li>`).join("");
+  const modalidad = [item.contrato ? "Contrato" : "", item.fixPrice ? "Fix Price" : ""].filter(Boolean).join(" · ");
+  return `<section style="margin:14px 0;padding:14px;border:1px solid #dbe6f0;border-radius:10px">
+    ${accion ? `<p style="margin:0 0 8px"><strong>${escaparHtml(accion)}</strong></p>` : ""}
+    <p style="margin:0 0 6px"><strong>${escaparHtml(item.fecha)}</strong> · ${escaparHtml(item.cliente || "Sin cliente")}</p>
+    ${modalidad ? `<p style="margin:6px 0"><strong>Modalidad:</strong> ${escaparHtml(modalidad)}</p>` : ""}
+    ${ordenes ? `<ul style="margin:6px 0;padding-left:20px">${ordenes}</ul>` : ""}
+    ${item.vehiculoNombre ? `<p style="margin:6px 0"><strong>Vehículo:</strong> ${escaparHtml(item.vehiculoNombre)}</p>` : ""}
+    ${companeros.length ? `<p style="margin:6px 0"><strong>Trabajará con:</strong> ${escaparHtml(companeros.join(", "))}</p>` : ""}
+    ${item.observaciones ? `<p style="margin:6px 0"><strong>Indicaciones:</strong> ${escaparHtml(item.observaciones)}</p>` : ""}
+  </section>`;
+}
+
+function companerosProgramacion(item, destinatarioId, usuarios) {
+  const participantes = [
+    ...(item.usuarioIds || []).map(id => ({ id, rol: "Técnico" })),
+    ...(item.supervisorIds || []).map(id => ({ id, rol: "Supervisor" })),
+    ...(item.sheqIds || []).map(id => ({ id, rol: "SHEQ" }))
+  ];
+  const vistos = new Set();
+  return participantes
+    .filter(participante => participante.id !== destinatarioId && !vistos.has(participante.id) && vistos.add(participante.id))
+    .map(participante => {
+      const perfil = usuarios.get(participante.id);
+      return `${perfil?.nombreCompleto || perfil?.nombre || perfil?.email || "Usuario"} (${participante.rol})`;
+    });
+}
+
 function passwordTemporal() {
   const mayusculas = "ABCDEFGHJKLMNPQRSTUVWXYZ";
   const minusculas = "abcdefghijkmnopqrstuvwxyz";
@@ -1333,6 +1396,116 @@ exports.generarExportacionEmpresa = onCall({
     if (error instanceof HttpsError) throw error;
     throw new HttpsError("internal", "No fue posible preparar el respaldo completo. Intenta nuevamente.");
   }
+});
+
+exports.publicarProgramacion = onCall(CALLABLE_OPTIONS, async request => {
+  const solicitante = await obtenerSolicitante(request);
+  const empresaId = texto(request.data?.empresaId, 120);
+  const semanaInicio = texto(request.data?.semanaInicio, 10);
+  if (!empresaId || !/^\d{4}-\d{2}-\d{2}$/.test(semanaInicio)) {
+    throw new HttpsError("invalid-argument", "Empresa y semana son obligatorias.");
+  }
+  if (solicitante.rol !== "super_admin" &&
+      !(solicitante.empresaId === empresaId && solicitante.rol === "planificador")) {
+    throw new HttpsError("permission-denied", "No puedes publicar esta programación.");
+  }
+  const empresaSnap = await exigirEmpresaOperativa(empresaId, solicitante);
+  const inicio = new Date(`${semanaInicio}T12:00:00Z`);
+  const termino = new Date(inicio);
+  termino.setUTCDate(termino.getUTCDate() + 6);
+  const semanaTermino = termino.toISOString().slice(0, 10);
+  const [asignacionesSnap, semanaSnap, usuariosSnap] = await Promise.all([
+    db.collection("programaciones").where("empresaId", "==", empresaId).get(),
+    db.collection("programacionSemanas").doc(`${empresaId}_${semanaInicio}`).get(),
+    db.collection("usuarios").where("empresaId", "==", empresaId).get()
+  ]);
+  const actuales = asignacionesSnap.docs
+    .map(programacionPublicable)
+    .filter(item => item.fecha >= semanaInicio && item.fecha <= semanaTermino);
+  if (!actuales.length) throw new HttpsError("failed-precondition", "La semana no tiene asignaciones.");
+  const anteriores = Array.isArray(semanaSnap.data()?.snapshotPublicado) ? semanaSnap.data().snapshotPublicado : [];
+  const primeraPublicacion = !anteriores.length;
+  const anteriorPorId = new Map(anteriores.map(item => [item.id, item]));
+  const actualPorId = new Map(actuales.map(item => [item.id, item]));
+  const cambios = [];
+  if (primeraPublicacion) {
+    actuales.forEach(item => cambios.push({ accion: "Programación semanal", anterior: null, actual: item }));
+  } else {
+    actuales.forEach(item => {
+      const anterior = anteriorPorId.get(item.id);
+      if (!anterior) cambios.push({ accion: "Nueva asignación", anterior: null, actual: item });
+      else if (JSON.stringify(anterior) !== JSON.stringify(item)) cambios.push({ accion: "Asignación modificada", anterior, actual: item });
+    });
+    anteriores.forEach(item => {
+      if (!actualPorId.has(item.id)) cambios.push({ accion: "Asignación eliminada", anterior: item, actual: null });
+    });
+  }
+  const usuarios = new Map(usuariosSnap.docs.map(item => [item.id, { id: item.id, ...item.data() }]));
+  const cambiosPorUsuario = new Map();
+  cambios.forEach(cambio => {
+    const idsAntes = new Set(cambio.anterior ? idsProgramacion(cambio.anterior) : []);
+    const idsAhora = new Set(cambio.actual ? idsProgramacion(cambio.actual) : []);
+    const ids = new Set([...idsAntes, ...idsAhora]);
+    ids.forEach(id => {
+      if (!cambiosPorUsuario.has(id)) cambiosPorUsuario.set(id, []);
+      let accionUsuario = cambio.accion;
+      if (idsAntes.has(id) && !idsAhora.has(id)) accionUsuario = "Retirado de la asignación";
+      else if (!idsAntes.has(id) && idsAhora.has(id) && !primeraPublicacion) accionUsuario = "Nueva asignación";
+      cambiosPorUsuario.get(id).push({ ...cambio, accion: accionUsuario });
+    });
+  });
+  const lote = db.batch();
+  const correosActivos = empresaSnap.data().envioCorreosProgramacion === true;
+  let enCola = 0;
+  let destinatariosPotenciales = 0;
+  let sinCorreo = 0;
+  for (const [usuarioId, cambiosUsuario] of cambiosPorUsuario) {
+    const perfil = usuarios.get(usuarioId);
+    const correo = texto(perfil?.email || perfil?.correo, 160).toLowerCase();
+    if (!correoValido(correo)) { sinCorreo += 1; continue; }
+    destinatariosPotenciales += 1;
+    if (!correosActivos) continue;
+    const asunto = primeraPublicacion
+      ? `Programación semanal · ${semanaInicio}`
+      : `Cambio en tu programación · ${semanaInicio}`;
+    const contenido = cambiosUsuario.map(cambio => {
+      const asignacion = cambio.actual || cambio.anterior;
+      return detalleProgramacionHtml(asignacion, cambio.accion, companerosProgramacion(asignacion, usuarioId, usuarios));
+    }).join("");
+    const referencia = db.collection("mail").doc();
+    lote.set(referencia, {
+      to: correo,
+      message: {
+        subject: asunto,
+        html: `<div style="font-family:Arial,sans-serif;color:#17324a"><h2>${escaparHtml(empresaSnap.data().nombre || "Vectaria")}</h2><p>Hola ${escaparHtml(perfil?.nombreCompleto || perfil?.nombre || "")},</p><p>${primeraPublicacion ? "Esta es tu programación completa para la semana." : "Se realizaron cambios que afectan tu programación."}</p>${contenido}<p>Revisa el sistema para consultar la programación vigente.</p></div>`,
+        text: `${primeraPublicacion ? "Programación semanal" : "Cambios de programación"} desde ${semanaInicio}. Ingresa al sistema para ver el detalle.`
+      },
+      empresaId, semanaInicio, usuarioId,
+      tipo: primeraPublicacion ? "programacion_completa" : "cambio_programacion",
+      estadoAplicacion: "pendiente_proveedor_correo",
+      creadoPor: solicitante.uid,
+      fechaCreacion: FieldValue.serverTimestamp()
+    });
+    enCola += 1;
+  }
+  lote.set(db.collection("programacionSemanas").doc(`${empresaId}_${semanaInicio}`), {
+    empresaId, semanaInicio, estado: "publicada",
+    publicadoPor: solicitante.uid,
+    fechaPublicacion: FieldValue.serverTimestamp(),
+    cantidadAsignaciones: actuales.length,
+    snapshotPublicado: actuales,
+    ultimoEnvio: {
+      tipo: primeraPublicacion ? "completo" : "cambios",
+      modoPrueba: !correosActivos,
+      destinatarios: enCola,
+      destinatariosPotenciales,
+      cambios: cambios.length,
+      sinCorreo
+    }
+  }, { merge: true });
+  await lote.commit();
+  await registrarAuditoria({ solicitante, empresaId, accion: "programacion_publicada", objetivoId: semanaInicio, detalle: `${primeraPublicacion ? "Completa" : "Cambios"}: ${cambios.length}; modo prueba: ${!correosActivos}; correos en cola: ${enCola}` });
+  return { ok: true, primeraPublicacion, cambios: cambios.length, modoPrueba: !correosActivos, destinatarios: enCola, destinatariosPotenciales, sinCorreo };
 });
 
 exports.limpiarExportacionesExpiradas = onSchedule({

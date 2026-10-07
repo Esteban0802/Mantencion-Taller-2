@@ -76,7 +76,7 @@ service firebase.storage {
     function canManageSheq(empresaId) {
       return activeUser() && (
         isSuperAdmin() ||
-        (profile().empresaId == empresaId && profile().rol in ['admin_empresa', 'admin_sucursal', 'sheq'])
+        (profile().empresaId == empresaId && profile().rol == 'sheq')
       );
     }
 
@@ -94,8 +94,7 @@ service firebase.storage {
       return activeUser() && (
         isSuperAdmin() ||
         (profile().empresaId == empresaId && (
-          profile().rol == 'admin_empresa' ||
-          (profile().sucursalId == sucursalId && profile().rol in ['admin_sucursal', 'jefe_taller', 'planificador', 'bodeguero'])
+          (profile().sucursalId == sucursalId && profile().rol in ['jefe_taller', 'planificador', 'bodeguero'])
         ))
       );
     }

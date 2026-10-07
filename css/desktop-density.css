@@ -354,15 +354,19 @@
     border-radius:7px;
     font-size:9px;
   }
-  .programacion-page .asignacion-dato {
+  .programacion-page .asignacion-dato,
+  .programacion-page .bloque-asignacion .asignacion-os-item {
+    min-height:22px;
     grid-template-columns:62px minmax(0,1fr);
     gap:6px;
-    padding:2px 0;
+    padding:1px 0;
     font-size:9px;
-    line-height:1.15;
+    line-height:1.1;
   }
   .programacion-page .asignacion-dato strong,
-  .programacion-page .asignacion-dato span { font-size:9px; line-height:1.15; }
+  .programacion-page .asignacion-dato span,
+  .programacion-page .bloque-asignacion .asignacion-os-item strong,
+  .programacion-page .bloque-asignacion .asignacion-os-item span { font-size:9px; line-height:1.1; }
   .programacion-page .celda-vacia { min-height:40px; font-size:9px; }
 
   /* Órdenes y SHEQ */

@@ -9,8 +9,8 @@
   <link rel="stylesheet" href="css/brand-overtrack.css">
   <link rel="stylesheet" href="css/brand-overtrack-light.css">
   <link rel="stylesheet" href="css/notificaciones.css">
-  <link rel="stylesheet" href="css/programacion.css?v=20261004-6">
-  <link rel="stylesheet" href="css/desktop-density.css?v=20261004-8">
+  <link rel="stylesheet" href="css/programacion.css?v=20261006-12">
+  <link rel="stylesheet" href="css/desktop-density.css?v=20261006-10">
 </head>
 <body class="dashboard-overtrack programacion-page">
   <div class="app">
@@ -24,6 +24,7 @@
       <div class="sidebar-logo"><img class="sidebar-brand-logo" src="img/vectaria-logo-official.png?v=3" alt="Vectaria - Tu operación, en una misma dirección"></div>
       <ul>
         <li id="menuDashboardProgramacion" onclick="volverDashboard()"><svg class="ot-icon nav-icon" aria-hidden="true"><use href="img/icons-overtrack.svg#dashboard"></use></svg><span>Dashboard</span></li>
+        <li id="menuOrdenesProgramacion" onclick="volverOrdenes()"><svg class="ot-icon nav-icon" aria-hidden="true"><use href="img/icons-overtrack.svg#list"></use></svg><span>Todas las OS</span></li>
         <li id="menuSheqProgramacion" style="display:none" onclick="volverSheq()"><span class="sheq-nav-icon">🛡️</span><span>SHEQ</span></li>
         <li id="menuInventarioProgramacion" style="display:none" onclick="volverInventario()"><svg class="ot-icon nav-icon" aria-hidden="true"><use href="img/icons-overtrack.svg#clipboard"></use></svg><span>Inventario</span></li>
         <li class="active"><svg class="ot-icon nav-icon" aria-hidden="true"><use href="img/icons-overtrack.svg#calendar"></use></svg><span>Programación</span></li>
@@ -78,14 +79,17 @@
         <input type="hidden" id="asignacionId">
         <div class="campo"><label for="asignacionFecha">Fecha</label><input type="date" id="asignacionFecha" required></div>
         <div class="campo"><label for="asignacionGrupo">Grupo</label><select id="asignacionGrupo" required><option value="tecnico">Técnicos</option><option value="supervisor">Supervisores</option><option value="sheq">SHEQ</option></select></div>
-        <div class="campo campo-ancho"><label for="asignacionUsuarios">Trabajador</label><select id="asignacionUsuarios" required><option value="">Cargando usuarios...</option></select><small>Se muestran usuarios activos de la sucursal que corresponden al grupo seleccionado.</small><div id="alertaSheqProgramacion" class="alerta-sheq-programacion" role="status" hidden></div></div>
+        <div class="campo campo-ancho"><label for="asignacionUsuarios">Trabajadores</label><div id="listaAsignacionUsuarios" class="lista-asignacion-usuarios"><div class="fila-asignacion-usuario"><select id="asignacionUsuarios" class="asignacion-usuario-select" required aria-describedby="ayudaAsignacionUsuarios"><option value="">Cargando usuarios...</option></select></div></div><button type="button" id="btnAgregarTrabajador" class="btn-agregar-trabajador">+ Agregar otro trabajador</button><small id="ayudaAsignacionUsuarios">Agrega a todos los técnicos que participarán en la misma actividad.</small><div id="resumenAsignacionUsuarios" class="resumen-seleccion-programacion" aria-live="polite">Ningún trabajador seleccionado.</div><div id="alertaSheqProgramacion" class="alerta-sheq-programacion" role="status" hidden></div></div>
         <div class="campo campo-ancho"><label for="asignacionSupervisor">Supervisor</label><select id="asignacionSupervisor"><option value="">Cargando usuarios...</option></select><small>Selecciona al supervisor responsable de acompañar o supervisar la actividad.</small></div>
         <div class="campo campo-ancho"><label for="asignacionSheq">Asesor SHEQ</label><select id="asignacionSheq"><option value="">Cargando usuarios...</option></select><small>Opcional. Asígnalo cuando la actividad en terreno requiera acompañamiento SHEQ.</small></div>
-        <div class="campo"><label for="asignacionTipo">Tipo de asignación</label><select id="asignacionTipo"><option value="terreno">Trabajo en terreno</option><option value="interno">Trabajo interno</option><option value="capacitacion">Capacitación</option></select></div>
-        <div class="campo"><label for="asignacionCliente">Cliente o lugar</label><input type="text" id="asignacionCliente" required></div>
-        <div class="campo campo-ancho"><label for="asignacionActividad">Actividad</label><input type="text" id="asignacionActividad" required></div>
-        <div class="campo"><label for="asignacionOt">OT relacionada</label><input type="text" id="asignacionOt" placeholder="Opcional"></div>
-        <div class="campo"><label for="asignacionEquipo">Equipo, modelo o serie</label><input type="text" id="asignacionEquipo" placeholder="Opcional"></div>
+        <div class="campo-ancho fila-modalidad-asignacion">
+          <div class="campo"><label for="asignacionTipo">Tipo de asignación</label><select id="asignacionTipo"><option value="terreno">Trabajo en terreno</option><option value="interno">Trabajo interno</option><option value="capacitacion">Capacitación</option></select></div>
+          <div class="campo"><label for="asignacionCliente">Cliente o lugar</label><input type="text" id="asignacionCliente" required></div>
+          <label class="control-modalidad-asignacion" for="asignacionContrato"><input type="checkbox" id="asignacionContrato"><span>Contrato</span></label>
+          <label class="control-modalidad-asignacion" for="asignacionFixPrice"><input type="checkbox" id="asignacionFixPrice"><span>Fix Price</span></label>
+        </div>
+        <div class="campo campo-ancho"><label>Órdenes de servicio</label><div id="listaAsignacionOs" class="lista-asignacion-os"></div><button type="button" id="btnAgregarOs" class="btn-agregar-os">+ Agregar nueva OS</button><small>Cada OS puede indicar su equipo, actividad, observación e instrucción de cierre.</small></div>
+        <div class="campo campo-ancho"><label for="asignacionVehiculo">Vehículo</label><select id="asignacionVehiculo"><option value="">Sin vehículo asignado</option></select><small>Se muestran los vehículos incorporados en la sección SHEQ.</small></div>
         <div class="campo campo-ancho"><label for="asignacionObservaciones">Indicaciones</label><textarea id="asignacionObservaciones" rows="3" placeholder="Opcional"></textarea></div>
         <div class="form-programacion-acciones campo-ancho"><button type="button" class="btn-danger" id="btnEliminarAsignacion" style="display:none">Eliminar</button><span></span><button type="button" class="btn-programacion-secundario" data-cerrar-modal="modalAsignacion">Cancelar</button><button type="submit" class="btn-primary" id="btnGuardarAsignacion">Guardar asignación</button></div>
       </form>
@@ -100,6 +104,6 @@
   </div>
 
   <script src="js/components/notificaciones.js"></script>
-  <script type="module" src="js/programacion.js?v=20261004-7"></script>
+  <script type="module" src="js/programacion.js?v=20261006-16"></script>
 </body>
 </html>

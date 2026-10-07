@@ -12,9 +12,44 @@
 .programacion-page .campo select,
 .programacion-page .campo textarea{min-height:42px;border:1px solid #c7d8e7!important;background:#f9fcff!important;color:#152c40!important;caret-color:#1475c9;box-shadow:none!important;color-scheme:light}
 .programacion-page .campo textarea{min-height:82px;resize:vertical}
-.programacion-page .campo select[multiple]{min-height:116px;padding:6px}
-.programacion-page .campo select[multiple] option{margin:2px 0;padding:8px 10px;border-radius:6px;color:#15324a;background:#f9fcff}
-.programacion-page .campo select[multiple] option:checked{color:#fff;background:#1475c9 linear-gradient(0deg,#1475c9 0%,#1475c9 100%)}
+.programacion-page .lista-asignacion-usuarios{display:flex;flex-direction:column;gap:9px}
+.programacion-page .fila-asignacion-usuario{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:9px}
+.programacion-page .fila-asignacion-usuario:only-child{grid-template-columns:minmax(0,1fr)}
+.programacion-page .btn-agregar-trabajador{align-self:flex-start;padding:8px 12px;border:1px solid #8dbce0;background:#fff;color:#0b65ad;font-size:.8rem}
+.programacion-page .btn-agregar-trabajador:hover{background:#edf7ff}
+.programacion-page .btn-quitar-trabajador{min-height:42px;padding:8px 12px;border:1px solid #efb5bd;background:#fff5f6;color:#b42332;font-size:.78rem}
+.programacion-page .btn-quitar-trabajador:hover{background:#ffe8eb}
+.programacion-page .resumen-seleccion-programacion{padding:8px 10px;border-radius:8px;color:#31536e;background:#eef6fc;font-size:.78rem;line-height:1.4}
+.programacion-page .lista-asignacion-os{display:flex;flex-direction:column;gap:9px}
+.programacion-page .fila-asignacion-os{display:grid;grid-template-columns:minmax(90px,.7fr) minmax(115px,.9fr) minmax(125px,1.1fr) minmax(125px,1.1fr) auto auto;align-items:center;gap:7px;padding:4px 6px;border:1px solid #dbe6f0;border-radius:9px;background:#f8fbfe;transition:.2s ease}
+.programacion-page .fila-asignacion-os .asignacion-os-numero,
+.programacion-page .fila-asignacion-os .asignacion-os-equipo,
+.programacion-page .fila-asignacion-os .asignacion-os-actividad,
+.programacion-page .fila-asignacion-os .asignacion-os-observacion{height:34px;min-height:34px;padding-top:5px;padding-bottom:5px}
+.programacion-page .fila-asignacion-os.os-cerrada{border-color:#f3a43b;background:#fff4e5}
+.programacion-page .fila-asignacion-os.os-cerrada .asignacion-os-numero,
+.programacion-page .fila-asignacion-os.os-cerrada .asignacion-os-equipo,
+.programacion-page .fila-asignacion-os.os-cerrada .asignacion-os-actividad,
+.programacion-page .fila-asignacion-os.os-cerrada .asignacion-os-observacion{border-color:#e99524!important;background:#fff0d8!important;color:#8a4d00!important}
+.programacion-page .fila-asignacion-os.os-cerrada .asignacion-os-numero{font-weight:700}
+.programacion-page .fila-asignacion-os.os-cerrada .control-cerrar-os{border-color:#e99524;background:#fff0d8}
+.programacion-page .fila-asignacion-os.os-cerrada .control-cerrar-os span{color:#8a4d00}
+.programacion-page .control-cerrar-os{height:34px;min-height:34px;display:flex;align-items:center;gap:6px;padding:0 9px;border:1px solid #d1deea;border-radius:8px;background:#fff;white-space:nowrap;cursor:pointer}
+.programacion-page .control-cerrar-os input{width:17px!important;min-height:auto!important;height:17px;margin:0;padding:0;accent-color:#ef8d14}
+.programacion-page .control-cerrar-os span{color:#405267;font-size:.8rem;font-weight:700}
+.programacion-page .btn-agregar-os{align-self:flex-start;padding:8px 12px;border:1px solid #8dbce0;background:#fff;color:#0b65ad;font-size:.8rem}
+.programacion-page .btn-agregar-os:hover{background:#edf7ff}
+.programacion-page .btn-quitar-os{height:34px;min-height:34px;padding:5px 10px;border:1px solid #efb5bd;background:#fff5f6;color:#b42332;font-size:.76rem}
+.programacion-page .bloque-asignacion .asignacion-os-lista{display:flex;flex-direction:column;gap:0;margin-top:0}
+.programacion-page .bloque-asignacion .asignacion-os-item{min-height:28px;box-sizing:border-box;display:grid;grid-template-columns:72px minmax(0,1fr);align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid rgba(20,117,201,.10);border-radius:5px;font-size:.78rem;line-height:1.3}
+.programacion-page .bloque-asignacion .asignacion-os-item:last-child{border-bottom:0}
+.programacion-page .bloque-asignacion .asignacion-os-item.os-cerrada{color:#8a4d00;background:#ffe6bf}
+.programacion-page .bloque-asignacion .asignacion-os-item strong{color:#23445f;font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.02em}
+.programacion-page .bloque-asignacion .asignacion-os-item span{min-width:0;color:#4d6173;font-size:.78rem;font-weight:400;overflow-wrap:anywhere}
+.programacion-page .bloque-asignacion .asignacion-os-item.os-cerrada strong,
+.programacion-page .bloque-asignacion .asignacion-os-item.os-cerrada span{color:#8a4d00}
+.programacion-page .bloque-asignacion .indicacion-cerrar-os{display:inline;color:inherit;font-size:inherit;font-weight:700}
+@media(max-width:700px){.programacion-page .fila-asignacion-os{grid-template-columns:1fr}.programacion-page .control-cerrar-os{justify-content:flex-start}}
 .programacion-page .campo input::placeholder,
 .programacion-page .campo textarea::placeholder{color:#8295a7;opacity:1}
 .programacion-page .campo input:hover,
@@ -56,6 +91,11 @@
 .programacion-page .campo input,
 .programacion-page .campo select{height:44px}
 .programacion-page .campo select[multiple]{height:112px}
+.programacion-page .fila-modalidad-asignacion{display:grid;grid-template-columns:minmax(170px,.9fr) minmax(220px,1.25fr) minmax(112px,.45fr) minmax(112px,.45fr);align-items:end;gap:12px}
+.programacion-page .control-modalidad-asignacion{display:flex;align-items:center;justify-content:center;gap:8px;box-sizing:border-box;height:44px;padding:0 13px;border:1px solid #c7d8e7;border-radius:10px;background:#f9fcff;color:#294963;font-size:.82rem;font-weight:700;white-space:nowrap;cursor:pointer}
+.programacion-page .control-modalidad-asignacion:hover{border-color:#82b7df;background:#fff}
+.programacion-page .control-modalidad-asignacion:focus-within{outline:3px solid rgba(20,117,201,.15);border-color:#1475c9;background:#fff}
+.programacion-page .control-modalidad-asignacion input{flex:0 0 auto;width:17px!important;height:17px!important;min-width:17px!important;min-height:17px!important;margin:0!important;accent-color:#1475c9}
 .programacion-page .form-programacion-acciones .btn-primary{
   background:#1475c9!important;
   border-color:#1475c9!important;
@@ -63,13 +103,15 @@
 }
 
 .programacion-page .bloque-asignacion{min-height:0;padding:11px 12px}
-.programacion-page .asignacion-dato{display:grid;grid-template-columns:72px minmax(0,1fr);gap:8px;padding:4px 0;border-bottom:1px solid rgba(20,117,201,.10);font-size:.78rem;line-height:1.3}
+.programacion-page .asignacion-dato{min-height:28px;box-sizing:border-box;display:grid;grid-template-columns:72px minmax(0,1fr);align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid rgba(20,117,201,.10);font-size:.78rem;line-height:1.3}
 .programacion-page .asignacion-dato:last-child{border-bottom:0}
 .programacion-page .asignacion-dato strong{color:#23445f;font-size:.72rem;text-transform:uppercase;letter-spacing:.02em}
 .programacion-page .asignacion-dato span{min-width:0;color:#4d6173;overflow-wrap:anywhere}
 @media(max-width:800px){
   .programacion-page .form-programacion{grid-template-columns:minmax(0,1fr)}
   .programacion-page .campo-ancho{grid-column:auto}
+  .programacion-page .fila-modalidad-asignacion{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+  .programacion-page .fila-modalidad-asignacion .campo{grid-column:1/-1}
 }
 
 /* Navegación de la vista previa individual por grupo y persona. */

@@ -11,7 +11,7 @@ if (!usuario) throw new Error("Acceso no autorizado");
 
 const $ = id => document.getElementById(id);
 const escapar = valor => String(valor ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#039;");
-const rolesEdicion = ["super_admin", "admin_empresa", "admin_sucursal", "sheq"];
+const rolesEdicion = ["super_admin", "sheq"];
 const puedeEditar = rolesEdicion.includes(usuario.rol);
 let empresa = null, empresaId = "", sucursales = [], usuarios = [], contratos = [], vehiculos = [], documentos = [];
 

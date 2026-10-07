@@ -104,9 +104,7 @@ export function puedeCrearOT(
 
   return tieneRol(usuario, [
     ROLES.SUPER_ADMIN,
-    ROLES.ADMIN_SUCURSAL,
-    ROLES.JEFE_TALLER,
-    ROLES.USUARIO_TALLER
+    ROLES.JEFE_TALLER
   ]);
 }
 

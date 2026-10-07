@@ -128,15 +128,15 @@ function redirigirPorRol(perfil) {
       window.location.replace("super-admin.html");
       break;
     case "admin_empresa":
-      window.location.replace(`empresa-admin.html?id=${perfil.empresaId}`);
-      break;
     case "admin_sucursal":
     case "jefe_taller":
     case "usuario_taller":
     case "supervisor":
     case "tecnico":
-    case "planificador":
       window.location.replace("dashboard.html");
+      break;
+    case "planificador":
+      window.location.replace("programacion.html");
       break;
     case "bodeguero":
       window.location.replace("inventario.html");

@@ -51,6 +51,58 @@
 .inventario-form-grid label:last-child:nth-child(odd) { grid-column: 1 / -1; }
 .inventario-form-grid input { min-height:43px!important;padding:9px 11px!important;border:1px solid #c8d8e5!important;border-radius:9px!important;color:#173047!important;background:#fafdff!important;font-family:inherit!important;font-size:13px!important;font-weight:400!important;color-scheme:light;box-shadow:none!important; }.inventario-form-grid input:hover { border-color:#9fbdd3!important;background:#fff!important; }.inventario-form-grid input:focus { outline:0!important;border-color:#1689e8!important;background:#fff!important;box-shadow:0 0 0 3px rgba(22,137,232,.14)!important; }
 .inventario-modal-acciones { display: flex; justify-content: flex-end; gap: 10px; margin-top: 22px; padding-top:14px;border-top:1px solid #e5ecf2; }.inventario-modal-acciones button { min-height:42px;padding:9px 15px;border-radius:9px;font-size:13px; }
+.inventario-modal-os{width:min(720px,100%)}
+.inventario-form-os{grid-template-columns:minmax(0,1.15fr) minmax(0,1.15fr) minmax(150px,.7fr)}
+.inventario-form-os label:last-child:nth-child(odd){grid-column:auto}
+.inventario-modal-repuestos-os{width:min(980px,100%)}
+.inventario-repuestos-tabla-wrap{overflow-x:auto;border:1px solid #d7e2eb;border-radius:12px;background:#f8fbfd}
+.inventario-repuestos-tabla-encabezado,.inventario-repuesto-fila{display:grid;grid-template-columns:minmax(150px,.8fr) minmax(300px,1.8fr) minmax(110px,.55fr) 42px;gap:10px;align-items:center;min-width:690px}
+.inventario-repuestos-tabla-encabezado{padding:10px 12px;background:#102c49;color:#fff;font-size:12px;font-weight:800;text-transform:uppercase}
+.inventario-repuestos-filas{display:grid}
+.inventario-repuesto-fila{padding:9px 12px;border-top:1px solid #dfe8ef;background:#fff}
+.inventario-repuesto-fila:first-child{border-top:0}
+.inventario-repuesto-fila input{box-sizing:border-box;width:100%;height:40px;margin:0;padding:8px 10px;border:1px solid #c8d8e5;border-radius:8px;background:#fafdff;color:#173047;font:inherit}
+.inventario-repuesto-fila input:focus{outline:0;border-color:#1689e8;box-shadow:0 0 0 3px rgba(22,137,232,.14)}
+.inventario-quitar-fila{display:grid;place-items:center;width:34px;height:34px;padding:0;border:1px solid #efc1c6;border-radius:8px;background:#fff1f3;color:#c62838;font-size:18px;font-weight:800;cursor:pointer}
+.inventario-agregar-fila{margin-top:12px}
+.inventario-os-accion{display:flex;align-items:center;gap:8px}
+.inventario-tabla-os{min-width:900px;table-layout:fixed}
+.inventario-page .inventario-tabla.inventario-tabla-os th:nth-child(1){width:24%!important}.inventario-page .inventario-tabla.inventario-tabla-os th:nth-child(2){width:18%!important}.inventario-page .inventario-tabla.inventario-tabla-os th:nth-child(3){width:17%!important}.inventario-page .inventario-tabla.inventario-tabla-os th:nth-child(4){width:25%!important}.inventario-page .inventario-tabla.inventario-tabla-os th:nth-child(5){width:16%!important}
+.inventario-tabla-os th{padding:12px 18px;font-family:inherit;font-size:10px;font-weight:800;line-height:1.2;letter-spacing:.025em;text-transform:uppercase}
+.inventario-tabla-os td{height:58px;padding:10px 18px;font-family:inherit;font-size:12px;font-weight:400;line-height:1.35}
+.inventario-page .inventario-tabla.inventario-tabla-os th,.inventario-page .inventario-tabla.inventario-tabla-os td{box-sizing:border-box;text-align:center;vertical-align:middle;overflow:visible}
+.inventario-page .inventario-tabla.inventario-tabla-os th:first-child,.inventario-page .inventario-tabla.inventario-tabla-os td:first-child{text-align:left;padding-left:22px}
+.inventario-tabla-os tbody tr{transition:transform .15s,box-shadow .15s}
+.inventario-tabla-os tbody tr:hover td{background:#f2f8fd}
+.inventario-page .inventario-tabla-os .inventario-os-cliente{color:#173047;font-family:inherit;font-size:12px;font-weight:700;line-height:1.35}
+.inventario-page .inventario-tabla-os .inventario-os-equipo{color:#40586c;font-family:inherit;font-size:12px;font-weight:400;line-height:1.35}
+.inventario-page .inventario-tabla-os .inventario-os-numero{display:inline-flex;padding:6px 10px;border-radius:8px;background:#f0f5f9;color:#193d5a;font-family:inherit;font-size:12px;font-weight:600;line-height:1.2;letter-spacing:0}
+.inventario-os-accion{justify-content:center;gap:10px;width:100%}
+.inventario-repuestos-conteo{display:grid;place-items:center;flex:0 0 auto;width:30px;height:30px;border-radius:50%;background:#e5f2fd;color:#0878e8;font-family:inherit;font-size:11px;font-weight:700;line-height:1}
+.inventario-mostrar-repuestos{display:inline-flex;align-items:center;justify-content:center;gap:9px;max-width:calc(100% - 42px);min-height:36px;padding:7px 13px;border:1px solid #1689e8;border-radius:9px;background:#fff;color:#0878e8;font-family:inherit;font-size:11px;font-weight:700;line-height:1.2;cursor:pointer;white-space:nowrap}
+.inventario-mostrar-repuestos:hover{background:#1689e8;color:#fff}
+.inventario-detalle-tabla-wrap{overflow:auto;border:1px solid #d7e2eb;border-radius:12px}
+.inventario-detalle-tabla{width:100%;min-width:660px;border-collapse:collapse;background:#fff}
+.inventario-detalle-tabla th{padding:11px 12px;text-align:left;background:#102c49;color:#fff;font-size:12px;text-transform:uppercase}
+.inventario-detalle-tabla td{padding:10px 12px;border-bottom:1px solid #dfe8ef;color:#263b4b;font-size:13px}
+.inventario-detalle-tabla tr:last-child td{border-bottom:0}
+.inventario-estado-repuesto{width:100%;min-width:170px;height:38px;padding:0 34px 0 11px;border:1px solid #c8d8e5;border-radius:8px;background:#fafdff;color:#173047;font:inherit}
+.inventario-estado-os{width:100%;max-width:175px;min-width:130px;height:36px;padding:0 30px 0 10px;border:1px solid #c8d8e5;border-radius:9px;background:#fafdff;color:#173047;font-family:inherit;font-size:11px;font-weight:700;cursor:pointer}
+.inventario-estado-os:disabled{cursor:not-allowed;opacity:.82}
+.inventario-estado-repuesto.estado-parcial,.inventario-estado-os.estado-parcial{border-color:#f0b94f;background:#fff8e6;color:#8a5a00}
+.inventario-estado-repuesto.estado-completa,.inventario-estado-os.estado-completa{border-color:#7dcf96;background:#effaf2;color:#176b35}
+.inventario-estado-repuesto.estado-despachada,.inventario-estado-os.estado-despachada{border-color:#68aee8;background:#eef7ff;color:#075f9e}
+.inventario-estado-repuesto.estado-recepcion-cliente,.inventario-estado-os.estado-recepcion-cliente{border-color:#aa91df;background:#f6f1ff;color:#5d3c9b}
+.inventario-recibido-check{display:inline-flex;align-items:center;gap:10px;min-height:38px;padding:0 12px;border:1px solid #c8d8e5;border-radius:9px;background:#fafdff;color:#29465b;cursor:pointer;user-select:none}
+.inventario-recibido-check input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+.inventario-recibido-check span{display:grid;place-items:center;width:20px;height:20px;box-sizing:border-box;border:2px solid #9db2c3;border-radius:6px;background:#fff;transition:.15s}
+.inventario-recibido-check span::after{content:"";width:9px;height:5px;border-left:2px solid #fff;border-bottom:2px solid #fff;transform:translateY(-1px) rotate(-45deg);opacity:0}
+.inventario-recibido-check strong{font-family:inherit;font-size:12px;font-weight:700}
+.inventario-recibido-check:has(input:checked){border-color:#79c994;background:#effaf2;color:#176b35}
+.inventario-recibido-check input:checked + span{border-color:#22a653;background:#22a653}
+.inventario-recibido-check input:checked + span::after{opacity:1}
+.inventario-recibido-check:has(input:focus-visible){outline:3px solid rgba(22,137,232,.18);border-color:#1689e8}
+.inventario-recibido-check:has(input:disabled){cursor:not-allowed;opacity:.68}
 
 @media (max-width: 1000px) {
   .inventario-toolbar { align-items: stretch; flex-direction: column; }
@@ -59,6 +111,8 @@
 }
 @media (max-width: 680px) {
   .inventario-filtros, .inventario-resumen, .inventario-form-grid { grid-template-columns: 1fr; }
+  .inventario-form-os{grid-template-columns:1fr}
+  .inventario-form-os label:last-child:nth-child(odd){grid-column:auto}
   .inventario-acciones > button { flex: 1 1 145px; }
   .inventario-header .user-box { display: none; }
 }

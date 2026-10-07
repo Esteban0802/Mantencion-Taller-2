@@ -9,7 +9,7 @@
   <link rel="stylesheet" href="css/brand-overtrack.css">
   <link rel="stylesheet" href="css/brand-overtrack-light.css">
   <link rel="stylesheet" href="css/notificaciones.css">
-  <link rel="stylesheet" href="css/inventario.css?v=20261004-15">
+  <link rel="stylesheet" href="css/inventario.css?v=20261007-18">
   <link rel="stylesheet" href="css/desktop-density.css?v=20261004-7">
 </head>
 <body class="dashboard-overtrack inventario-page">
@@ -50,21 +50,21 @@
       <div class="inventario-acciones" id="accionesEdicionInventario">
         <input type="file" id="archivoInventario" accept=".xlsx,.xls" hidden>
         <button type="button" class="btn-secondary-inventario" id="btnImportarInventario">Importar Excel</button>
-        <button type="button" class="btn-primary-inventario" id="btnAgregarInventario">Agregar repuesto</button>
+        <button type="button" class="btn-primary-inventario" id="btnAgregarInventario">Agregar OS</button>
         <button type="button" class="btn-secondary-inventario" id="btnExportarInventario">Exportar Excel</button>
       </div>
     </section>
 
     <section class="inventario-resumen" aria-label="Resumen de inventario">
-      <article><span>Registros</span><strong id="totalInventario">…</strong></article>
-      <article><span>Columnas</span><strong id="totalColumnasInventario">…</strong></article>
+      <article><span>Órdenes de servicio</span><strong id="totalInventario">…</strong></article>
+      <article><span>Repuestos</span><strong id="totalColumnasInventario">…</strong></article>
       <article><span>Última actualización</span><strong id="ultimaActualizacionInventario">…</strong></article>
     </section>
 
     <section class="card inventario-tabla-card">
       <div class="inventario-tabla-encabezado"><div><h3>Existencias</h3><p id="estadoInventario">Cargando inventario…</p></div></div>
       <div class="inventario-tabla-scroll">
-        <table class="inventario-tabla" id="tablaInventario">
+        <table class="inventario-tabla inventario-tabla-os" id="tablaInventario">
           <thead><tr><th>Inventario</th></tr></thead>
           <tbody><tr><td class="inventario-vacio">Selecciona una sucursal para comenzar.</td></tr></tbody>
         </table>
@@ -76,15 +76,49 @@
   </main>
 </div>
 
-<div class="inventario-modal" id="modalRepuesto" hidden>
-  <section class="inventario-modal-contenido" role="dialog" aria-modal="true" aria-labelledby="tituloModalRepuesto">
-    <div class="inventario-modal-header"><div><h2 id="tituloModalRepuesto">Agregar repuesto</h2><p>Registra un nuevo material o repuesto en el inventario de la sucursal.</p></div><button type="button" id="cerrarModalRepuesto" aria-label="Cerrar">×</button></div>
-    <form id="formRepuesto"><div id="camposRepuesto" class="inventario-form-grid"></div><div class="inventario-modal-acciones"><button type="button" class="btn-secondary-inventario" id="cancelarModalRepuesto">Cancelar</button><button type="submit" class="btn-primary-inventario">Guardar repuesto</button></div></form>
+<div class="inventario-modal" id="modalOsInventario" hidden>
+  <section class="inventario-modal-contenido inventario-modal-os" role="dialog" aria-modal="true" aria-labelledby="tituloModalOsInventario">
+    <div class="inventario-modal-header"><div><h2 id="tituloModalOsInventario">Agregar OS</h2><p>Identifica el servicio antes de incorporar sus repuestos.</p></div><button type="button" id="cerrarModalOsInventario" aria-label="Cerrar">×</button></div>
+    <form id="formOsInventario">
+      <div class="inventario-form-grid inventario-form-os">
+        <label><span>Cliente</span><input type="text" id="inventarioOsCliente" maxlength="180" required></label>
+        <label><span>Equipo</span><input type="text" id="inventarioOsEquipo" maxlength="180" required></label>
+        <label><span>OS</span><input type="text" id="inventarioOsNumero" maxlength="100" required></label>
+      </div>
+      <div class="inventario-modal-acciones"><button type="button" class="btn-secondary-inventario" id="cancelarModalOsInventario">Cancelar</button><button type="submit" class="btn-primary-inventario">Agregar repuestos</button></div>
+    </form>
+  </section>
+</div>
+
+<div class="inventario-modal" id="modalRepuestosOs" hidden>
+  <section class="inventario-modal-contenido inventario-modal-repuestos-os" role="dialog" aria-modal="true" aria-labelledby="tituloModalRepuestosOs">
+    <div class="inventario-modal-header"><div><h2 id="tituloModalRepuestosOs">Repuestos de la OS</h2><p id="resumenOsInventario">Completa los repuestos manualmente.</p></div><button type="button" id="cerrarModalRepuestosOs" aria-label="Cerrar">×</button></div>
+    <form id="formRepuestosOs">
+      <div class="inventario-repuestos-tabla-wrap">
+        <div class="inventario-repuestos-tabla-encabezado"><span>NP</span><span>Descripción</span><span>Cantidad</span><span aria-hidden="true"></span></div>
+        <div id="filasRepuestosOs" class="inventario-repuestos-filas"></div>
+      </div>
+      <button type="button" class="btn-secondary-inventario inventario-agregar-fila" id="btnAgregarFilaRepuesto">+ Agregar otro repuesto</button>
+      <div class="inventario-modal-acciones"><button type="button" class="btn-secondary-inventario" id="volverModalOsInventario">Volver</button><button type="submit" class="btn-primary-inventario">Guardar OS y repuestos</button></div>
+    </form>
+  </section>
+</div>
+
+<div class="inventario-modal" id="modalDetalleRepuestosOs" hidden>
+  <section class="inventario-modal-contenido inventario-modal-repuestos-os" role="dialog" aria-modal="true" aria-labelledby="tituloDetalleRepuestosOs">
+    <div class="inventario-modal-header"><div><h2 id="tituloDetalleRepuestosOs">Repuestos de la OS</h2><p id="resumenDetalleOsInventario">Detalle y estado de los repuestos.</p></div><button type="button" id="cerrarDetalleRepuestosOs" aria-label="Cerrar">×</button></div>
+    <div class="inventario-detalle-tabla-wrap">
+      <table class="inventario-detalle-tabla">
+        <thead><tr><th>NP</th><th>Descripción</th><th>Cantidad</th><th>Recibido</th></tr></thead>
+        <tbody id="detalleRepuestosOsBody"></tbody>
+      </table>
+    </div>
+    <div class="inventario-modal-acciones"><button type="button" class="btn-primary-inventario" id="aceptarDetalleRepuestosOs">Cerrar</button></div>
   </section>
 </div>
 
 <script src="js/components/notificaciones.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script type="module" src="js/inventario.js?v=20261004-10"></script>
+<script type="module" src="js/inventario.js?v=20261007-16"></script>
 </body>
 </html>

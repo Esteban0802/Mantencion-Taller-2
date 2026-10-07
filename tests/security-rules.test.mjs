@@ -457,9 +457,9 @@ test("un usuario de una sucursal inactiva no puede crear OT", async () => {
   );
 });
 
-test("un usuario puede crear una OT propia en su empresa", async () => {
+test("Técnico no puede crear una OT propia", async () => {
   const db = firestoreComo("taller-a");
-  await assertSucceeds(
+  await assertFails(
     setDoc(doc(db, "ots", "ot-nueva-a"), {
       empresaId: "empresa-a",
       sucursalId: "sucursal-a",
@@ -470,9 +470,9 @@ test("un usuario puede crear una OT propia en su empresa", async () => {
   );
 });
 
-test("Admin Sucursal puede crear una OT en su propia sucursal", async () => {
+test("Admin Sucursal no puede crear una OT en su propia sucursal", async () => {
   const db = firestoreComo("admin-sucursal-a");
-  await assertSucceeds(
+  await assertFails(
     setDoc(doc(db, "ots", "ot-admin-sucursal-a"), {
       empresaId: "empresa-a",
       sucursalId: "sucursal-a",
@@ -497,12 +497,12 @@ test("un flujo reducido puede comenzar directamente en Mantención", async () =>
     }, { merge: true });
   });
 
-  const db = firestoreComo("taller-a");
+  const db = firestoreComo("jefe-a");
   await assertSucceeds(
     setDoc(doc(db, "ots", "ot-flujo-reducido"), {
       empresaId: "empresa-a",
       sucursalId: "sucursal-a",
-      creadoPor: "taller-a",
+      creadoPor: "jefe-a",
       estado: "OVERHAUL",
       cerrada: false,
       ingresoAprobado: false,
@@ -528,12 +528,12 @@ test("un flujo reducido puede comenzar directamente en Despacho", async () => {
     }, { merge: true });
   });
 
-  const db = firestoreComo("taller-a");
+  const db = firestoreComo("jefe-a");
   await assertSucceeds(
     setDoc(doc(db, "ots", "ot-solo-despacho"), {
       empresaId: "empresa-a",
       sucursalId: "sucursal-a",
-      creadoPor: "taller-a",
+      creadoPor: "jefe-a",
       estado: "DESPACHO",
       cerrada: false,
       ingresoAprobado: false,
@@ -710,9 +710,9 @@ test("Jefe de Taller puede cerrar una OT con las etapas habilitadas completas", 
   );
 });
 
-test("Admin Sucursal puede cerrar una OT de su sucursal", async () => {
+test("Admin Sucursal no puede cerrar una OT de su sucursal", async () => {
   const db = firestoreComo("admin-sucursal-a");
-  await assertSucceeds(
+  await assertFails(
     updateDoc(doc(db, "ots", "ot-flujo-a"), {
       ingresoAprobado: true,
       evaluacionAprobada: true,
@@ -786,9 +786,9 @@ test("Jefe de Taller puede aprobar la Evaluación", async () => {
   );
 });
 
-test("Admin Sucursal puede aprobar la Evaluación de su sucursal", async () => {
+test("Admin Sucursal no puede aprobar la Evaluación de su sucursal", async () => {
   const db = firestoreComo("admin-sucursal-a");
-  await assertSucceeds(
+  await assertFails(
     updateDoc(doc(db, "ots", "ot-flujo-a"), {
       evaluacionAprobada: true,
       overhaulRequerido: true,
@@ -882,8 +882,13 @@ test("Taller no puede eliminar una OT", async () => {
   await assertFails(deleteDoc(doc(db, "ots", "ot-abierta-a")));
 });
 
-test("Admin Empresa puede eliminar una OT de su empresa", async () => {
+test("Admin Empresa no puede eliminar una OT de su empresa", async () => {
   const db = firestoreComo("admin-a");
+  await assertFails(deleteDoc(doc(db, "ots", "ot-abierta-a")));
+});
+
+test("Jefe de Taller puede eliminar una OT de su sucursal", async () => {
+  const db = firestoreComo("jefe-a");
   await assertSucceeds(deleteDoc(doc(db, "ots", "ot-abierta-a")));
 });
 
@@ -1100,9 +1105,9 @@ test("durante cancelación Admin Empresa no puede modificar configuración ni in
   }));
 });
 
-test("Admin Sucursal puede modificar inventario de su sucursal", async () => {
+test("Admin Sucursal no puede modificar inventario de su sucursal", async () => {
   const db = firestoreComo("admin-sucursal-a");
-  await assertSucceeds(updateDoc(doc(db, "inventarioItems", "item-a"), {
+  await assertFails(updateDoc(doc(db, "inventarioItems", "item-a"), {
     datos: { Código: "REP-001", Descripción: "Rodamiento", Cantidad: "5" },
     actualizadoPor: "admin-sucursal-a",
 }));

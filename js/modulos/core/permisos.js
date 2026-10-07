@@ -6,12 +6,12 @@ export function inicializarPermisos(config) {
 
 export function esJefeTaller() {
     const usuario = getUsuario();
-    return usuario && ["jefe_taller", "admin_sucursal"].includes(usuario.rol);
+    return usuario && usuario.rol === "jefe_taller";
 }
 
 export function esUsuarioTaller() {
     const usuario = getUsuario();
-    return usuario && usuario.rol === "usuario_taller";
+    return usuario && ["usuario_taller", "supervisor", "tecnico"].includes(usuario.rol);
 }
 
 export function puedeEliminarComentario(c) {
@@ -37,9 +37,15 @@ export function aplicarPermisosRol() {
 
     if (!usuario) return;
 
-    if (usuario.rol === "admin_empresa") {
+    if (["admin_empresa", "admin_sucursal"].includes(usuario.rol)) {
         document.querySelectorAll(".solo-jefe, .solo-usuario")
             .forEach(el => el.style.display = "none");
+        document.querySelectorAll("input, textarea, select, button").forEach(el => {
+            if (el.classList.contains("tab") || el.classList.contains("permitido-bloqueo")) return;
+            el.disabled = true;
+            el.style.opacity = "0.55";
+            el.style.cursor = "not-allowed";
+        });
         return;
     }
 

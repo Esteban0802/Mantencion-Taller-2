@@ -374,6 +374,10 @@ function aplicarModulosDashboard() {
 
 
 function configurarNavegacionPorPermisos() {
+  const rol = usuario.rol;
+  const esAdministradorConsulta = ["admin_empresa", "admin_sucursal"].includes(rol);
+  const esPlanificador = rol === "planificador";
+  const esTrabajador = ["usuario_taller", "supervisor", "tecnico"].includes(rol);
   const btnPanelEmpresa =
     document.getElementById("btnPanelEmpresa");
 
@@ -426,18 +430,20 @@ function configurarNavegacionPorPermisos() {
   }
 
   if (menuInventario) {
-    menuInventario.style.display = moduloActivo(empresaActualDashboard, "inventario")
+    menuInventario.style.display = moduloActivo(empresaActualDashboard, "inventario") &&
+      (["super_admin"].includes(rol) || esAdministradorConsulta || esPlanificador)
       ? ""
       : "none";
   }
 
   if (menuProgramacion) {
-    menuProgramacion.style.display = moduloActivo(empresaActualDashboard, "programacion")
+    menuProgramacion.style.display = moduloActivo(empresaActualDashboard, "programacion") &&
+      (rol === "super_admin" || esAdministradorConsulta || esPlanificador || esTrabajador)
       ? ""
       : "none";
   }
   if (menuSheq) {
-    menuSheq.style.display = moduloActivo(empresaActualDashboard, "sheq") && ["super_admin", "admin_empresa", "admin_sucursal", "jefe_taller", "planificador", "sheq"].includes(usuario.rol)
+    menuSheq.style.display = moduloActivo(empresaActualDashboard, "sheq") && ["super_admin", "admin_empresa", "admin_sucursal", "planificador"].includes(rol)
       ? ""
       : "none";
   }

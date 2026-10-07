@@ -20,6 +20,7 @@ let items = [];
 let itemsFiltrados = [];
 let usuariosRetiro = [];
 let puedeEditar = false;
+let puedeGestionarEstados = false;
 let importacionEnCurso = false;
 const operacionesInventarioEnCurso = new Set();
 const REGISTROS_POR_CARGA = 50;
@@ -185,7 +186,7 @@ function celdaEvidencias(item) {
   return `<div class="inventario-evidencias">${enlaces}${puedeEditar ? `<label class="inventario-adjuntar"><input type="file" data-evidencia accept="image/*,.pdf,application/pdf" multiple><span>+ Adjuntar</span></label>` : ""}</div>`;
 }
 
-async function cargarInventario({ reiniciar = true, completo = false } = {}) {
+async function cargarInventario({ reiniciar = true, completo = true } = {}) {
   if (!sucursalId) {
     columnas = []; items = []; itemsFiltrados = []; totalInventarioServidor = 0; renderInventario(); return;
   }
@@ -261,31 +262,131 @@ async function asegurarInventarioCompleto() {
   await cargarInventario({ reiniciar: true, completo: true });
 }
 
+function claveOsInventario(item) {
+  return [item.datos?.CLIENTE, item.datos?.EQUIPO, item.datos?.OS].map(valor => String(valor || "").trim().toLowerCase()).join("||");
+}
+
+function gruposOsInventario(lista = itemsFiltrados) {
+  const grupos = new Map();
+  lista.forEach(item => {
+    const clave = claveOsInventario(item);
+    if (!grupos.has(clave)) grupos.set(clave, { clave, cliente: item.datos?.CLIENTE || "", equipo: item.datos?.EQUIPO || "", os: item.datos?.OS || "", repuestos: [] });
+    grupos.get(clave).repuestos.push(item);
+  });
+  return [...grupos.values()];
+}
+
+function claseEstadoRepuesto(estado = "Parcial") {
+  return `estado-${String(estado).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, "-")}`;
+}
+
+function opcionesEstadoInventario(estado = "Parcial") {
+  return ["Parcial", "Completa", "Despachada", "Recepción Cliente"]
+    .map(opcion => `<option value="${opcion}"${estado === opcion ? " selected" : ""}>${opcion}</option>`)
+    .join("");
+}
+
+function estadoGeneralOs(grupo) {
+  const estados = new Set(grupo.repuestos.map(item => item.estado || "Parcial"));
+  return estados.size === 1 ? [...estados][0] : "Parcial";
+}
+
+function repuestoRecibido(item) {
+  return item.recibido === true || (item.recibido == null && ["Completa", "Despachada", "Recepción Cliente"].includes(item.estado));
+}
+
 function renderInventario() {
   const thead = $("tablaInventario").querySelector("thead");
   const tbody = $("tablaInventario").querySelector("tbody");
-  $("totalInventario").textContent = String(totalInventarioServidor || items.length);
-  $("totalColumnasInventario").textContent = String(columnas.length);
+  const grupos = gruposOsInventario();
+  $("totalInventario").textContent = String(gruposOsInventario(items).length);
+  $("totalColumnasInventario").textContent = String(items.length);
   const ultima = items.map(i => i.fechaActualizacion?.toDate?.()).filter(Boolean).sort((a,b) => b-a)[0];
   $("ultimaActualizacionInventario").textContent = ultima ? ultima.toLocaleDateString("es-CL") : "Sin registros";
   $("estadoInventario").textContent = sucursalId
-    ? `${itemsFiltrados.length} visibles · ${items.length} cargados de ${totalInventarioServidor}`
+    ? `${grupos.length} OS visibles · ${itemsFiltrados.length} repuestos`
     : "Selecciona una sucursal para comenzar.";
   const botonCargarMas = $("btnCargarMasInventario");
   botonCargarMas.hidden = !sucursalId || inventarioCompleto || Boolean($("buscarInventario").value.trim());
   botonCargarMas.disabled = cargaInventarioEnCurso;
 
-  if (!columnas.length) {
-    thead.innerHTML = "<tr><th>Inventario</th></tr>";
-    tbody.innerHTML = '<tr><td class="inventario-vacio">Importa un Excel para crear la estructura inicial del inventario.</td></tr>';
+  thead.innerHTML = '<tr><th>Cliente</th><th>Equipo</th><th>OS</th><th>Repuestos</th><th>Estado</th></tr>';
+  if (!grupos.length) {
+    tbody.innerHTML = '<tr><td colspan="5" class="inventario-vacio">No se encontraron órdenes de servicio.</td></tr>';
     return;
   }
-  thead.innerHTML = `<tr>${columnas.map(c => `<th>${escapar(c)}</th>`).join("")}<th>RETIRA</th><th>EVIDENCIA</th><th>Acciones</th></tr>`;
-  if (!itemsFiltrados.length) {
-    tbody.innerHTML = `<tr><td colspan="${columnas.length + 3}" class="inventario-vacio">No se encontraron registros.</td></tr>`;
-    return;
+  tbody.innerHTML = grupos.map(grupo => {
+    const estado = estadoGeneralOs(grupo);
+    return `<tr data-os-clave="${escapar(grupo.clave)}"><td><strong class="inventario-os-cliente">${escapar(grupo.cliente)}</strong></td><td><span class="inventario-os-equipo">${escapar(grupo.equipo)}</span></td><td><span class="inventario-os-numero">${escapar(grupo.os)}</span></td><td><div class="inventario-os-accion"><span class="inventario-repuestos-conteo">${grupo.repuestos.length}</span><button type="button" class="inventario-mostrar-repuestos">Mostrar repuestos <span aria-hidden="true">→</span></button></div></td><td><select class="inventario-estado-os ${claseEstadoRepuesto(estado)}" data-estado-os aria-label="Estado de la OS ${escapar(grupo.os)}" ${puedeGestionarEstados ? "" : "disabled"}>${opcionesEstadoInventario(estado)}</select></td></tr>`;
+  }).join("");
+}
+
+function abrirDetalleRepuestosOs(clave) {
+  const grupo = gruposOsInventario(items).find(item => item.clave === clave);
+  if (!grupo) return;
+  $("resumenDetalleOsInventario").textContent = `${grupo.cliente} · ${grupo.equipo} · OS ${grupo.os}`;
+  $("detalleRepuestosOsBody").innerHTML = grupo.repuestos.map(item => {
+    const recibido = repuestoRecibido(item);
+    return `<tr data-item-id="${item.id}"><td>${escapar(item.datos?.NP || "")}</td><td>${escapar(item.datos?.DESCRIPCION || "")}</td><td>${escapar(item.datos?.CANTIDAD || "")}</td><td><label class="inventario-recibido-check"><input type="checkbox" data-repuesto-recibido ${recibido ? "checked" : ""} ${puedeGestionarEstados ? "" : "disabled"}><span aria-hidden="true"></span><strong>Recibido</strong></label></td></tr>`;
+  }).join("");
+  $("modalDetalleRepuestosOs").hidden = false;
+}
+
+function cerrarDetalleRepuestosOs() { $("modalDetalleRepuestosOs").hidden = true; }
+
+async function actualizarRecepcionRepuesto(checkbox) {
+  if (!puedeGestionarEstados) return;
+  const fila = checkbox.closest("tr[data-item-id]");
+  const item = items.find(registro => registro.id === fila?.dataset.itemId);
+  if (!item) return;
+  const valorAnterior = item.recibido;
+  item.recibido = checkbox.checked;
+  const grupo = gruposOsInventario(items).find(registro => registro.clave === claveOsInventario(item));
+  const estadoOs = grupo.repuestos.every(repuestoRecibido) ? "Completa" : "Parcial";
+  checkbox.disabled = true;
+  try {
+    const lote = writeBatch(db);
+    grupo.repuestos.forEach(repuesto => {
+      const cambios = { estado: estadoOs, fechaActualizacion: serverTimestamp(), actualizadoPor: usuario.uid };
+      if (repuesto.id === item.id) cambios.recibido = checkbox.checked;
+      lote.update(doc(db, "inventarioItems", repuesto.id), cambios);
+    });
+    await lote.commit();
+    grupo.repuestos.forEach(repuesto => { repuesto.estado = estadoOs; });
+    renderInventario();
+  } catch (error) {
+    item.recibido = valorAnterior;
+    checkbox.checked = repuestoRecibido(item);
+    throw error;
+  } finally {
+    checkbox.disabled = !puedeGestionarEstados;
   }
-  tbody.innerHTML = itemsFiltrados.map(item => `<tr data-item-id="${item.id}">${columnas.map(columna => `<td><input class="inventario-celda-input" data-columna="${escapar(columna)}" value="${escapar(item.datos?.[columna] ?? "")}" ${puedeEditar ? "" : "disabled"}></td>`).join("")}<td><select class="inventario-retira" data-retira ${puedeEditar ? "" : "disabled"}>${opcionesRetira(item.retiraUsuarioId || "")}</select></td><td>${celdaEvidencias(item)}</td><td><div class="inventario-fila-acciones">${puedeEditar ? '<button type="button" class="inventario-guardar">Guardar</button><button type="button" class="inventario-eliminar">Eliminar</button>' : '<span>Consulta</span>'}</div></td></tr>`).join("");
+}
+
+async function actualizarEstadoOs(select) {
+  if (!puedeGestionarEstados) return;
+  const fila = select.closest("tr[data-os-clave]");
+  const grupo = gruposOsInventario(items).find(item => item.clave === fila?.dataset.osClave);
+  if (!grupo?.repuestos.length) return;
+  select.disabled = true;
+  try {
+    for (let inicio = 0; inicio < grupo.repuestos.length; inicio += 450) {
+      const lote = writeBatch(db);
+      grupo.repuestos.slice(inicio, inicio + 450).forEach(item => {
+        lote.update(doc(db, "inventarioItems", item.id), {
+          estado: select.value,
+          recibido: select.value !== "Parcial",
+          fechaActualizacion: serverTimestamp(),
+          actualizadoPor: usuario.uid
+        });
+      });
+      await lote.commit();
+    }
+    grupo.repuestos.forEach(item => { item.estado = select.value; item.recibido = select.value !== "Parcial"; });
+    renderInventario();
+  } finally {
+    select.disabled = false;
+  }
 }
 
 async function subirEvidencias(fila, archivosSeleccionados) {
@@ -460,43 +561,78 @@ async function eliminarFila(fila) {
   }
 }
 
-function abrirModalRepuesto() {
-  if (!sucursalId) return mensaje({ titulo: "Sucursal requerida", texto: "Selecciona una sucursal antes de agregar un repuesto.", tipo: "advertencia" });
-  if (!columnas.length) return mensaje({ titulo: "Estructura pendiente", texto: "Importa primero un Excel para definir las columnas del inventario.", tipo: "advertencia" });
-  $("camposRepuesto").innerHTML = columnas.map((c, i) => {
-    const esFecha = /fecha/i.test(c);
-    return `<label><span>${escapar(c)}</span><input type="${esFecha ? "date" : "text"}" name="campo_${i}" data-columna="${escapar(c)}"${esFecha ? ' aria-label="Seleccionar fecha en el calendario"' : ""}></label>`;
-  }).join("");
-  $("modalRepuesto").hidden = false;
-  $("camposRepuesto").querySelector("input")?.focus();
+function abrirModalOsInventario() {
+  if (!sucursalId) return mensaje({ titulo: "Sucursal requerida", texto: "Selecciona una sucursal antes de agregar una OS.", tipo: "advertencia" });
+  $("formOsInventario").reset();
+  $("filasRepuestosOs").innerHTML = "";
+  $("modalOsInventario").hidden = false;
+  $("inventarioOsCliente").focus();
 }
 
-function cerrarModalRepuesto() { $("modalRepuesto").hidden = true; $("formRepuesto").reset(); }
+function cerrarModalOsInventario() {
+  $("modalOsInventario").hidden = true;
+  $("modalRepuestosOs").hidden = true;
+  $("formOsInventario").reset();
+  $("formRepuestosOs").reset();
+  $("filasRepuestosOs").innerHTML = "";
+}
 
-async function guardarNuevoRepuesto(evento) {
+function agregarFilaRepuesto(valores = {}) {
+  const fila = document.createElement("div");
+  fila.className = "inventario-repuesto-fila";
+  fila.innerHTML = `<input type="text" data-repuesto-np maxlength="100" placeholder="Número de parte" value="${escapar(valores.np || "")}" required><input type="text" data-repuesto-descripcion maxlength="300" placeholder="Descripción del repuesto" value="${escapar(valores.descripcion || "")}" required><input type="number" data-repuesto-cantidad min="1" step="1" placeholder="0" value="${escapar(valores.cantidad || "")}" required><button type="button" class="inventario-quitar-fila" aria-label="Quitar repuesto">×</button>`;
+  $("filasRepuestosOs").appendChild(fila);
+  fila.querySelector("[data-repuesto-np]").focus();
+}
+
+function abrirModalRepuestosOs(evento) {
   evento.preventDefault();
-  const claveOperacion = "nuevo-repuesto";
+  $("modalOsInventario").hidden = true;
+  $("modalRepuestosOs").hidden = false;
+  $("resumenOsInventario").textContent = `${$("inventarioOsCliente").value.trim()} · ${$("inventarioOsEquipo").value.trim()} · OS ${$("inventarioOsNumero").value.trim()}`;
+  if (!$("filasRepuestosOs").children.length) agregarFilaRepuesto();
+}
+
+function volverModalOsInventario() {
+  $("modalRepuestosOs").hidden = true;
+  $("modalOsInventario").hidden = false;
+  $("inventarioOsCliente").focus();
+}
+
+async function guardarOsConRepuestos(evento) {
+  evento.preventDefault();
+  const claveOperacion = "nueva-os-inventario";
   if (operacionesInventarioEnCurso.has(claveOperacion)) return;
-  const datos = {};
-  $("camposRepuesto").querySelectorAll("[data-columna]").forEach(input => { datos[input.dataset.columna] = input.value.trim().slice(0, 500); });
-  if (!Object.values(datos).some(Boolean)) return mensaje({ titulo: "Registro vacío", texto: "Completa al menos un campo del repuesto.", tipo: "advertencia" });
-  await asegurarInventarioCompleto();
-  const huella = JSON.stringify(columnas.map(c => String(datos[c] ?? "").trim().toLowerCase()));
-  if (items.some(item => JSON.stringify(columnas.map(c => String(item.datos?.[c] ?? "").trim().toLowerCase())) === huella)) {
-    return mensaje({ titulo: "Registro duplicado", texto: "Ya existe un registro con los mismos datos.", tipo: "advertencia" });
-  }
+  const cliente = $("inventarioOsCliente").value.trim();
+  const equipo = $("inventarioOsEquipo").value.trim();
+  const os = $("inventarioOsNumero").value.trim();
+  const repuestos = [...$("filasRepuestosOs").querySelectorAll(".inventario-repuesto-fila")].map(fila => ({
+    np: fila.querySelector("[data-repuesto-np]").value.trim(),
+    descripcion: fila.querySelector("[data-repuesto-descripcion]").value.trim(),
+    cantidad: fila.querySelector("[data-repuesto-cantidad]").value.trim()
+  })).filter(item => item.np || item.descripcion || item.cantidad);
+  if (!repuestos.length) return mensaje({ titulo: "Sin repuestos", texto: "Agrega al menos un repuesto a la OS.", tipo: "advertencia" });
+  if (repuestos.some(item => !item.np || !item.descripcion || !item.cantidad || Number(item.cantidad) < 1)) return mensaje({ titulo: "Datos incompletos", texto: "Completa NP, descripción y una cantidad válida en todas las filas.", tipo: "advertencia" });
 
   const boton = evento.submitter;
   try {
     operacionesInventarioEnCurso.add(claveOperacion);
     if (boton) { boton.disabled = true; boton.textContent = "Guardando…"; }
-    await addDoc(collection(db, "inventarioItems"), { empresaId, sucursalId, datos, fechaCreacion: serverTimestamp(), fechaActualizacion: serverTimestamp(), creadoPor: usuario.uid, actualizadoPor: usuario.uid });
-    cerrarModalRepuesto();
+    const columnasOs = ["CLIENTE", "EQUIPO", "OS", "NP", "DESCRIPCION", "CANTIDAD"];
+    const lote = writeBatch(db);
+    lote.set(doc(db, "inventarioConfiguraciones", claveConfiguracion()), { empresaId, sucursalId, columnas: columnasOs, fechaActualizacion: serverTimestamp(), actualizadoPor: usuario.uid }, { merge: true });
+    repuestos.forEach(item => {
+      const referencia = doc(collection(db, "inventarioItems"));
+      lote.set(referencia, { empresaId, sucursalId, datos: { CLIENTE: cliente, EQUIPO: equipo, OS: os, NP: item.np, DESCRIPCION: item.descripcion, CANTIDAD: item.cantidad }, estado: "Parcial", recibido: false, fechaCreacion: serverTimestamp(), fechaActualizacion: serverTimestamp(), creadoPor: usuario.uid, actualizadoPor: usuario.uid });
+    });
+    await lote.commit();
+    columnas = columnasOs;
+    cerrarModalOsInventario();
     await cargarInventario();
-    await mensaje({ titulo: "Repuesto agregado", texto: "El registro fue agregado correctamente.", tipo: "exito" });
+    await mensaje({ titulo: "OS agregada", texto: `Se guardaron ${repuestos.length} repuesto(s) para la OS ${os}.`, tipo: "exito" });
   } finally {
     operacionesInventarioEnCurso.delete(claveOperacion);
-    if (boton?.isConnected) { boton.disabled = false; boton.textContent = "Guardar repuesto"; }
+    if (boton?.isConnected) { boton.disabled = false; boton.textContent = "Guardar OS y repuestos"; }
   }
 }
 
@@ -530,14 +666,37 @@ function configurarEventos() {
   });
   $("btnImportarInventario").addEventListener("click", () => $("archivoInventario").click());
   $("archivoInventario").addEventListener("change", async e => { const archivo = e.target.files?.[0]; if (!archivo || importacionEnCurso) return; const boton = $("btnImportarInventario"); try { importacionEnCurso = true; boton.disabled = true; boton.textContent = "Importando…"; await importarExcel(archivo); } catch (error) { await mensaje({ titulo: "No se pudo importar", texto: error.message || "Revisa el archivo Excel.", tipo: "error" }); } finally { importacionEnCurso = false; boton.disabled = false; boton.textContent = "Importar Excel"; e.target.value = ""; } });
-  $("btnAgregarInventario").addEventListener("click", abrirModalRepuesto);
+  $("btnAgregarInventario").addEventListener("click", abrirModalOsInventario);
   $("btnExportarInventario").addEventListener("click", async () => {
     try { await exportarInventario(); }
     catch (error) { await mensaje({ titulo: "No se pudo exportar", texto: error.message || "Intenta nuevamente.", tipo: "error" }); }
   });
-  $("cerrarModalRepuesto").addEventListener("click", cerrarModalRepuesto);
-  $("cancelarModalRepuesto").addEventListener("click", cerrarModalRepuesto);
-  $("formRepuesto").addEventListener("submit", guardarNuevoRepuesto);
+  $("cerrarModalOsInventario").addEventListener("click", cerrarModalOsInventario);
+  $("cancelarModalOsInventario").addEventListener("click", cerrarModalOsInventario);
+  $("formOsInventario").addEventListener("submit", abrirModalRepuestosOs);
+  $("cerrarModalRepuestosOs").addEventListener("click", cerrarModalOsInventario);
+  $("volverModalOsInventario").addEventListener("click", volverModalOsInventario);
+  $("btnAgregarFilaRepuesto").addEventListener("click", () => agregarFilaRepuesto());
+  $("formRepuestosOs").addEventListener("submit", guardarOsConRepuestos);
+  $("filasRepuestosOs").addEventListener("click", evento => {
+    const boton = evento.target.closest(".inventario-quitar-fila");
+    if (!boton) return;
+    const fila = boton.closest(".inventario-repuesto-fila");
+    fila.remove();
+    if (!$("filasRepuestosOs").children.length) agregarFilaRepuesto();
+  });
+  $("tablaInventario").addEventListener("click", evento => {
+    const boton = evento.target.closest(".inventario-mostrar-repuestos");
+    if (boton) abrirDetalleRepuestosOs(boton.closest("tr[data-os-clave]").dataset.osClave);
+  });
+  $("tablaInventario").addEventListener("change", evento => {
+    if (evento.target.matches("[data-estado-os]")) actualizarEstadoOs(evento.target).catch(error => mensaje({ titulo: "No se pudo actualizar", texto: error.message || "Intenta nuevamente.", tipo: "error" }));
+  });
+  $("cerrarDetalleRepuestosOs").addEventListener("click", cerrarDetalleRepuestosOs);
+  $("aceptarDetalleRepuestosOs").addEventListener("click", cerrarDetalleRepuestosOs);
+  $("detalleRepuestosOsBody").addEventListener("change", evento => {
+    if (evento.target.matches("[data-repuesto-recibido]")) actualizarRecepcionRepuesto(evento.target).catch(error => mensaje({ titulo: "No se pudo actualizar", texto: error.message || "Intenta nuevamente.", tipo: "error" }));
+  });
   $("tablaInventario").addEventListener("click", async e => { const fila = e.target.closest("tr[data-item-id]"); if (!fila) return; try { if (e.target.closest(".inventario-guardar")) await guardarFila(fila); if (e.target.closest(".inventario-eliminar")) await eliminarFila(fila); } catch (error) { await mensaje({ titulo: "No se pudo completar", texto: error.message || "Intenta nuevamente.", tipo: "error" }); } });
   $("tablaInventario").addEventListener("change", async e => { if (!e.target.matches("[data-evidencia]")) return; const fila = e.target.closest("tr[data-item-id]"); try { await subirEvidencias(fila, e.target.files); } catch (error) { e.target.value = ""; await mensaje({ titulo: "No se pudo adjuntar", texto: error.message || "Intenta nuevamente.", tipo: "error" }); } });
   [$("btnSalirInventario"), $("btnSalirInventarioTop")].forEach(b => b.addEventListener("click", cerrarSesion));
@@ -568,7 +727,8 @@ async function iniciar() {
   $("menuDashboardInventario").style.display = esBodeguero ? "none" : "";
   $("menuOrdenesInventario").style.display = esBodeguero ? "none" : "";
   $("menuProgramacionInventario").style.display = esBodeguero ? "" : "none";
-  puedeEditar = ["super_admin", "admin_empresa", "admin_sucursal", "jefe_taller", "planificador", "bodeguero"].includes(usuario.rol);
+  puedeEditar = ["super_admin", "jefe_taller", "planificador", "bodeguero"].includes(usuario.rol);
+  puedeGestionarEstados = ["super_admin", "bodeguero"].includes(usuario.rol);
   if (!puedeEditar) $("accionesEdicionInventario").querySelectorAll("button").forEach(b => { if (b.id !== "btnExportarInventario") b.style.display = "none"; });
   if (["super_admin", "admin_empresa"].includes(usuario.rol)) $("menuPanelEmpresaInventario").style.display = "";
   try { if (!(await cargarEmpresa())) return; await cargarSucursales(); } catch (error) { await mensaje({ titulo: "No se pudo cargar Inventario", texto: error.message || "Intenta nuevamente.", tipo: "error" }); }

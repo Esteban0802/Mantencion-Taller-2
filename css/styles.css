@@ -6045,6 +6045,9 @@ box-shadow:
   width: auto;
   min-width: 130px;
 }
+.orden-item-acciones{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.orden-item .btn-card-delete{padding:10px 18px;border:1px solid #ef9a9a;border-radius:10px;background:#fff5f5;color:#c62828;font-weight:700}
+.orden-item .btn-card-delete:hover{background:#c62828;color:#fff}
 
 .ordenes-vacio {
   padding: 34px 12px;

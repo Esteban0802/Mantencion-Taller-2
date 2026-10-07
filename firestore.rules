@@ -104,7 +104,7 @@ service cloud.firestore {
     function canManageSheq(data) {
       return isSuperAdmin() || (
         sameCompany(data) &&
-        hasRole(['admin_empresa', 'admin_sucursal', 'sheq']) &&
+        hasRole(['sheq']) &&
         canWriteCompany(data)
       );
     }
@@ -198,7 +198,7 @@ service cloud.firestore {
     }
 
     function puedeAprobarOCerrarOT() {
-      return hasRole(['admin_empresa', 'admin_sucursal', 'jefe_taller']);
+      return hasRole(['jefe_taller']);
     }
 
     function cambiaCamposAprobacionOT() {
@@ -345,7 +345,7 @@ service cloud.firestore {
           sameCompany(request.resource.data) &&
           canWriteCompany(request.resource.data) &&
           sameBranch(request.resource.data) &&
-          hasRole(['admin_sucursal', 'jefe_taller', 'usuario_taller', 'supervisor', 'tecnico']) &&
+          hasRole(['jefe_taller']) &&
           request.resource.data.creadoPor == request.auth.uid &&
           request.resource.data.cerrada == false &&
           (
@@ -384,7 +384,6 @@ service cloud.firestore {
             (!solicitaCierreOT() && actualizacionOTValida())
           ) &&
           hasRole([
-            'admin_sucursal',
             'jefe_taller',
             'usuario_taller',
             'supervisor',
@@ -393,8 +392,8 @@ service cloud.firestore {
         );
 
       allow delete: if isSuperAdmin() || (
-        hasRole(['admin_empresa']) && sameCompany(resource.data) &&
-        canWriteCompany(resource.data)
+        hasRole(['jefe_taller']) && sameCompany(resource.data) &&
+        sameBranch(resource.data) && canWriteCompany(resource.data)
       );
     }
 
@@ -493,7 +492,7 @@ service cloud.firestore {
         activeUser() &&
         canWriteCompany(request.resource.data) &&
         canReadBranchData(request.resource.data) &&
-        hasRole(['admin_empresa', 'admin_sucursal', 'jefe_taller', 'planificador', 'bodeguero']) &&
+        hasRole(['jefe_taller', 'planificador', 'bodeguero']) &&
         moduloEtapaActivo(empresaDeOT(request.resource.data), 'inventario')
       );
 
@@ -502,14 +501,14 @@ service cloud.firestore {
         canWriteCompany(resource.data) &&
         canReadBranchData(resource.data) &&
         canReadBranchData(request.resource.data) &&
-        hasRole(['admin_empresa', 'admin_sucursal', 'jefe_taller', 'planificador', 'bodeguero']) &&
+        hasRole(['jefe_taller', 'planificador', 'bodeguero']) &&
         request.resource.data.empresaId == resource.data.empresaId &&
         request.resource.data.sucursalId == resource.data.sucursalId &&
         moduloEtapaActivo(empresaDeOT(request.resource.data), 'inventario')
       );
 
       allow delete: if isSuperAdmin() || (
-        hasRole(['admin_empresa', 'admin_sucursal']) &&
+        hasRole(['jefe_taller']) &&
         canWriteCompany(resource.data) &&
         canReadBranchData(resource.data)
       );
@@ -523,7 +522,7 @@ service cloud.firestore {
         activeUser() &&
         canWriteCompany(request.resource.data) &&
         canReadBranchData(request.resource.data) &&
-        hasRole(['admin_empresa', 'admin_sucursal', 'jefe_taller', 'planificador', 'bodeguero']) &&
+        hasRole(['jefe_taller', 'planificador', 'bodeguero']) &&
         request.resource.data.datos is map &&
         request.resource.data.creadoPor == request.auth.uid &&
         moduloEtapaActivo(empresaDeOT(request.resource.data), 'inventario')
@@ -534,7 +533,7 @@ service cloud.firestore {
         canWriteCompany(resource.data) &&
         canReadBranchData(resource.data) &&
         canReadBranchData(request.resource.data) &&
-        hasRole(['admin_empresa', 'admin_sucursal', 'jefe_taller', 'planificador', 'bodeguero']) &&
+        hasRole(['jefe_taller', 'planificador', 'bodeguero']) &&
         request.resource.data.empresaId == resource.data.empresaId &&
         request.resource.data.sucursalId == resource.data.sucursalId &&
         request.resource.data.creadoPor == resource.data.creadoPor &&
@@ -546,7 +545,7 @@ service cloud.firestore {
         activeUser() &&
         canWriteCompany(resource.data) &&
         canReadBranchData(resource.data) &&
-        hasRole(['admin_empresa', 'admin_sucursal', 'jefe_taller', 'planificador', 'bodeguero']) &&
+        hasRole(['jefe_taller', 'planificador', 'bodeguero']) &&
         moduloEtapaActivo(empresaDeOT(resource.data), 'inventario')
       );
     }
@@ -557,14 +556,14 @@ service cloud.firestore {
       allow read: if isSuperAdmin() || sameCompany(resource.data);
 
       allow create: if isSuperAdmin() || (
-        hasRole(['admin_empresa', 'admin_sucursal', 'jefe_taller', 'planificador']) &&
+        hasRole(['planificador']) &&
         sameCompany(request.resource.data) &&
         canWriteCompany(request.resource.data) &&
         moduloEtapaActivo(empresaDeOT(request.resource.data), 'programacion')
       );
 
       allow update: if isSuperAdmin() || (
-        hasRole(['admin_empresa', 'admin_sucursal', 'jefe_taller', 'planificador']) &&
+        hasRole(['planificador']) &&
         sameCompany(resource.data) &&
         sameCompany(request.resource.data) &&
         request.resource.data.empresaId == resource.data.empresaId &&
@@ -573,7 +572,7 @@ service cloud.firestore {
       );
 
       allow delete: if isSuperAdmin() || (
-        hasRole(['admin_empresa', 'admin_sucursal', 'jefe_taller', 'planificador']) &&
+        hasRole(['planificador']) &&
         sameCompany(resource.data) &&
         canWriteCompany(resource.data)
       );
@@ -583,14 +582,14 @@ service cloud.firestore {
       allow read: if isSuperAdmin() || sameCompany(resource.data);
 
       allow create: if isSuperAdmin() || (
-        hasRole(['admin_empresa', 'admin_sucursal', 'jefe_taller', 'planificador']) &&
+        hasRole(['planificador']) &&
         sameCompany(request.resource.data) &&
         canWriteCompany(request.resource.data) &&
         moduloEtapaActivo(empresaDeOT(request.resource.data), 'programacion')
       );
 
       allow update: if isSuperAdmin() || (
-        hasRole(['admin_empresa', 'admin_sucursal', 'jefe_taller', 'planificador']) &&
+        hasRole(['planificador']) &&
         sameCompany(resource.data) &&
         sameCompany(request.resource.data) &&
         request.resource.data.empresaId == resource.data.empresaId &&
@@ -598,7 +597,7 @@ service cloud.firestore {
       );
 
       allow delete: if isSuperAdmin() || (
-        hasRole(['admin_empresa']) && sameCompany(resource.data)
+        hasRole(['planificador']) && sameCompany(resource.data)
       );
     }
 
