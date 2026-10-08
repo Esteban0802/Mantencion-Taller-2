@@ -27,9 +27,6 @@ function diasHasta(valor, hoy = new Date()) {
 export function estadoDocumentoAcreditacion(documento, hoy = new Date()) {
   const dias = diasHasta(documento?.fechaVencimiento, hoy);
   if (dias !== null && dias < 0) return { key: "vencido", texto: "Vencido", dias };
-  if (documento?.estado === "rechazado") return { key: "rechazado", texto: "Rechazado", dias };
-  if (documento?.estado === "observado") return { key: "observado", texto: "Observado", dias };
-  if (documento?.estado !== "aprobado") return { key: "pendiente", texto: "Pendiente", dias };
   if (dias !== null && dias <= 15) return { key: "critico", texto: `Vence en ${dias} días`, dias };
   if (dias !== null && dias <= 30) return { key: "proximo", texto: `Vence en ${dias} días`, dias };
   if (dias !== null && dias <= 90) return { key: "aviso", texto: `Vence en ${dias} días`, dias };
@@ -41,10 +38,7 @@ const calidadDocumento = {
   aviso: 1,
   proximo: 2,
   critico: 3,
-  pendiente: 4,
-  observado: 5,
-  rechazado: 6,
-  vencido: 7
+  vencido: 4
 };
 
 export function evaluarRequisito(requisito, documentos, contratoId, hoy = new Date()) {
@@ -74,12 +68,9 @@ export function evaluarEntidadEnContrato({ tipo, entidadId, contrato, documentos
   const claves = detalles.map(item => item.key);
   let key = "vigente";
   let texto = "Habilitado";
-  if (claves.some(item => ["faltante", "vencido", "rechazado"].includes(item))) {
+  if (claves.some(item => ["faltante", "vencido"].includes(item))) {
     key = "vencido";
     texto = "No acreditado";
-  } else if (claves.some(item => ["pendiente", "observado"].includes(item))) {
-    key = "pendiente";
-    texto = "Pendiente";
   } else if (claves.some(item => ["aviso", "critico", "proximo"].includes(item))) {
     key = "proximo";
     texto = "Con observaciones";
@@ -90,7 +81,7 @@ export function evaluarEntidadEnContrato({ tipo, entidadId, contrato, documentos
 }
 
 export function peorEvaluacion(evaluaciones) {
-  const prioridad = { vencido: 5, pendiente: 4, proximo: 3, vigente: 2, "sin-requisitos": 1 };
+  const prioridad = { vencido: 5, proximo: 3, vigente: 2, "sin-requisitos": 1 };
   return [...evaluaciones].sort((a, b) => (prioridad[b.key] || 0) - (prioridad[a.key] || 0))[0] || null;
 }
 

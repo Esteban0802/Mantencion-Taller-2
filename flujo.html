@@ -5,16 +5,17 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Flujo de Trabajo - Vectaria</title>
   <link rel="icon" type="image/png" href="img/vectaria-favicon-official.png?v=3">
-  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/styles.css?v=20261007-1">
   <link rel="stylesheet" href="css/brand-overtrack.css">
   <link rel="stylesheet" href="css/brand-overtrack-light.css">
-  <link rel="stylesheet" href="css/notificaciones.css">
+  <link rel="stylesheet" href="css/notificaciones.css?v=20261007-1">
   <link rel="stylesheet" href="css/desktop-density.css?v=20261004-9">
+  <link rel="stylesheet" href="css/flow-professional.css?v=20261007-2">
 </head>
 <body class="ot-view flow-overtrack">
 
 <header class="topbar-overtrack">
-  <a class="brand-overtrack mobile-topbar-brand" href="dashboard.html" aria-label="Volver al Dashboard">
+  <a class="brand-overtrack mobile-topbar-brand" href="dashboard.html" aria-label="Volver al Taller">
     <img class="desktop-brand-logo" src="img/vectaria-logo-official.png?v=3" alt="Vectaria - Tu operación, en una misma dirección">
     <div class="mobile-brand-composite" role="img" aria-label="Vectaria - Gestión operativa">
       <img class="mobile-brand-layer mobile-brand-base" src="img/vectaria-logo-official.png?v=3" alt="">
@@ -41,7 +42,7 @@
 <button type="button" class="mobile-menu-backdrop permitido-bloqueo" aria-label="Cerrar menú de navegación" tabindex="-1"></button>
 <aside class="mobile-flow-menu" id="flowMobileMenu" aria-label="Navegación de la orden">
   <button type="button" class="permitido-bloqueo mobile-flow-back" onclick="window.location.href='dashboard.html'">
-    ← Volver al Dashboard
+    ← Volver al Taller
   </button>
   <button type="button" class="permitido-bloqueo mobile-flow-logout" onclick="cerrarSesion()">
     Salir
@@ -162,73 +163,62 @@
   </div>
 
   <!-- INGRESO -->
-<div id="ingreso" class="content" data-etapa="ingreso">
-  <div class="card">
-    <h3>Checklist Ingreso</h3>
-
-    <div class="file-actions carga-checklist">
-
-      <input type="file" id="excelIngreso" accept=".xlsx,.xls">
-
-      <button class="btn-primary" onclick="cargarIngreso()">
-        Cargar Checklist
-      </button>
-
+  <div id="ingreso" class="content flow-stage-checklist" data-etapa="ingreso">
+  <div class="card flow-stage-card ingreso-stage-card">
+    <div class="stage-card-heading">
+      <div>
+        <span class="stage-eyebrow">Etapa 02</span>
+        <h2>Recepción e ingreso del equipo</h2>
+        <p>Registra el estado inicial, adjunta evidencias y documenta cada revisión realizada.</p>
+      </div>
+      <div class="file-actions carga-checklist stage-import-box">
+        <input type="file" id="excelIngreso" accept=".xlsx,.xls" aria-label="Seleccionar checklist de ingreso">
+        <button class="btn-primary" onclick="cargarIngreso()">
+          Cargar checklist
+        </button>
+      </div>
     </div>
 
     <div id="progresoIngreso"></div>
 
     <div id="listaIngreso"></div>
 
-    <button class="btn-success btn-guardar-etapa" onclick="guardarIngreso()">
-      💾 Guardar Progreso
-    </button>
-
-    <button class="btn-primary" onclick="aprobarIngreso()">
-      Siguiente
-    </button>
-
-    <button class="btn-primary solo-jefe" data-cierre-etapa="ingreso" style="display:none;" onclick="cerrarOT()">
-      Cerrar OT
-    </button>
+    <div class="stage-actions">
+      <button class="btn-success btn-guardar-etapa" onclick="guardarIngreso()">
+        Guardar progreso
+      </button>
+      <button class="btn-primary" onclick="aprobarIngreso()">
+        Continuar a evaluación
+      </button>
+      <button class="btn-danger solo-jefe" data-cierre-etapa="ingreso" style="display:none;" onclick="cerrarOT()">
+        Cerrar OS
+      </button>
+    </div>
 
   </div>
 </div>
 
   <!-- EVALUACION -->
-  <div id="evaluacion" class="content" data-etapa="evaluacion">
-    <div class="card">
-      <h2>Evaluación</h2>
-
-      <div class="file-actions carga-checklist">
-
-        <input type="file" id="excelEvaluacion" accept=".xlsx,.xls">
-
-        <button class="btn-primary" onclick="cargarEvaluacion()">
-          Cargar Checklist
-        </button>
-
+  <div id="evaluacion" class="content flow-stage-checklist" data-etapa="evaluacion">
+    <div class="card flow-stage-card">
+      <div class="stage-card-heading">
+        <div>
+          <span class="stage-eyebrow">Etapa 03</span>
+          <h2>Evaluación técnica</h2>
+          <p>Documenta el diagnóstico, registra hallazgos y reúne los antecedentes para autorizar la mantención.</p>
+        </div>
+        <div class="file-actions carga-checklist stage-import-box">
+          <input type="file" id="excelEvaluacion" accept=".xlsx,.xls" aria-label="Seleccionar checklist de evaluación">
+          <button class="btn-primary" onclick="cargarEvaluacion()">Cargar checklist</button>
+        </div>
       </div>
 
       <div id="progresoEvaluacion"></div>
 
       <div id="listaEvaluacion"></div>
 
-      <button class="btn-success btn-guardar-etapa" onclick="guardarEvaluacion()">
-        💾 Guardar Evaluación
-      </button>
-
-      <button
-        id="btnContinuarEvaluacionSinAprobacion"
-        class="btn-primary"
-        style="display:none;"
-        onclick="continuarEvaluacionSinAprobacion()"
-      >
-        Siguiente
-      </button>
-
       <!-- DECISIÓN JEFE DE TALLER -->
-      <div id="decisionEvaluacionJefe" class="decision-box solo-jefe">
+      <div id="decisionEvaluacionJefe" class="decision-box stage-decision-panel solo-jefe">
 
         <h3>Decisión Jefe de Taller</h3>
         <p class="decision-text">
@@ -252,14 +242,14 @@
             class="btn-success"
             onclick="aprobarOverhaulDesdeEvaluacion()"
           >
-            ✅ Aprobar Mantención
+            Aprobar mantención
           </button>
 
           <button
             class="btn-danger"
             onclick="rechazarOverhaulDesdeEvaluacion()"
           >
-            ❌ Rechazar
+            Rechazar
           </button>
         </div>
 
@@ -269,20 +259,27 @@
 
       <div id="comentarioDecisionEvaluacionGuardado"></div>
 
-      <button class="btn-primary solo-jefe" data-cierre-etapa="evaluacion" style="display:none;" onclick="cerrarOT()">
-        Cerrar OT
-      </button>
+      <div class="stage-actions">
+        <button class="btn-success btn-guardar-etapa" onclick="guardarEvaluacion()">Guardar evaluación</button>
+        <button id="btnContinuarEvaluacionSinAprobacion" class="btn-primary" style="display:none;" onclick="continuarEvaluacionSinAprobacion()">Continuar a mantención</button>
+        <button class="btn-danger solo-jefe" data-cierre-etapa="evaluacion" style="display:none;" onclick="cerrarOT()">Cerrar OS</button>
+      </div>
 
     </div>
   </div>
 
   <!-- MANTENCIÓN -->
-  <div id="overhaul" class="content" data-etapa="mantencion">
-  <div class="card">
-    <h2>Mantención</h2>
+  <div id="overhaul" class="content flow-stage-checklist" data-etapa="mantencion">
+  <div class="card flow-stage-card">
+    <div class="stage-card-heading">
+      <div>
+        <span class="stage-eyebrow">Etapa 04</span>
+        <h2>Ejecución de mantención</h2>
+        <p>Registra las actividades realizadas, sus responsables, evidencias y repuestos utilizados.</p>
+      </div>
 
 
-  <div class="file-actions">
+  <div class="file-actions stage-maintenance-tools">
 
   <div class="carga-checklist">
     <input
@@ -309,16 +306,15 @@
       data-modulo-gantt
       style="display:none !important"
     >
-      📅 Ver Carta Gantt
+      Ver carta Gantt
     </button>
 
   </div>
 
 </div>
+</div>
 
-<br>
-
-<div class="solo-jefe" data-modulo-repuestos style="display:none !important">
+<div class="solo-jefe stage-secondary-panel" data-modulo-repuestos style="display:none !important">
   <h3>Cargar listado de repuestos</h3>
 
   <input type="file" id="excelRepuestos" accept=".xlsx,.xls">
@@ -331,13 +327,11 @@
     <div id="progresoOverhaul"></div>
 
     <div id="listaOverhaul"></div>
-    <button class="btn-success btn-guardar-etapa" onclick="guardarOverhaul()">
-        💾 Guardar Mantención
-    </button>
-    <button class="btn-primary" onclick="aprobarOverhaul()">Siguiente</button>
-    <button class="btn-primary solo-jefe" data-cierre-etapa="overhaul" style="display:none;" onclick="cerrarOT()">
-      Cerrar OT
-    </button>
+    <div class="stage-actions">
+      <button class="btn-success btn-guardar-etapa" onclick="guardarOverhaul()">Guardar mantención</button>
+      <button class="btn-primary" onclick="aprobarOverhaul()">Continuar a pruebas</button>
+      <button class="btn-danger solo-jefe" data-cierre-etapa="overhaul" style="display:none;" onclick="cerrarOT()">Cerrar OS</button>
+    </div>
   </div>
 </div>
 
@@ -345,47 +339,29 @@
 
 
 <!--PRUEBAS-->
-  <div id="pruebas" class="content" data-etapa="pruebas">
-  <div class="card">
-    <h2>Pruebas</h2>
-
-    <h3>Checklist de Pruebas</h3>
-
-<div class="file-actions carga-checklist">
-  <input type="file" id="excelPruebas" accept=".xlsx,.xls">
-
-  <button class="btn-primary" onclick="cargarChecklist('general')">
-    Cargar Checklist
-  </button>
-</div>
+  <div id="pruebas" class="content flow-stage-checklist" data-etapa="pruebas">
+  <div class="card flow-stage-card">
+    <div class="stage-card-heading">
+      <div>
+        <span class="stage-eyebrow">Etapa 05</span>
+        <h2>Pruebas y control de calidad</h2>
+        <p>Valida el funcionamiento del equipo y deja respaldo de cada comprobación antes del despacho.</p>
+      </div>
+      <div class="file-actions carga-checklist stage-import-box">
+        <input type="file" id="excelPruebas" accept=".xlsx,.xls" aria-label="Seleccionar checklist de pruebas">
+        <button class="btn-primary" onclick="cargarChecklist('general')">Cargar checklist</button>
+      </div>
+    </div>
 
 <div id="progresoPruebas"></div>
 
 <div id="listaPruebas"></div>
-<button class="btn-success btn-guardar-etapa" onclick="guardarPruebas()">
-  💾 Guardar Progreso
-</button>
-
-<button
-  id="btnAprobarPruebasJefe"
-  class="btn-primary solo-jefe"
-  onclick="aprobarPruebas()"
->
-  ✅ Aprobar Pruebas
-</button>
-
-<button
-  id="btnFinalizarPruebasSinAprobacion"
-  class="btn-primary"
-  style="display:none;"
-  onclick="finalizarPruebasSinAprobacion()"
->
-  Siguiente
-</button>
-
-<button class="btn-primary solo-jefe" data-cierre-etapa="pruebas" style="display:none;" onclick="cerrarOT()">
-  Cerrar OT
-</button>
+<div class="stage-actions">
+  <button class="btn-success btn-guardar-etapa" onclick="guardarPruebas()">Guardar progreso</button>
+  <button id="btnAprobarPruebasJefe" class="btn-primary solo-jefe" onclick="aprobarPruebas()">Aprobar pruebas</button>
+  <button id="btnFinalizarPruebasSinAprobacion" class="btn-primary" style="display:none;" onclick="finalizarPruebasSinAprobacion()">Continuar a despacho</button>
+  <button class="btn-danger solo-jefe" data-cierre-etapa="pruebas" style="display:none;" onclick="cerrarOT()">Cerrar OS</button>
+</div>
 
 </div>
 </div>
@@ -396,10 +372,17 @@
 
 <!--DESPACHO-->
 <div id="despacho" class="content" data-etapa="despacho">
-  <div class="card">
-    <h2>Despacho</h2>
+  <div class="card flow-stage-card dispatch-stage-card">
+    <div class="stage-card-heading">
+      <div>
+        <span class="stage-eyebrow">Etapa 06</span>
+        <h2>Preparación y despacho</h2>
+        <p>Centraliza los documentos finales, comentarios de entrega y cierre formal de la orden.</p>
+      </div>
+    </div>
 
-    <h3>Preparación de Despacho</h3>
+    <section class="dispatch-section">
+    <div class="dispatch-section-heading"><span>01</span><div><h3>Preparación de despacho</h3><p>Documentación y observaciones previas a la entrega.</p></div></div>
 
 <div class="file-actions">
 
@@ -409,14 +392,14 @@
     class="btn-warning"
     onclick="subirDocsSeccion('preparacion')"
   >
-    Cargar
+    Adjuntar documentos
   </button>
 
 </div>
 
 <div id="listaDocsPrep"></div>
 <div class="comentarios-despacho-box">
-  <h4>Comentarios Preparación</h4>
+  <h4>Comentarios de preparación</h4>
 
   <input id="comentarioDespachoPrep" placeholder="Comentario">
   <button onclick="agregarComentarioDespacho('preparacion')" class="btn-primary">
@@ -425,10 +408,10 @@
 
   <div id="comentarios-despacho-preparacion"></div>
 </div>
+</section>
 
-<hr>
-
-<h3>Despacho Final</h3>
+<section class="dispatch-section">
+<div class="dispatch-section-heading"><span>02</span><div><h3>Despacho final</h3><p>Respaldo definitivo y confirmación de entrega.</p></div></div>
 <div class="file-actions">
 
   <input type="file" id="docsFinal" multiple>
@@ -437,7 +420,7 @@
     class="btn-warning"
     onclick="subirDocsSeccion('final')"
   >
-    Cargar
+    Adjuntar documentos
   </button>
 
 </div>
@@ -453,20 +436,19 @@
 
   <div id="comentarios-despacho-final"></div>
 </div>
-
-<hr>
-    <button class="btn-success btn-guardar-etapa" onclick="guardarDespacho()">
-        💾 Guardar Despacho
-    </button>
-    <button class="btn-primary solo-jefe" data-cierre-etapa="despacho" onclick="cerrarOT()">Cerrar OT</button>
+</section>
+    <div class="stage-actions">
+    <button class="btn-success btn-guardar-etapa" onclick="guardarDespacho()">Guardar despacho</button>
+    <button class="btn-danger solo-jefe" data-cierre-etapa="despacho" onclick="cerrarOT()">Cerrar OS</button>
     <button
         id="btnGenerarInformePDF"
         class="permitido-bloqueo btn-warning"
         data-modulo-reportes-pdf
         style="display:none !important"
       >
-        Generar PDF
+        Generar informe PDF
       </button>
+    </div>
   </div>
 </div>
 <div class="volver-panel-box">
@@ -669,11 +651,11 @@
 </div>
 
 
-<script src="js/components/notificaciones.js"></script>
+<script src="js/components/notificaciones.js?v=20261007-1"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<script type="module" src="js/app.js?v=20261006-2"></script>
+<script type="module" src="js/app.js?v=20261007-5"></script>
 </body>
 </html>

@@ -55,6 +55,13 @@ test("genera una alerta temprana desde 90 días antes del vencimiento", () => {
   assert.equal(aNoventaYUnDias.key, "vigente");
 });
 
+test("la vigencia se calcula por fecha aunque el registro antiguo figure pendiente", () => {
+  const hoy = new Date("2026-10-03T12:00:00");
+  const estado = estadoDocumentoAcreditacion({ estado: "pendiente", fechaVencimiento: "2027-02-01" }, hoy);
+  assert.equal(estado.key, "vigente");
+  assert.equal(estado.texto, "Vigente");
+});
+
 test("prefiere un documento vigente sobre una copia histórica vencida", () => {
   const documentos = [
     { entidadTipo: "persona", entidadId: "persona-a", tipoDocumento: "Examen ocupacional", estado: "aprobado", fechaVencimiento: "2026-01-01" },

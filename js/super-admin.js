@@ -743,7 +743,8 @@ function etiquetaRol(rol) {
     admin_empresa: "Admin Empresa",
     admin_sucursal: "Admin Sucursal",
     jefe_taller: "Jefe Taller",
-    usuario_taller: "Usuario Taller"
+    tecnico: "Técnico",
+    supervisor: "Supervisor"
     ,supervisor: "Supervisor"
     ,tecnico: "Técnico"
     ,planificador: "Planificador"
@@ -934,7 +935,7 @@ function renderVistaUsuarios() {
       <div class="section-header"><div><h2>Usuarios por empresa</h2><p class="section-copy">Cada grupo reúne únicamente a los usuarios pertenecientes a esa empresa.</p></div></div>
       <div class="users-global-filters">
         <input id="buscarUsuarioGlobal" class="admin-search" type="search" placeholder="Buscar por nombre, correo, rol o empresa...">
-        <select id="filtrarRolGlobal" class="admin-select"><option value="">Todos los roles</option><option value="admin_empresa">Admin Empresa</option><option value="admin_sucursal">Admin Sucursal</option><option value="jefe_taller">Jefe Taller</option><option value="usuario_taller">Usuario Taller</option></select>
+        <select id="filtrarRolGlobal" class="admin-select"><option value="">Todos los roles</option><option value="admin_empresa">Admin Empresa</option><option value="admin_sucursal">Admin Sucursal</option><option value="jefe_taller">Jefe Taller</option><option value="supervisor">Supervisor</option><option value="tecnico">Técnico</option></select>
         <select id="filtrarEstadoGlobal" class="admin-select"><option value="">Todos los estados</option><option value="activo">Activos</option><option value="inactivo">Inactivos</option></select>
       </div>
       <div id="gruposUsuariosGlobal" class="users-company-groups">${gruposUsuarios()}</div>

@@ -58,7 +58,7 @@ Puede:
 - Generar informes PDF.
 - Ver OS de su sucursal.
 
-### Usuario Taller
+### Técnico
 
 Rol operativo técnico.
 
@@ -347,7 +347,8 @@ Módulos:
 Roles:
 
 - Jefe de Taller
-- Usuario Taller
+- Supervisor
+- Técnico
 
 ---
 

@@ -448,7 +448,7 @@ async function guardarRepuestosUsados() {
 
             repuesto.tecnico =
                 usuario?.nombre ||
-                "Usuario Taller";
+                "Técnico";
 
             if (!estabaUsado || !repuesto.fecha) {
                 repuesto.fecha =

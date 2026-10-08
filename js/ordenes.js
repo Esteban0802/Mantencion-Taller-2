@@ -14,7 +14,7 @@ import {
   writeBatch
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-const usuario = protegerPagina(["super_admin", "admin_empresa", "admin_sucursal", "jefe_taller", "usuario_taller", "supervisor", "tecnico", "planificador"]);
+const usuario = protegerPagina(["super_admin", "admin_empresa", "admin_sucursal", "jefe_taller", "supervisor", "tecnico", "planificador"]);
 if (!usuario) throw new Error("Acceso no autorizado");
 
 const POR_PAGINA = 20;
@@ -212,10 +212,17 @@ async function eliminarOT(id) {
       })
     : window.confirm("¿Eliminar definitivamente esta OS?");
   if (!confirmar) return;
-  const lote = writeBatch(db);
-  lote.delete(doc(db, "ots", id));
-  lote.delete(doc(db, "otsResumen", id));
-  await lote.commit();
+  const eliminar = async () => {
+    const lote = writeBatch(db);
+    lote.delete(doc(db, "ots", id));
+    lote.delete(doc(db, "otsResumen", id));
+    await lote.commit();
+  };
+  if (window.OverTrackUI?.ejecutarConCarga) {
+    await window.OverTrackUI.ejecutarConCarga(eliminar, "Eliminando orden de servicio…");
+  } else {
+    await eliminar();
+  }
 }
 
 function volverPanelEmpresa() {

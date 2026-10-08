@@ -1,4 +1,5 @@
 let getUsuario = () => null;
+const ROLES_OPERATIVOS = ["supervisor", "tecnico"];
 
 export function inicializarPermisos(config) {
     getUsuario = config.getUsuario;
@@ -11,7 +12,7 @@ export function esJefeTaller() {
 
 export function esUsuarioTaller() {
     const usuario = getUsuario();
-    return usuario && ["usuario_taller", "supervisor", "tecnico"].includes(usuario.rol);
+    return usuario && ROLES_OPERATIVOS.includes(usuario.rol);
 }
 
 export function puedeEliminarComentario(c) {
@@ -24,7 +25,13 @@ export function puedeEliminarComentario(c) {
         return false;
     }
 
-    if (esUsuarioTaller() && c.rol === "usuario_taller") {
+    // Cada trabajador puede eliminar solamente sus propios comentarios.
+    const usuario = getUsuario();
+    if (
+        esUsuarioTaller() &&
+        ROLES_OPERATIVOS.includes(c.rol) &&
+        (!c.creadoPorUid || c.creadoPorUid === usuario?.uid)
+    ) {
         return true;
     }
 

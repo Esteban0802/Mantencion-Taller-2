@@ -22,7 +22,6 @@ const ROLES_EMPRESA = [
   "admin_empresa",
   "admin_sucursal",
   "jefe_taller",
-  "usuario_taller",
   "supervisor",
   "tecnico",
   "planificador",

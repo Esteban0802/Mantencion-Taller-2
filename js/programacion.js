@@ -35,7 +35,7 @@ const usuario = protegerPagina([
   "supervisor",
   "tecnico",
   "sheq",
-  "usuario_taller"
+  "tecnico"
 ]);
 
 if (!usuario) throw new Error("Acceso no autorizado");

@@ -51,8 +51,7 @@ const usuarioActivo = protegerPagina([
     "super_admin",
     "admin_empresa",
     "admin_sucursal",
-    "jefe_taller",
-    "usuario_taller"
+    "jefe_taller"
 ]);
 
 if (!usuarioActivo) throw new Error("Acceso no autorizado");
@@ -130,10 +129,7 @@ async function validarAccesoEmpresa() {
 
   await alert("No tienes permiso para acceder a esta empresa.");
 
-  if (
-    usuarioActivo.rol === "jefe_taller" ||
-    usuarioActivo.rol === "usuario_taller"
-  ) {
+  if (usuarioActivo.rol === "jefe_taller") {
     window.location.href = "dashboard.html";
   } else {
     window.location.href = "index.html";

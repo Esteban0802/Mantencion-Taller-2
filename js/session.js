@@ -97,7 +97,6 @@ export function redirigirPorRol(usuario) {
     case "admin_empresa":
     case "admin_sucursal":
     case "jefe_taller":
-    case "usuario_taller":
     case "supervisor":
     case "tecnico":
       window.location.replace("dashboard.html");

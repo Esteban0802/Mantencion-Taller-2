@@ -49,6 +49,7 @@ async function iniciarSesion() {
   loginError.textContent = "";
   loginMensaje.textContent = "";
   btnLogin.disabled = true;
+  const cargaUI = window.OverTrackUI?.iniciarCarga?.("Validando tus credenciales…");
 
   try {
     const credencial = await signInWithEmailAndPassword(auth, email, password);
@@ -107,7 +108,6 @@ switch (usuario.rol) {
     window.location.href = "dashboard.html";
     break;
 
-  case "usuario_taller":
   case "supervisor":
   case "tecnico":
     window.location.href = "dashboard.html";
@@ -134,6 +134,7 @@ switch (usuario.rol) {
     loginError.textContent = "Correo o contraseña incorrectos.";
   } finally {
     btnLogin.disabled = false;
+    window.OverTrackUI?.finalizarCarga?.(cargaUI);
   }
 }
 
@@ -160,6 +161,7 @@ async function recuperarPassword() {
   }
 
   btnRecuperarPassword.disabled = true;
+  const cargaUI = window.OverTrackUI?.iniciarCarga?.("Enviando instrucciones…");
 
   try {
     await sendPasswordResetEmail(auth, email);
@@ -168,6 +170,7 @@ async function recuperarPassword() {
     console.warn("Solicitud de recuperación procesada:", error.code || error);
   } finally {
     btnRecuperarPassword.disabled = false;
+    window.OverTrackUI?.finalizarCarga?.(cargaUI);
     loginMensaje.textContent =
       "Si el correo pertenece a una cuenta habilitada, recibirás instrucciones para recuperar el acceso.";
   }

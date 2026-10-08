@@ -1,0 +1,301 @@
+/* Flujo de trabajo OT: capa visual profesional.
+   Se carga al final para normalizar estilos heredados sin alterar la lógica. */
+
+.flow-overtrack {
+  --flow-navy: #0d2947;
+  --flow-navy-strong: #071d33;
+  --flow-blue: #087be6;
+  --flow-blue-soft: #eaf4ff;
+  --flow-green: #14804a;
+  --flow-amber: #b65d09;
+  --flow-red: #c93645;
+  --flow-text: #17283c;
+  --flow-muted: #60758a;
+  --flow-line: #d8e2ec;
+  --flow-surface: #ffffff;
+  --flow-surface-soft: #f5f8fb;
+  color: var(--flow-text);
+}
+
+/* Mantiene compacto el botón al usar solo el campo de trabajo realizado. */
+.flow-overtrack #ingreso .checklist-comment-box.checklist-comment-box--single,
+.flow-overtrack .flow-stage-checklist .checklist-comment-box.checklist-comment-box--single {
+  grid-template-columns: minmax(260px, 1fr) auto;
+}
+.flow-overtrack #ingreso .checklist-comment-box.checklist-comment-box--single button,
+.flow-overtrack .flow-stage-checklist .checklist-comment-box.checklist-comment-box--single button {
+  grid-column: auto;
+  width: auto;
+  min-width: 150px;
+  justify-self: end;
+}
+@media (max-width: 640px) {
+  .flow-overtrack #ingreso .checklist-comment-box.checklist-comment-box--single,
+  .flow-overtrack .flow-stage-checklist .checklist-comment-box.checklist-comment-box--single {
+    grid-template-columns: 1fr;
+  }
+  .flow-overtrack #ingreso .checklist-comment-box.checklist-comment-box--single button,
+  .flow-overtrack .flow-stage-checklist .checklist-comment-box.checklist-comment-box--single button {
+    width: 100%;
+    justify-self: stretch;
+  }
+}
+
+.flow-overtrack .container {
+  width: min(1440px, calc(100% - 40px));
+  padding-top: 18px;
+}
+
+.flow-overtrack .header-ot-pro {
+  width: min(1320px, 100%);
+  margin: 8px auto 14px;
+  padding: 20px 22px;
+  border: 1px solid #cbd9e6;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #fff 0%, #f7faff 72%, #edf5fc 100%);
+  box-shadow: 0 10px 28px rgba(15, 42, 70, .10);
+}
+
+.flow-overtrack .header-ot-main { margin-bottom: 16px; }
+.flow-overtrack .header-ot-label { color: #557087; font-size: 11px; letter-spacing: 1.25px; }
+.flow-overtrack .header-ot-main h1 { color: var(--flow-text); font-size: clamp(26px, 2vw, 34px); line-height: 1.1; }
+.flow-overtrack .header-ot-estado { padding: 8px 14px; font-size: 11px; letter-spacing: .4px; }
+
+.flow-overtrack .header-ot-grid { gap: 10px; margin-bottom: 16px; }
+.flow-overtrack .header-ot-grid div {
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--flow-line);
+  border-radius: 11px;
+  background: var(--flow-surface-soft);
+}
+.flow-overtrack .header-ot-grid span { color: #61798e; font-size: 10px; letter-spacing: .65px; }
+.flow-overtrack .header-ot-grid strong { display: block; overflow: hidden; color: var(--flow-text); font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
+.flow-overtrack .header-ot-progress-info { color: #405970; font-size: 11px; }
+.flow-overtrack .header-ot-progress-bar { height: 8px; background: #dbe4ec; }
+.flow-overtrack .header-ot-progress-bar div { background: linear-gradient(90deg, #1d91f0, #50b848); }
+
+.flow-overtrack .tabs-timeline-pro,
+.flow-overtrack .container .tabs.tabs-timeline-pro {
+  width: min(1320px, 100%);
+  margin: 0 auto 14px;
+  padding: 14px 20px 12px;
+  border: 1px solid rgba(64, 112, 157, .38) !important;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #071a31, #0d2b4c) !important;
+  box-shadow: 0 12px 30px rgba(7, 29, 51, .20) !important;
+}
+.flow-overtrack .tabs-timeline-pro::before,
+.flow-overtrack .container .tabs.tabs-timeline-pro::before { top: 32px; height: 2px; }
+.flow-overtrack .tabs-timeline-pro .tab { gap: 7px; min-width: 0; }
+.flow-overtrack .tabs-timeline-pro .tab-dot { width: 36px; height: 36px; border: 2px solid #8092a5; background: #122b45; font-size: 12px; box-shadow: 0 0 0 4px #0a223d; }
+.flow-overtrack .tabs-timeline-pro .tab.active .tab-dot { box-shadow: 0 0 0 4px #0a223d, 0 5px 14px rgba(8, 123, 230, .35); transform: none; }
+.flow-overtrack .tabs-timeline-pro .tab-text { color: #b8c7d6; font-size: 12px; font-weight: 750; }
+.flow-overtrack .tabs-timeline-pro .tab.active .tab-text { color: #fff; }
+
+.flow-overtrack .content > .flow-stage-card,
+.flow-overtrack .content .flow-stage-card {
+  width: min(1320px, 100%);
+  margin: 0 auto;
+  padding: 24px;
+  border: 1px solid var(--flow-line);
+  border-radius: 16px;
+  background: var(--flow-surface);
+  box-shadow: 0 12px 32px rgba(23, 40, 60, .08);
+}
+
+.flow-overtrack .stage-card-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--flow-line);
+}
+.flow-overtrack .stage-eyebrow { display: block; margin-bottom: 5px; color: var(--flow-blue); font-size: 11px; font-weight: 800; letter-spacing: .9px; text-transform: uppercase; }
+.flow-overtrack .stage-card-heading h2 { margin: 0; color: var(--flow-text); font-size: 21px; line-height: 1.25; }
+.flow-overtrack .stage-card-heading p { max-width: 680px; margin: 7px 0 0; color: var(--flow-muted); font-size: 13px; line-height: 1.5; }
+.flow-overtrack .stage-import-box { flex: 0 1 470px; justify-content: flex-end; margin: 0; }
+.flow-overtrack .stage-import-box input[type="file"] { min-width: 250px; min-height: 42px; padding: 5px 7px; border: 1px solid var(--flow-line); border-radius: 10px; background: #fff; color: var(--flow-text); font-size: 12px; }
+.flow-overtrack .stage-import-box .btn-primary { min-height: 42px !important; height: 42px !important; padding: 0 18px !important; border-radius: 10px; }
+
+.flow-overtrack #ingreso #progresoIngreso { margin: 18px 0; }
+.flow-overtrack #ingreso .progreso-etapa-card { margin: 0; padding: 14px 16px; border: 1px solid var(--flow-line); border-radius: 12px; background: var(--flow-surface-soft); }
+.flow-overtrack #ingreso .progreso-etapa-header { margin-bottom: 9px; color: var(--flow-text); font-size: 12px; }
+.flow-overtrack #ingreso .progreso-etapa-barra { height: 8px; background: #dce6ef; }
+.flow-overtrack #ingreso .progreso-etapa-fill { background: linear-gradient(90deg, var(--flow-blue), #4aac78); }
+
+.flow-overtrack #ingreso .checklist-pro-grid { gap: 12px; margin-top: 0; }
+.flow-overtrack #ingreso .checklist-card {
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) auto;
+  padding: 16px;
+  border: 1px solid var(--flow-line);
+  border-left: 4px solid #a9b8c7;
+  border-radius: 13px;
+  background: #fff;
+  box-shadow: 0 4px 14px rgba(23, 40, 60, .05);
+  color: var(--flow-text);
+}
+.flow-overtrack #ingreso .checklist-card:hover { transform: none; border-color: #b7c9da; border-left-color: var(--flow-blue); box-shadow: 0 8px 22px rgba(23, 40, 60, .09); }
+.flow-overtrack #ingreso .checklist-card.completed { border-color: #badfcb; border-left-color: var(--flow-green); box-shadow: 0 4px 14px rgba(20, 128, 74, .07); }
+.flow-overtrack #ingreso .checklist-card-header { grid-column: 1 / -1; margin-bottom: 10px; }
+.flow-overtrack #ingreso .checklist-card-title { min-width: 0; }
+.flow-overtrack #ingreso .checklist-card-title h4 { overflow: hidden; color: var(--flow-text); font-size: 14px; font-weight: 750; line-height: 1.35; text-overflow: ellipsis; }
+.flow-overtrack #ingreso .checklist-card-check { width: 21px; height: 21px; accent-color: var(--flow-green); }
+.flow-overtrack #ingreso .checklist-status { padding: 5px 10px; font-size: 10px; letter-spacing: .35px; }
+.flow-overtrack #ingreso .checklist-status.pending { border-color: #f1ce9c; background: #fff6e7; color: var(--flow-amber); }
+.flow-overtrack #ingreso .checklist-status.done { border-color: #b5dec6; background: #eaf8f0; color: var(--flow-green); }
+.flow-overtrack #ingreso .checklist-card-footer { align-items: center; margin: 0; }
+.flow-overtrack #ingreso .checklist-mini-badge { padding: 6px 9px; border: 1px solid #dce5ed; border-radius: 8px; background: #f3f6f9; color: #536b80; font-size: 11px; }
+.flow-overtrack #ingreso .checklist-upload-box { margin: 0; text-align: right; }
+.flow-overtrack #ingreso .btn-upload-pro { padding: 8px 12px; border-radius: 9px; background: #eaf4ff; color: #0668c5; font-size: 11px; box-shadow: none; }
+.flow-overtrack #ingreso .btn-upload-pro:hover { background: #d9ecff; }
+.flow-overtrack #ingreso .checklist-fotos-pro { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 10px; margin-top: 13px; }
+.flow-overtrack #ingreso .foto-box { width: 112px; margin: 0; }
+.flow-overtrack #ingreso .foto-box img,
+.flow-overtrack #ingreso .evidencia-pdf-card { width: 112px; height: 82px; box-sizing: border-box; border: 1px solid #cbd8e4; border-radius: 9px; object-fit: cover; }
+.flow-overtrack #ingreso .btn-delete-img { top: -6px; right: -6px; width: 22px; height: 22px; border: 2px solid #fff; background: var(--flow-red); font-size: 13px; }
+.flow-overtrack #ingreso .checklist-comment-box { grid-column: 1 / -1; grid-template-columns: minmax(150px, .65fr) minmax(260px, 1.5fr) auto; gap: 9px; margin-top: 14px; padding-top: 14px; border-top: 1px solid #e1e8ef; }
+.flow-overtrack #ingreso .checklist-comment-box input { min-height: 40px; padding: 9px 11px; border: 1px solid #cbd8e4; border-radius: 9px; background: #fff; color: var(--flow-text); font-size: 12px; }
+.flow-overtrack #ingreso .checklist-comment-box input:focus { border-color: var(--flow-blue); box-shadow: 0 0 0 3px rgba(8, 123, 230, .12); outline: none; }
+.flow-overtrack #ingreso .checklist-comment-box button { min-height: 40px; padding: 9px 15px; border-radius: 9px; background: var(--flow-green); font-size: 11px; }
+.flow-overtrack #ingreso [id^="comentarios-ingreso-"] { grid-column: 1 / -1; }
+
+.flow-overtrack .stage-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--flow-line); }
+.flow-overtrack .stage-actions button { min-height: 42px; margin: 0; padding: 9px 18px; border-radius: 10px; font-size: 12px; }
+.flow-overtrack .stage-actions .btn-success { border: 1px solid #bad7c7; background: #edf8f2; color: #12683d; }
+
+@media (max-width: 900px) {
+  .flow-overtrack .container { width: min(100% - 24px, 1440px); }
+  .flow-overtrack .stage-card-heading { flex-direction: column; }
+  .flow-overtrack .stage-import-box { flex-basis: auto; width: 100%; justify-content: flex-start; }
+  .flow-overtrack #ingreso .checklist-comment-box { grid-template-columns: 1fr 1fr; }
+  .flow-overtrack #ingreso .checklist-comment-box button { grid-column: 1 / -1; }
+}
+
+@media (max-width: 640px) {
+  .flow-overtrack .container { width: min(100% - 16px, 1440px); }
+  .flow-overtrack .header-ot-pro,
+  .flow-overtrack .content > .flow-stage-card,
+  .flow-overtrack .content .flow-stage-card { padding: 16px; border-radius: 13px; }
+  .flow-overtrack .header-ot-grid { grid-template-columns: 1fr 1fr; }
+  .flow-overtrack .tabs-timeline-pro,
+  .flow-overtrack .container .tabs.tabs-timeline-pro { grid-template-columns: repeat(3, 1fr); row-gap: 16px; padding: 12px 8px; }
+  .flow-overtrack .tabs-timeline-pro::before { display: none; }
+  .flow-overtrack .stage-import-box { display: grid; grid-template-columns: 1fr; }
+  .flow-overtrack .stage-import-box input[type="file"],
+  .flow-overtrack .stage-import-box .btn-primary { width: 100%; min-width: 0; }
+  .flow-overtrack #ingreso .checklist-card { grid-template-columns: 1fr; padding: 13px; }
+  .flow-overtrack #ingreso .checklist-card-header { align-items: flex-start; }
+  .flow-overtrack #ingreso .checklist-upload-box { margin-top: 10px; text-align: left; }
+  .flow-overtrack #ingreso .checklist-comment-box { grid-template-columns: 1fr; }
+  .flow-overtrack #ingreso .checklist-comment-box button { grid-column: auto; }
+  .flow-overtrack .stage-actions { flex-direction: column; }
+  .flow-overtrack .stage-actions button { width: 100%; }
+}
+
+/* Comentarios: la identidad proviene de la sesión activa. */
+.flow-overtrack .checklist-comment-box.checklist-comment-box--single {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+}
+.flow-overtrack .checklist-comment-box.checklist-comment-box--single input {
+  width: 100%;
+  box-sizing: border-box;
+}
+@media (max-width: 640px) {
+  .flow-overtrack .checklist-comment-box.checklist-comment-box--single {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Componentes compartidos por Evaluación, Mantención y Pruebas */
+.flow-overtrack .flow-stage-checklist [id^="progreso"] { margin: 18px 0; }
+.flow-overtrack .flow-stage-checklist .progreso-etapa-card { margin: 0; padding: 14px 16px; border: 1px solid var(--flow-line); border-radius: 12px; background: var(--flow-surface-soft); }
+.flow-overtrack .flow-stage-checklist .progreso-etapa-header { margin-bottom: 9px; color: var(--flow-text); font-size: 12px; }
+.flow-overtrack .flow-stage-checklist .progreso-etapa-barra { height: 8px; background: #dce6ef; }
+.flow-overtrack .flow-stage-checklist .progreso-etapa-fill { background: linear-gradient(90deg, var(--flow-blue), #4aac78); }
+.flow-overtrack .flow-stage-checklist .checklist-pro-grid { gap: 12px; margin-top: 0; }
+.flow-overtrack .flow-stage-checklist .checklist-card { display: grid; grid-template-columns: minmax(240px, 1fr) auto; padding: 16px; border: 1px solid var(--flow-line); border-left: 4px solid #a9b8c7; border-radius: 13px; background: #fff; box-shadow: 0 4px 14px rgba(23, 40, 60, .05); color: var(--flow-text); }
+.flow-overtrack .flow-stage-checklist .checklist-card:hover { transform: none; border-color: #b7c9da; border-left-color: var(--flow-blue); box-shadow: 0 8px 22px rgba(23, 40, 60, .09); }
+.flow-overtrack .flow-stage-checklist .checklist-card.completed { border-color: #badfcb; border-left-color: var(--flow-green); box-shadow: 0 4px 14px rgba(20, 128, 74, .07); }
+.flow-overtrack .flow-stage-checklist .checklist-card-header { grid-column: 1 / -1; margin-bottom: 10px; }
+.flow-overtrack .flow-stage-checklist .checklist-card-title { min-width: 0; }
+.flow-overtrack .flow-stage-checklist .checklist-card-title h4 { overflow: hidden; color: var(--flow-text); font-size: 14px; font-weight: 750; line-height: 1.35; text-overflow: ellipsis; }
+.flow-overtrack .flow-stage-checklist .checklist-card-check { width: 21px; height: 21px; accent-color: var(--flow-green); }
+.flow-overtrack .flow-stage-checklist .checklist-status { padding: 5px 10px; font-size: 10px; letter-spacing: .35px; }
+.flow-overtrack .flow-stage-checklist .checklist-status.pending { border-color: #f1ce9c; background: #fff6e7; color: var(--flow-amber); }
+.flow-overtrack .flow-stage-checklist .checklist-status.done { border-color: #b5dec6; background: #eaf8f0; color: var(--flow-green); }
+.flow-overtrack .flow-stage-checklist .checklist-card-footer { align-items: center; margin: 0; }
+.flow-overtrack .flow-stage-checklist .checklist-mini-badge { padding: 6px 9px; border: 1px solid #dce5ed; border-radius: 8px; background: #f3f6f9; color: #536b80; font-size: 11px; }
+.flow-overtrack .flow-stage-checklist .checklist-upload-box { margin: 0; text-align: right; }
+.flow-overtrack .flow-stage-checklist .btn-upload-pro { padding: 8px 12px; border-radius: 9px; background: #eaf4ff; color: #0668c5; font-size: 11px; box-shadow: none; }
+.flow-overtrack .flow-stage-checklist .btn-upload-pro:hover { background: #d9ecff; }
+.flow-overtrack .flow-stage-checklist .checklist-fotos-pro { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 10px; margin-top: 13px; }
+.flow-overtrack .flow-stage-checklist .foto-box { width: 112px; margin: 0; }
+.flow-overtrack .flow-stage-checklist .foto-box img,
+.flow-overtrack .flow-stage-checklist .evidencia-pdf-card { width: 112px; height: 82px; box-sizing: border-box; border: 1px solid #cbd8e4; border-radius: 9px; object-fit: cover; }
+.flow-overtrack .flow-stage-checklist .btn-delete-img { top: -6px; right: -6px; width: 22px; height: 22px; border: 2px solid #fff; background: var(--flow-red); font-size: 13px; }
+.flow-overtrack .flow-stage-checklist .checklist-comment-box { grid-column: 1 / -1; grid-template-columns: minmax(150px, .65fr) minmax(260px, 1.5fr) auto; gap: 9px; margin-top: 14px; padding-top: 14px; border-top: 1px solid #e1e8ef; }
+.flow-overtrack .flow-stage-checklist .checklist-comment-box input { min-height: 40px; padding: 9px 11px; border: 1px solid #cbd8e4; border-radius: 9px; background: #fff; color: var(--flow-text); font-size: 12px; }
+.flow-overtrack .flow-stage-checklist .checklist-comment-box input:focus { border-color: var(--flow-blue); box-shadow: 0 0 0 3px rgba(8, 123, 230, .12); outline: none; }
+.flow-overtrack .flow-stage-checklist .checklist-comment-box button { min-height: 40px; padding: 9px 15px; border-radius: 9px; background: var(--flow-green); font-size: 11px; }
+.flow-overtrack .flow-stage-checklist [id^="comentarios-"] { grid-column: 1 / -1; }
+
+.flow-overtrack .stage-maintenance-tools { flex: 0 1 600px; justify-content: flex-end; margin: 0; }
+.flow-overtrack .stage-maintenance-tools .carga-checklist,
+.flow-overtrack .stage-maintenance-tools .overhaul-actions { display: flex; align-items: center; gap: 8px; }
+.flow-overtrack .stage-maintenance-tools input[type="file"] { min-height: 42px; max-width: 245px; padding: 5px 7px; border: 1px solid var(--flow-line); border-radius: 10px; background: #fff; font-size: 12px; }
+.flow-overtrack .stage-maintenance-tools button { min-height: 42px !important; height: 42px !important; margin: 0; padding: 0 14px !important; border-radius: 10px; }
+.flow-overtrack .stage-secondary-panel { margin: 18px 0; padding: 16px; border: 1px solid var(--flow-line); border-radius: 12px; background: var(--flow-surface-soft); }
+.flow-overtrack .stage-secondary-panel h3 { margin: 0 0 12px; color: var(--flow-text); font-size: 14px; }
+
+.flow-overtrack .stage-decision-panel { margin: 20px 0 0; padding: 18px; border: 1px solid #d6e2ec; border-left: 4px solid var(--flow-blue); border-radius: 12px; background: #f7fafc; box-shadow: none; }
+.flow-overtrack .stage-decision-panel h3 { margin: 0 0 5px; color: var(--flow-text); font-size: 16px; }
+.flow-overtrack .stage-decision-panel .decision-text { color: var(--flow-muted); font-size: 12px; }
+.flow-overtrack .stage-decision-panel textarea { width: 100%; min-height: 90px; box-sizing: border-box; border: 1px solid #cbd8e4; border-radius: 9px; background: #fff; color: var(--flow-text); }
+.flow-overtrack .stage-decision-panel input[type="file"] { width: 100%; box-sizing: border-box; margin-top: 10px; padding: 7px; border: 1px solid #cbd8e4; border-radius: 9px; background: #fff; }
+.flow-overtrack .stage-decision-panel .decision-actions { display: flex; gap: 9px; margin-top: 12px; }
+.flow-overtrack .stage-decision-panel .decision-actions button { min-height: 40px; margin: 0; border-radius: 9px; }
+
+/* Despacho */
+.flow-overtrack .dispatch-section { margin-top: 18px; padding: 18px; border: 1px solid var(--flow-line); border-radius: 13px; background: var(--flow-surface-soft); }
+.flow-overtrack .dispatch-section-heading { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+.flow-overtrack .dispatch-section-heading > span { display: grid; flex: 0 0 34px; height: 34px; place-items: center; border-radius: 9px; background: var(--flow-navy); color: #fff; font-size: 11px; font-weight: 800; }
+.flow-overtrack .dispatch-section-heading h3 { margin: 0; color: var(--flow-text); font-size: 15px; }
+.flow-overtrack .dispatch-section-heading p { margin: 3px 0 0; color: var(--flow-muted); font-size: 11px; }
+.flow-overtrack .dispatch-section .file-actions { margin: 0 0 14px; gap: 10px; }
+.flow-overtrack .dispatch-section .file-actions input[type="file"] { min-height: 42px; flex: 1; padding: 5px 7px; border: 1px solid #cbd8e4; border-radius: 9px; background: #fff; font-size: 12px; }
+.flow-overtrack .dispatch-section .file-actions button { min-height: 42px !important; height: 42px !important; padding: 0 16px !important; border-radius: 9px; background: var(--flow-blue); }
+.flow-overtrack .dispatch-section .comentarios-despacho-box { display: grid; grid-template-columns: minmax(180px, 1fr) auto; gap: 9px; margin-top: 14px; padding: 14px; border: 1px solid #d9e3ec; border-radius: 10px; background: #fff; }
+.flow-overtrack .dispatch-section .comentarios-despacho-box h4 { grid-column: 1 / -1; margin: 0; color: var(--flow-text); font-size: 12px; }
+.flow-overtrack .dispatch-section .comentarios-despacho-box input { min-height: 40px; margin: 0; border: 1px solid #cbd8e4; border-radius: 9px; background: #fff; color: var(--flow-text); }
+.flow-overtrack .dispatch-section .comentarios-despacho-box > button { min-height: 40px; margin: 0; border-radius: 9px; }
+.flow-overtrack .dispatch-section .comentarios-despacho-box > div { grid-column: 1 / -1; }
+
+@media (max-width: 900px) {
+  .flow-overtrack .stage-maintenance-tools { flex-basis: auto; width: 100%; justify-content: flex-start; flex-wrap: wrap; }
+  .flow-overtrack .flow-stage-checklist .checklist-comment-box { grid-template-columns: 1fr 1fr; }
+  .flow-overtrack .flow-stage-checklist .checklist-comment-box button { grid-column: 1 / -1; }
+}
+
+@media (max-width: 640px) {
+  .flow-overtrack .flow-stage-checklist .checklist-card { grid-template-columns: 1fr; padding: 13px; }
+  .flow-overtrack .flow-stage-checklist .checklist-card-header { align-items: flex-start; }
+  .flow-overtrack .flow-stage-checklist .checklist-upload-box { margin-top: 10px; text-align: left; }
+  .flow-overtrack .flow-stage-checklist .checklist-comment-box { grid-template-columns: 1fr; }
+  .flow-overtrack .flow-stage-checklist .checklist-comment-box button { grid-column: auto; }
+  .flow-overtrack .stage-maintenance-tools,
+  .flow-overtrack .stage-maintenance-tools .carga-checklist,
+  .flow-overtrack .stage-maintenance-tools .overhaul-actions { display: grid; width: 100%; grid-template-columns: 1fr; }
+  .flow-overtrack .stage-maintenance-tools input[type="file"],
+  .flow-overtrack .stage-maintenance-tools button { width: 100%; max-width: none; }
+  .flow-overtrack .stage-decision-panel .decision-actions,
+  .flow-overtrack .dispatch-section .file-actions { flex-direction: column; }
+  .flow-overtrack .dispatch-section .file-actions input[type="file"],
+  .flow-overtrack .dispatch-section .file-actions button { width: 100%; }
+  .flow-overtrack .dispatch-section .comentarios-despacho-box { grid-template-columns: 1fr; }
+  .flow-overtrack .dispatch-section .comentarios-despacho-box h4,
+  .flow-overtrack .dispatch-section .comentarios-despacho-box > div { grid-column: auto; }
+}

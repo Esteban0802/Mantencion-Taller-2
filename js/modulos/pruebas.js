@@ -2,6 +2,8 @@ import {
   capturarBorradoresFormulario,
   restaurarBorradoresFormulario
 } from "./core/utilidades.js";
+import { programarRenderDiferido } from "./core/renderDiferido.js?v=20261007-2";
+import { actualizarTarjetaChecklist } from "./core/actualizacionParcial.js?v=20261007-1";
 
 /**
  * Inicializa el módulo de Pruebas.
@@ -39,6 +41,38 @@ let avancePruebasEnCurso = false;
     aprobacionesHabilitadas,
     agregarBitacora
   } = servicios;
+
+  const esArchivoPdf = archivo => archivo?.type === "application/pdf" || /\.pdf$/i.test(archivo?.name || "");
+  const prepararEvidencia = async (archivo, prefijo) => {
+    if (esArchivoPdf(archivo)) return archivo;
+    try {
+      return new File([await comprimirImagenBlob(archivo)], `${prefijo}_${Date.now()}.jpg`, { type: "image/jpeg" });
+    } catch (error) {
+      console.warn("La imagen se subirá en su formato original:", archivo.name, error);
+      return archivo;
+    }
+  };
+  const esUrlPdf = url => /\.pdf(?:\?|$)/i.test(String(url || ""));
+  const crearVistaEvidencia = (url, descripcion) => {
+    if (esUrlPdf(url)) {
+      const enlace = document.createElement("a");
+      enlace.className = "evidencia-pdf-card";
+      enlace.href = url;
+      enlace.target = "_blank";
+      enlace.rel = "noopener";
+      enlace.setAttribute("aria-label", `${descripcion}: abrir PDF`);
+      enlace.innerHTML = "<span>PDF</span><small>Ver documento</small>";
+      return enlace;
+    }
+    const img = document.createElement("img");
+    img.loading = "lazy";
+    img.decoding = "async";
+    img.alt = descripcion;
+    img.src = url;
+    img.width = 100;
+    img.onclick = () => verImagenModal(url);
+    return img;
+  };
 
   const alert = (mensaje) => {
     const texto = String(mensaje || "");
@@ -317,6 +351,7 @@ function renderChecklist(tipo = "general") {
 
     div.className =
       `checklist-card ${completado ? "completed" : ""}`;
+    div.dataset.checklistIndex = String(index);
 
     div.innerHTML = `
       <div class="checklist-card-header">
@@ -363,7 +398,7 @@ function renderChecklist(tipo = "general") {
 
           <input
             type="file"
-            accept="image/*"
+            accept="image/*,.pdf,application/pdf"
             multiple
             onchange="subirFotoPrueba(
               event,
@@ -381,13 +416,7 @@ function renderChecklist(tipo = "general") {
         class="checklist-fotos-pro"
       ></div>
 
-      <div class="checklist-comment-box">
-
-        <input
-          id="tecnico-${tipo}-${index}"
-          placeholder="Técnico"
-        >
-
+      <div class="checklist-comment-box checklist-comment-box--single">
         <input
           id="comentario-${tipo}-${index}"
           placeholder="Trabajo realizado"
@@ -410,8 +439,10 @@ function renderChecklist(tipo = "general") {
 
     cont.appendChild(div);
 
-    mostrarFotosPrueba(tipo, index);
-    renderComentariosPrueba(tipo, index);
+    programarRenderDiferido(div, () => {
+      mostrarFotosPrueba(tipo, index);
+      renderComentariosPrueba(tipo, index);
+    });
   });
 }
 
@@ -445,7 +476,8 @@ function togglePrueba(tipo, index) {
 
   autoguardarCambiosOT();
 
-  renderChecklist(tipo);
+  actualizarTarjetaChecklist("listaPruebas", index, item, itemCompleto);
+  renderProgresoEtapa("progresoPruebas", obtenerChecklistPruebas(ot));
 
   if (ot.gantt?.actividades?.length) {
     renderCartaGantt();
@@ -492,21 +524,11 @@ async function subirFotoPrueba(event, tipo, index) {
     fotosOriginales = [...item.fotos];
 
     for (const file of files) {
-
-      const imagenBlob =
-        await comprimirImagenBlob(file);
-
-      const imagenComprimida = new File(
-        [imagenBlob],
-        `pruebas_${tipo}_${Date.now()}.jpg`,
-        {
-          type: "image/jpeg"
-        }
-      );
+      const archivoEvidencia = await prepararEvidencia(file, `pruebas_${tipo}`);
 
       const urlFoto =
         await subirArchivoStorage(
-          imagenComprimida,
+          archivoEvidencia,
           `pruebas_${tipo}`,
           index
         );
@@ -568,15 +590,7 @@ function mostrarFotosPrueba(tipo, index) {
 
     container.className = "foto-box";
 
-    const img = document.createElement("img");
-
-    img.loading = "lazy";
-    img.decoding = "async";
-    img.alt = `Evidencia ${fotoIndex + 1} de pruebas`;
-    img.src = foto;
-    img.width = 100;
-    img.style.cursor = "pointer";
-    img.onclick = () => verImagenModal(foto);
+    const vista = crearVistaEvidencia(foto, `Evidencia ${fotoIndex + 1} de pruebas`);
 
     const btn = document.createElement("button");
 
@@ -591,7 +605,7 @@ function mostrarFotosPrueba(tipo, index) {
         fotoIndex
       );
 
-    container.appendChild(img);
+    container.appendChild(vista);
     container.appendChild(btn);
 
     div.appendChild(container);
@@ -662,19 +676,15 @@ async function agregarComentarioPrueba(tipo, index) {
 
   if (!item) return;
 
-  const inputTecnico = document.getElementById(
-    `tecnico-${tipo}-${index}`
-  );
-
   const inputComentario = document.getElementById(
     `comentario-${tipo}-${index}`
   );
 
-  const nombre = inputTecnico?.value?.trim();
+  const nombre = usuario?.nombre || usuario?.email || "Usuario";
   const texto = inputComentario?.value?.trim();
 
-  if (!nombre || !texto) {
-    alert("Completa técnico y comentario");
+  if (!texto) {
+    alert("Ingresa el trabajo realizado");
     return;
   }
 
@@ -690,7 +700,7 @@ async function agregarComentarioPrueba(tipo, index) {
     nombre,
     texto,
     fecha: new Date().toLocaleString(),
-    rol: usuario?.rol || "usuario_taller",
+    rol: usuario?.rol || "tecnico",
     creadoPorUid: usuario?.uid || "",
     creadoPorNombre: usuario?.nombre || nombre,
     atendido: esJefeTaller() ? false : true,
@@ -785,7 +795,7 @@ function renderComentariosPrueba(tipo, index) {
               <strong>
                 ✅ Respondido por ${
                   comentario.atendidoPor ||
-                  "Usuario Taller"
+                  "Técnico"
                 }
               </strong>
 
@@ -1070,7 +1080,7 @@ async function finalizarPruebasSinAprobacion() {
       resultado: "NO REQUERIDA",
       comentario: "La empresa tiene deshabilitado el módulo Aprobaciones.",
       usuario: getUsuario()?.nombre || "Usuario",
-      rol: getUsuario()?.rol || "usuario_taller",
+      rol: getUsuario()?.rol || "tecnico",
       fecha: new Date().toLocaleString()
     };
     ot.estado = obtenerEstadoOT(ot);

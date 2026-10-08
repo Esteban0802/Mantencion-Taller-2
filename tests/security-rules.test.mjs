@@ -34,7 +34,7 @@ let testEnv;
 
 const usuarioTallerA = {
   uid: "taller-a",
-  rol: "usuario_taller",
+  rol: "tecnico",
   empresaId: "empresa-a",
   sucursalId: "sucursal-a",
   activo: true,
@@ -44,6 +44,22 @@ const usuarioTallerA = {
 const jefeTallerA = {
   uid: "jefe-a",
   rol: "jefe_taller",
+  empresaId: "empresa-a",
+  sucursalId: "sucursal-a",
+  activo: true,
+};
+
+const supervisorA = {
+  uid: "supervisor-a",
+  rol: "supervisor",
+  empresaId: "empresa-a",
+  sucursalId: "sucursal-a",
+  activo: true,
+};
+
+const tecnicoA = {
+  uid: "tecnico-a",
+  rol: "tecnico",
   empresaId: "empresa-a",
   sucursalId: "sucursal-a",
   activo: true,
@@ -75,7 +91,7 @@ const usuarioSheqA = {
 
 const usuarioSucursalA2 = {
   uid: "taller-a2",
-  rol: "usuario_taller",
+  rol: "tecnico",
   empresaId: "empresa-a",
   sucursalId: "sucursal-a2",
   activo: true,
@@ -83,7 +99,7 @@ const usuarioSucursalA2 = {
 
 const usuarioTallerB = {
   uid: "taller-b",
-  rol: "usuario_taller",
+  rol: "tecnico",
   empresaId: "empresa-b",
   sucursalId: "sucursal-b",
   activo: true,
@@ -91,7 +107,7 @@ const usuarioTallerB = {
 
 const usuarioInactivo = {
   uid: "inactivo-a",
-  rol: "usuario_taller",
+  rol: "tecnico",
   empresaId: "empresa-a",
   sucursalId: "sucursal-a",
   activo: false,
@@ -99,7 +115,7 @@ const usuarioInactivo = {
 
 const usuarioSucursalInactiva = {
   uid: "taller-sucursal-inactiva",
-  rol: "usuario_taller",
+  rol: "tecnico",
   empresaId: "empresa-a",
   sucursalId: "sucursal-inactiva",
   activo: false,
@@ -121,6 +137,8 @@ async function sembrarDatos() {
     for (const usuario of [
       usuarioTallerA,
       jefeTallerA,
+      supervisorA,
+      tecnicoA,
       adminEmpresaA,
       adminSucursalA,
       usuarioSheqA,
@@ -204,6 +222,13 @@ async function sembrarDatos() {
       creadoPor: "jefe-a",
       estado: "Mantencion",
       cerrada: false,
+    });
+
+    await setDoc(doc(db, "ots", "ot-antigua-sin-cierre"), {
+      empresaId: "empresa-a",
+      sucursalId: "sucursal-a",
+      creadoPor: "jefe-a",
+      estado: "INGRESO",
     });
 
     await setDoc(doc(db, "ots", "ot-sucursal-inactiva"), {
@@ -662,8 +687,46 @@ test("Taller puede actualizar datos normales de una OT de su empresa", async () 
   );
 });
 
+test("Supervisor puede registrar trabajo normal en una OT de su sucursal", async () => {
+  const db = firestoreComo("supervisor-a");
+  await assertSucceeds(
+    updateDoc(doc(db, "ots", "ot-abierta-a"), {
+      observacionSupervisor: "Trabajo revisado en terreno",
+    }),
+  );
+});
+
+test("Técnico puede registrar trabajo normal en una OT de su sucursal", async () => {
+  const db = firestoreComo("tecnico-a");
+  await assertSucceeds(
+    updateDoc(doc(db, "ots", "ot-abierta-a"), {
+      observacionTecnico: "Actividad ejecutada",
+    }),
+  );
+});
+
 test("Taller puede avanzar de Ingreso a Evaluación al completar Ingreso", async () => {
   const db = firestoreComo("taller-a");
+  await assertSucceeds(
+    updateDoc(doc(db, "ots", "ot-flujo-a"), {
+      ingresoAprobado: true,
+      estado: "EVALUACION",
+    }),
+  );
+});
+
+test("Supervisor puede avanzar de Ingreso a Evaluación al completar Ingreso", async () => {
+  const db = firestoreComo("supervisor-a");
+  await assertSucceeds(
+    updateDoc(doc(db, "ots", "ot-flujo-a"), {
+      ingresoAprobado: true,
+      estado: "EVALUACION",
+    }),
+  );
+});
+
+test("Técnico puede avanzar de Ingreso a Evaluación al completar Ingreso", async () => {
+  const db = firestoreComo("tecnico-a");
   await assertSucceeds(
     updateDoc(doc(db, "ots", "ot-flujo-a"), {
       ingresoAprobado: true,
@@ -775,6 +838,17 @@ test("Técnico no puede aprobar la Evaluación cuando Aprobaciones está habilit
   );
 });
 
+test("Supervisor no puede aprobar la Evaluación cuando Aprobaciones está habilitado", async () => {
+  const db = firestoreComo("supervisor-a");
+  await assertFails(
+    updateDoc(doc(db, "ots", "ot-flujo-a"), {
+      evaluacionAprobada: true,
+      overhaulRequerido: true,
+      decisionEvaluacion: { resultado: "APROBADO" },
+    }),
+  );
+});
+
 test("Jefe de Taller puede aprobar la Evaluación", async () => {
   const db = firestoreComo("jefe-a");
   await assertSucceeds(
@@ -836,6 +910,21 @@ test("Técnico no puede cerrar una OT aunque todas las etapas estén completas",
       estado: "CERRADA",
       cerrada: true,
       cerradoPor: "taller-a",
+    }),
+  );
+});
+
+test("Supervisor no puede cerrar una OT aunque todas las etapas estén completas", async () => {
+  const db = firestoreComo("supervisor-a");
+  await assertFails(
+    updateDoc(doc(db, "ots", "ot-flujo-a"), {
+      ingresoAprobado: true,
+      evaluacionAprobada: true,
+      overhaulAprobado: true,
+      pruebasAprobado: true,
+      estado: "CERRADA",
+      cerrada: true,
+      cerradoPor: "supervisor-a",
     }),
   );
 });
@@ -951,7 +1040,7 @@ test("Admin Empresa no puede crear directamente un usuario desde el cliente", as
   await assertFails(
     setDoc(doc(db, "usuarios", "nuevo-a"), {
       uid: "nuevo-a",
-      rol: "usuario_taller",
+      rol: "tecnico",
       empresaId: "empresa-a",
       sucursalId: "sucursal-a",
       activo: true,
@@ -1134,6 +1223,17 @@ test("SHEQ puede consultar y crear documentos de acreditación de su empresa", a
   }));
 });
 
+test("SHEQ puede actualizar únicamente el RUT de un trabajador de su sucursal", async () => {
+  const db = firestoreComo("sheq-a");
+  await assertSucceeds(updateDoc(doc(db, "usuarios", "taller-a"), {
+    rut: "12.345.678-9",
+    fechaActualizacion: new Date(),
+  }));
+  await assertFails(updateDoc(doc(db, "usuarios", "taller-a"), {
+    rol: "admin_empresa",
+  }));
+});
+
 test("Jefe de Taller puede consultar SHEQ pero no modificarlo", async () => {
   const db = firestoreComo("jefe-a");
   await assertSucceeds(getDoc(doc(db, "sheqDocumentos", "documento-sheq-a")));
@@ -1213,6 +1313,42 @@ test("Taller puede subir un archivo menor a 20 MB a una OT abierta", async () =>
       { contentType: "text/plain" },
     ),
   );
+});
+
+test("Supervisor puede subir evidencia en otro formato de imagen", async () => {
+  const storage = storageComo("supervisor-a");
+  await assertSucceeds(uploadBytes(
+    ref(storage, "ots/ot-abierta-a/ingreso/item_0/evidencia-supervisor.gif"),
+    new Uint8Array([71, 73, 70]),
+    { contentType: "image/gif" },
+  ));
+});
+
+test("Técnico puede subir evidencia JPEG a una OT abierta de su sucursal", async () => {
+  const storage = storageComo("tecnico-a");
+  await assertSucceeds(uploadBytes(
+    ref(storage, "ots/ot-abierta-a/ingreso/item_0/evidencia-tecnico.jpg"),
+    new Uint8Array([255, 216, 255]),
+    { contentType: "image/jpeg" },
+  ));
+});
+
+test("Técnico puede subir un PDF como evidencia de una OT abierta", async () => {
+  const storage = storageComo("tecnico-a");
+  await assertSucceeds(uploadBytes(
+    ref(storage, "ots/ot-abierta-a/ingreso/item_0/evidencia-tecnico.pdf"),
+    new TextEncoder().encode("%PDF-1.4"),
+    { contentType: "application/pdf" },
+  ));
+});
+
+test("Técnico puede subir evidencia a una OT antigua sin campo cerrada", async () => {
+  const storage = storageComo("tecnico-a");
+  await assertSucceeds(uploadBytes(
+    ref(storage, "ots/ot-antigua-sin-cierre/ingreso/item_0/evidencia-antigua.jpg"),
+    new Uint8Array([255, 216, 255]),
+    { contentType: "image/jpeg" },
+  ));
 });
 
 test("durante cancelación se pueden descargar archivos, pero no subir ni eliminar", async () => {

@@ -181,7 +181,7 @@ function crearComentario(nombre, texto) {
         nombre: nombre || usuario?.nombre || "Usuario",
         texto: texto.trim(),
         fecha: new Date().toLocaleString(),
-        rol: usuario?.rol || "usuario_taller",
+        rol: usuario?.rol || "tecnico",
         creadoPorUid: usuario?.uid || "",
         creadoPorNombre:
             usuario?.nombre ||
@@ -322,7 +322,7 @@ export async function responderComentarioJefe(
 
     if (!esUsuarioTaller?.()) {
         alert(
-            "Solo Usuario Taller puede responder observaciones"
+            "Solo un técnico o supervisor puede responder observaciones"
         );
         return;
     }
@@ -367,7 +367,7 @@ export async function responderComentarioJefe(
             respuesta.trim();
 
         comentario.atendidoPor =
-            usuario?.nombre || "Usuario Taller";
+            usuario?.nombre || "Técnico";
 
         comentario.fechaAtendido =
             new Date().toLocaleString();
@@ -411,17 +411,15 @@ export async function agregarComentarioItem(i) {
         return;
     }
 
-    const inputNombre =
-        document.getElementById(`tecnico-${i}`);
-
     const inputTexto =
         document.getElementById(`comentario-${i}`);
 
-    const nombre = inputNombre?.value?.trim();
+    const usuario = obtenerUsuario();
+    const nombre = usuario?.nombre || usuario?.email || "Usuario";
     const texto = inputTexto?.value?.trim();
 
-    if (!nombre || !texto) {
-        alert("Completa técnico y comentario");
+    if (!texto) {
+        alert("Ingresa el trabajo realizado");
         return;
     }
 
@@ -562,21 +560,17 @@ export async function agregarComentarioEvaluacion(i) {
         return;
     }
 
-    const inputNombre =
-        document.getElementById(
-            `tecnico-eval-${i}`
-        );
-
     const inputTexto =
         document.getElementById(
             `comentario-eval-${i}`
         );
 
-    const nombre = inputNombre?.value?.trim();
+    const usuario = obtenerUsuario();
+    const nombre = usuario?.nombre || usuario?.email || "Usuario";
     const texto = inputTexto?.value?.trim();
 
-    if (!nombre || !texto) {
-        alert("Completa técnico y comentario");
+    if (!texto) {
+        alert("Ingresa el trabajo realizado");
         return;
     }
 
@@ -836,7 +830,7 @@ export async function responderComentarioJefeDespacho(
 
     if (!esUsuarioTaller?.()) {
         alert(
-            "Solo Usuario Taller puede responder observaciones"
+            "Solo un técnico o supervisor puede responder observaciones"
         );
         return;
     }
@@ -881,7 +875,7 @@ export async function responderComentarioJefeDespacho(
             respuesta.trim();
 
         comentario.atendidoPor =
-            usuario?.nombre || "Usuario Taller";
+            usuario?.nombre || "Técnico";
 
         comentario.fechaAtendido =
             new Date().toLocaleString();
@@ -1018,7 +1012,7 @@ function crearTarjetaComentario({
         const atendidoPor =
             escaparHTML(
                 comentario?.atendidoPor ||
-                "Usuario Taller"
+                "Técnico"
             );
 
         const respuesta =

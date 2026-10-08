@@ -51,7 +51,6 @@ service cloud.firestore {
     function isWorkshopUser() {
       return hasRole([
         'jefe_taller',
-        'usuario_taller',
         'supervisor',
         'tecnico'
       ]);
@@ -71,7 +70,6 @@ service cloud.firestore {
       return hasRole([
         'admin_sucursal',
         'jefe_taller',
-        'usuario_taller',
         'supervisor',
         'tecnico',
         'planificador',
@@ -282,6 +280,20 @@ service cloud.firestore {
           .hasOnly(['debeCambiarPassword', 'fechaActualizacion']) &&
         resource.data.debeCambiarPassword == true &&
         request.resource.data.debeCambiarPassword == false
+      ) || (
+        (
+          isSuperAdmin() ||
+          (
+            hasRole(['sheq']) &&
+            sameBranch(resource.data) &&
+            sameBranch(request.resource.data) &&
+            canWriteCompany(resource.data)
+          )
+        ) &&
+        request.resource.data.empresaId == resource.data.empresaId &&
+        request.resource.data.sucursalId == resource.data.sucursalId &&
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['rut', 'fechaActualizacion'])
       );
 
     }
@@ -385,7 +397,6 @@ service cloud.firestore {
           ) &&
           hasRole([
             'jefe_taller',
-            'usuario_taller',
             'supervisor',
             'tecnico'
           ])

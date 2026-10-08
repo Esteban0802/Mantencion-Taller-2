@@ -5,7 +5,6 @@ const ROLES = {
   ADMIN_EMPRESA: "admin_empresa",
   ADMIN_SUCURSAL: "admin_sucursal",
   JEFE_TALLER: "jefe_taller",
-  USUARIO_TALLER: "usuario_taller",
   SUPERVISOR: "supervisor",
   TECNICO: "tecnico",
   PLANIFICADOR: "planificador",
@@ -27,9 +26,7 @@ export function tieneRol(
 ) {
   if (!usuarioValido(usuario)) return false;
 
-  if (rolesPermitidos.includes(usuario.rol)) return true;
-  return [ROLES.SUPERVISOR, ROLES.TECNICO].includes(usuario.rol) &&
-    rolesPermitidos.includes(ROLES.USUARIO_TALLER);
+  return rolesPermitidos.includes(usuario.rol);
 }
 
 export function perteneceAEmpresa(
@@ -123,7 +120,8 @@ export function puedeAbrirOT(
     ROLES.ADMIN_EMPRESA,
     ROLES.ADMIN_SUCURSAL,
     ROLES.JEFE_TALLER,
-    ROLES.USUARIO_TALLER
+    ROLES.SUPERVISOR,
+    ROLES.TECNICO
   ]);
 }
 
@@ -157,7 +155,8 @@ export function puedeCargarChecklists(
     ROLES.SUPER_ADMIN,
     ROLES.ADMIN_SUCURSAL,
     ROLES.JEFE_TALLER,
-    ROLES.USUARIO_TALLER
+    ROLES.SUPERVISOR,
+    ROLES.TECNICO
   ]);
 }
 
@@ -176,7 +175,8 @@ export function puedeCompletarChecklists(
     ROLES.ADMIN_EMPRESA,
     ROLES.ADMIN_SUCURSAL,
     ROLES.JEFE_TALLER,
-    ROLES.USUARIO_TALLER
+    ROLES.SUPERVISOR,
+    ROLES.TECNICO
   ]);
 }
 

@@ -9,7 +9,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 import { deleteObject, getDownloadURL, ref, uploadBytes } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 
-const usuario = protegerPagina(["super_admin", "admin_empresa", "admin_sucursal", "jefe_taller", "usuario_taller", "planificador", "bodeguero"]);
+const usuario = protegerPagina(["super_admin", "admin_empresa", "admin_sucursal", "jefe_taller", "planificador", "bodeguero"]);
 if (!usuario) throw new Error("Acceso no autorizado");
 
 let empresa = null;
@@ -27,7 +27,6 @@ const REGISTROS_POR_CARGA = 50;
 const ROLES_LIMITADOS_A_SUCURSAL = [
   "admin_sucursal",
   "jefe_taller",
-  "usuario_taller",
   "planificador",
   "bodeguero"
 ];
@@ -158,7 +157,7 @@ async function cargarUsuariosRetiro() {
   const snap = await getDocs(query(collection(db, "usuarios"), where("empresaId", "==", empresaId), where("sucursalId", "==", sucursalId)));
   usuariosRetiro = snap.docs
     .map(item => ({ id: item.id, ...item.data() }))
-    .filter(item => item.activo !== false && ["supervisor", "jefe_taller", "tecnico", "usuario_taller"].includes(item.rol))
+    .filter(item => item.activo !== false && ["supervisor", "jefe_taller", "tecnico"].includes(item.rol))
     .sort((a, b) => String(a.nombreCompleto || a.nombre || a.email || "").localeCompare(String(b.nombreCompleto || b.nombre || b.email || ""), "es"));
 }
 

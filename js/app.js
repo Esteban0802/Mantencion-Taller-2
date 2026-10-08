@@ -1,4 +1,4 @@
-import { protegerPagina, cerrarSesion as cerrarSesionGlobal } from "./session.js?v=20261004-1";
+import { protegerPagina, cerrarSesion as cerrarSesionGlobal } from "./session.js?v=20261007-1";
 
 import { db, auth, storage } from "./firebase-config.js";
 
@@ -13,22 +13,22 @@ import {
 
 import {
   inicializarModuloIngreso
-} from "./modulos/ingreso.js";
+} from "./modulos/ingreso.js?v=20261007-3";
 
 
 import {
   inicializarModuloEvaluacion
-} from "./modulos/evaluacion.js";
+} from "./modulos/evaluacion.js?v=20261007-3";
 
 
 import {
   inicializarModuloOverhaul
-} from "./modulos/overhaul.js";
+} from "./modulos/overhaul.js?v=20261007-3";
 
 
 import {
   inicializarModuloPruebas
-} from "./modulos/pruebas.js";
+} from "./modulos/pruebas.js?v=20261007-3";
 
 
 import {
@@ -69,14 +69,14 @@ import {
 import {
     subirArchivoStorage,
     eliminarArchivoStorage
-} from "./modulos/core/storage.js";
+} from "./modulos/core/storage.js?v=20261007-4";
 
 
 import {
     verImagenModal,
     cerrarImagen,
     comprimirImagenBlob
-} from "./modulos/core/imagenes.js";
+} from "./modulos/core/imagenes.js?v=20261007-1";
 
 
 import {
@@ -84,7 +84,7 @@ import {
     guardarCambiosOT,
     autoguardarCambiosOT,
     obtenerEstadoOT
-} from "./modulos/core/otService.js";
+} from "./modulos/core/otService.js?v=20261007-2";
 
 import { guardarResumenOT } from "./modulos/core/resumenOT.js";
 
@@ -107,7 +107,7 @@ import {
 
 import {
     inicializarModuloInformePDF
-} from "./modulos/informePDF.js";
+} from "./modulos/informePDF.js?v=20261007-1";
 
 
 import {
@@ -136,7 +136,8 @@ const usuario = protegerPagina([
   "admin_empresa",
   "admin_sucursal",
   "jefe_taller",
-  "usuario_taller"
+  "supervisor",
+  "tecnico"
 ]);
 
 if (!usuario) throw new Error("Acceso no autorizado");
@@ -1103,7 +1104,7 @@ function configurarTabsSegunFlujo() {
     return;
   }
 
-  // Usuario Taller sigue el flujo real
+  // Supervisor y técnico siguen el flujo real
   if (ot.ingresoAprobado && etapaHabilitada("evaluacion")) {
     habilitarTab("evaluacion");
   }

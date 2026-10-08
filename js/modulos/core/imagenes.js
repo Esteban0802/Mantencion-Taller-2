@@ -80,7 +80,7 @@ export function comprimirImagenBlob(
                             return;
                         }
 
-                        resolve(blob);
+                        resolve(blob.size < file.size ? blob : file);
                     },
                     "image/jpeg",
                     calidad

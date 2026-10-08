@@ -5,7 +5,7 @@ export function grupoProgramacionUsuario(perfil = {}) {
     return perfil.cargoProgramacion;
   }
 
-  if (["tecnico", "usuario_taller"].includes(perfil.rol)) return "tecnico";
+  if (perfil.rol === "tecnico") return "tecnico";
   if (["supervisor", "jefe_taller"].includes(perfil.rol)) return "supervisor";
   if (perfil.rol === "sheq") return "sheq";
   return null;

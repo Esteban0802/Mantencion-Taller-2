@@ -1,5 +1,6 @@
 import { db } from "../../firebase-config.js";
 import { guardarResumenOT } from "./resumenOT.js";
+import { iniciarMedicion } from "./rendimiento.js";
 
 import {
     doc,
@@ -14,6 +15,15 @@ let timerAutoguardado = null;
 let cambiosPendientes = false;
 let guardadoEnCurso = false;
 let listenersRecuperacionRegistrados = false;
+
+function valoresIguales(valorA, valorB) {
+    if (Object.is(valorA, valorB)) return true;
+    try {
+        return JSON.stringify(valorA) === JSON.stringify(valorB);
+    } catch (_) {
+        return false;
+    }
+}
 
 function actualizarEstadoConexion() {
     const elemento = document.getElementById("estadoConexion");
@@ -168,6 +178,9 @@ export async function guardarCambiosOT(
         return false;
     }
 
+    const cargaUI = window.OverTrackUI?.iniciarCarga?.("Guardando cambios de la OT…");
+    const finalizarMedicion = iniciarMedicion("Guardado parcial de OT");
+
     try {
 
         guardadoEnCurso = true;
@@ -178,10 +191,6 @@ export async function guardarCambiosOT(
             JSON.parse(JSON.stringify(ot));
 
         delete datosActualizar.id;
-
-        datosActualizar.fechaActualizacion =
-            serverTimestamp();
-
 
         const revisionLocal = Math.max(0, Number(ot.revision || 0));
         const nuevaRevision = revisionLocal + 1;
@@ -194,8 +203,16 @@ export async function guardarCambiosOT(
             const revisionRemota = Math.max(0, Number(snapshot.data()?.revision || 0));
             if (revisionRemota !== revisionLocal) throw new Error("OT_MODIFICADA_POR_OTRO_USUARIO");
 
+            const datosRemotos = snapshot.data() || {};
+            const cambiosParciales = {};
+            Object.entries(datosActualizar).forEach(([campo, valor]) => {
+                if (campo === "revision" || campo === "fechaActualizacion") return;
+                if (!valoresIguales(valor, datosRemotos[campo])) cambiosParciales[campo] = valor;
+            });
+
             transaction.update(referencia, {
-                ...datosActualizar,
+                ...cambiosParciales,
+                fechaActualizacion: serverTimestamp(),
                 revision: nuevaRevision
             });
         });
@@ -251,6 +268,9 @@ export async function guardarCambiosOT(
         guardadoEnCurso = false;
 
         return false;
+    } finally {
+        finalizarMedicion();
+        window.OverTrackUI?.finalizarCarga?.(cargaUI);
     }
 }
 

@@ -6,6 +6,8 @@ import {
   capturarBorradoresFormulario,
   restaurarBorradoresFormulario
 } from "./core/utilidades.js";
+import { programarRenderDiferido } from "./core/renderDiferido.js?v=20261007-2";
+import { actualizarTarjetaChecklist } from "./core/actualizacionParcial.js?v=20261007-1";
 
 export function inicializarModuloIngreso(servicios) {
   let aprobacionIngresoEnCurso = false;
@@ -41,6 +43,38 @@ export function inicializarModuloIngreso(servicios) {
     mostrarAlerta
 
 } = servicios;
+
+  const esArchivoPdf = archivo => archivo?.type === "application/pdf" || /\.pdf$/i.test(archivo?.name || "");
+  const prepararEvidencia = async (archivo, prefijo) => {
+    if (esArchivoPdf(archivo)) return archivo;
+    try {
+      return new File([await comprimirImagenBlob(archivo)], `${prefijo}_${Date.now()}.jpg`, { type: "image/jpeg" });
+    } catch (error) {
+      console.warn("La imagen se subirá en su formato original:", archivo.name, error);
+      return archivo;
+    }
+  };
+  const esUrlPdf = url => /\.pdf(?:\?|$)/i.test(String(url || ""));
+  const crearVistaEvidencia = (url, descripcion) => {
+    if (esUrlPdf(url)) {
+      const enlace = document.createElement("a");
+      enlace.className = "evidencia-pdf-card";
+      enlace.href = url;
+      enlace.target = "_blank";
+      enlace.rel = "noopener";
+      enlace.setAttribute("aria-label", `${descripcion}: abrir PDF`);
+      enlace.innerHTML = "<span>PDF</span><small>Ver documento</small>";
+      return enlace;
+    }
+    const img = document.createElement("img");
+    img.loading = "lazy";
+    img.decoding = "async";
+    img.alt = descripcion;
+    img.src = url;
+    img.width = 100;
+    img.onclick = () => verImagenModal(url);
+    return img;
+  };
 
   const alert = (mensaje) => {
     const texto = String(mensaje || "");
@@ -278,6 +312,7 @@ export function inicializarModuloIngreso(servicios) {
         `checklist-card ${
           completado ? "completed" : ""
         }`;
+      div.dataset.checklistIndex = String(i);
 
       div.innerHTML = `
         <div class="checklist-card-header">
@@ -321,7 +356,7 @@ export function inicializarModuloIngreso(servicios) {
 
             <input
               type="file"
-              accept="image/*"
+              accept="image/*,.pdf,application/pdf"
               multiple
               onchange="subirFotoIngreso(event, ${i})"
             >
@@ -333,13 +368,7 @@ export function inicializarModuloIngreso(servicios) {
           class="checklist-fotos-pro"
         ></div>
 
-        <div class="checklist-comment-box">
-
-          <input
-            id="tecnico-${i}"
-            placeholder="Técnico"
-          >
-
+        <div class="checklist-comment-box checklist-comment-box--single">
           <input
             id="comentario-${i}"
             placeholder="Trabajo realizado"
@@ -356,8 +385,10 @@ export function inicializarModuloIngreso(servicios) {
 
       cont.appendChild(div);
 
-      mostrarFotosIngreso(i);
-      renderComentariosItem(i);
+      programarRenderDiferido(div, () => {
+        mostrarFotosIngreso(i);
+        renderComentariosItem(i);
+      });
     });
   }
 
@@ -381,7 +412,8 @@ function toggleIngreso(i) {
 
     autoguardarCambiosOT();
 
-    window.renderIngreso();
+    actualizarTarjetaChecklist("listaIngreso", i, ot.ingreso[i], itemCompleto);
+    renderProgresoEtapa("progresoIngreso", ot.ingreso);
 
     if (ot.gantt?.actividades?.length) {
         renderCartaGantt();
@@ -407,15 +439,7 @@ function mostrarFotosIngreso(i) {
         const cont = document.createElement("div");
         cont.className = "foto-box";
 
-        const img = document.createElement("img");
-        img.loading = "lazy";
-        img.decoding = "async";
-        img.alt = `Evidencia ${index + 1} del ingreso`;
-        img.src = foto;
-        img.style.cursor = "pointer";
-        img.width = 100;
-
-        img.onclick = () => verImagenModal(foto);
+        const vista = crearVistaEvidencia(foto, `Evidencia ${index + 1} del ingreso`);
 
         const btn = document.createElement("button");
         btn.innerHTML = "&times;";
@@ -423,7 +447,7 @@ function mostrarFotosIngreso(i) {
 
         btn.onclick = () => eliminarFotoIngreso(i, index);
 
-        cont.appendChild(img);
+        cont.appendChild(vista);
         cont.appendChild(btn);
 
         div.appendChild(cont);
@@ -481,19 +505,10 @@ async function subirFotoIngreso(e, i) {
         }
 
         for (const file of files) {
-
-            const imagenBlob = await comprimirImagenBlob(file);
-
-            const imagenComprimida = new File(
-                [imagenBlob],
-                `ingreso_${Date.now()}.jpg`,
-                {
-                    type: "image/jpeg"
-                }
-            );
+            const archivoEvidencia = await prepararEvidencia(file, "ingreso");
 
             const urlFoto = await subirArchivoStorage(
-                imagenComprimida,
+                archivoEvidencia,
                 "ingreso",
                 i
             );
@@ -506,7 +521,7 @@ async function subirFotoIngreso(e, i) {
 
         agregarBitacora(
             "Evidencia agregada",
-            `Ingreso: ${files.length} foto(s)`
+            `Ingreso: ${files.length} evidencia(s)`
         );
 
         const guardado = await guardarCambiosOT();
@@ -539,7 +554,7 @@ async function subirFotoIngreso(e, i) {
         );
 
         mostrarAlerta(
-            `No se completó la carga de ${files.length} fotografía(s). No se agregó ninguna evidencia del lote.`,
+            `${error?.message || `No se completó la carga de ${files.length} evidencia(s).`} No se agregó ninguna evidencia del lote.`,
             "error"
         );
 

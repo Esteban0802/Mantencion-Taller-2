@@ -31,6 +31,11 @@ export function inicializarModuloInformePDF(
         return Promise.resolve(true);
     };
 
+    const esEvidenciaPdf = url => /\.pdf(?:\?|$)/i.test(String(url || ""));
+    const imagenesDeItem = item => Array.isArray(item?.fotos)
+        ? item.fotos.filter(url => url && !esEvidenciaPdf(url))
+        : [];
+
     validarDependencias({
         getOT,
         getUsuario,
@@ -382,7 +387,7 @@ function obtenerResumenEjecutivoInforme() {
   }, 0);
 
   const totalFotos = todasActividades.reduce((acc, { item }) => {
-    return acc + (item.fotos?.length || 0);
+    return acc + imagenesDeItem(item).length;
   }, 0);
 
   const avance =
@@ -799,7 +804,7 @@ function obtenerResumenEvidenciasInforme() {
 
   return etapas.map(etapa => {
     const fotos = etapa.lista.reduce(
-      (acc, item) => acc + (item.fotos?.length || 0),
+      (acc, item) => acc + imagenesDeItem(item).length,
       0
     );
 
@@ -1111,7 +1116,7 @@ function obtenerFotosInforme() {
           ? item.comentarios[item.comentarios.length - 1]?.fecha
           : formatearFecha(new Date());
 
-      (item.fotos || []).forEach((foto, fotoIndex) => {
+      imagenesDeItem(item).forEach((foto, fotoIndex) => {
         fotos.push({
           etapa: nombreEtapaVisible(etapa.nombre),
           actividad: item.item || item.texto || `Ítem ${index + 1}`,
@@ -1142,8 +1147,9 @@ async function obtenerFotoPortadaInforme(config) {
 
   for (const lista of etapas) {
     for (const item of lista) {
-      if (item.fotos && item.fotos.length > 0) {
-        const url = item.fotos[0];
+      const imagenes = imagenesDeItem(item);
+      if (imagenes.length > 0) {
+        const url = imagenes[0];
 
         if (!url) continue;
 
@@ -1457,7 +1463,7 @@ function obtenerFotosRepresentativasEtapa(grupo, maximo = 4) {
   const totalItems = grupo?.lista?.length || 0;
 
   (grupo?.lista || []).forEach((item, index) => {
-    const fotosItem = Array.isArray(item?.fotos) ? item.fotos.filter(Boolean) : [];
+    const fotosItem = imagenesDeItem(item);
     const crearRegistro = (url, fotoIndex) => ({
       etapa: nombreEtapaVisible(grupo.nombre),
       actividad: item?.item || item?.texto || `Actividad ${index + 1}`,
@@ -1700,13 +1706,13 @@ function obtenerResponsablesInforme() {
   )?.nombre || "";
 
   const usuarioActualEsJefe = String(usuario?.rol || "").toLowerCase().includes("jefe");
-  const usuarioActualEsTecnico = ["usuario_taller", "tecnico", "técnico"].some(rol =>
+  const usuarioActualEsTecnico = ["tecnico", "técnico"].some(rol =>
     String(usuario?.rol || "").toLowerCase().includes(rol)
   );
 
   return {
     tecnico:
-      buscarPorRol(["usuario_taller", "tecnico", "técnico"]) ||
+      buscarPorRol(["tecnico", "técnico"]) ||
       (usuarioActualEsTecnico ? usuario?.nombre : "") ||
       "",
     jefeTaller:

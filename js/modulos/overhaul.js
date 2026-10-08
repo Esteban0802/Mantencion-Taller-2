@@ -6,6 +6,8 @@ import {
   capturarBorradoresFormulario,
   restaurarBorradoresFormulario
 } from "./core/utilidades.js";
+import { programarRenderDiferido } from "./core/renderDiferido.js?v=20261007-2";
+import { actualizarTarjetaChecklist } from "./core/actualizacionParcial.js?v=20261007-1";
 
 export function inicializarModuloOverhaul(servicios) {
   let aprobacionOverhaulEnCurso = false;
@@ -38,6 +40,38 @@ export function inicializarModuloOverhaul(servicios) {
     habilitarTab,
     navegarSiguienteEtapa
   } = servicios;
+
+  const esArchivoPdf = archivo => archivo?.type === "application/pdf" || /\.pdf$/i.test(archivo?.name || "");
+  const prepararEvidencia = async (archivo, prefijo) => {
+    if (esArchivoPdf(archivo)) return archivo;
+    try {
+      return new File([await comprimirImagenBlob(archivo)], `${prefijo}_${Date.now()}.jpg`, { type: "image/jpeg" });
+    } catch (error) {
+      console.warn("La imagen se subirá en su formato original:", archivo.name, error);
+      return archivo;
+    }
+  };
+  const esUrlPdf = url => /\.pdf(?:\?|$)/i.test(String(url || ""));
+  const crearVistaEvidencia = (url, descripcion) => {
+    if (esUrlPdf(url)) {
+      const enlace = document.createElement("a");
+      enlace.className = "evidencia-pdf-card";
+      enlace.href = url;
+      enlace.target = "_blank";
+      enlace.rel = "noopener";
+      enlace.setAttribute("aria-label", `${descripcion}: abrir PDF`);
+      enlace.innerHTML = "<span>PDF</span><small>Ver documento</small>";
+      return enlace;
+    }
+    const img = document.createElement("img");
+    img.loading = "lazy";
+    img.decoding = "async";
+    img.alt = descripcion;
+    img.src = url;
+    img.width = 100;
+    img.onclick = () => verImagenModal(url);
+    return img;
+  };
 
   const alert = (mensaje) => {
     const texto = String(mensaje || "");
@@ -272,6 +306,7 @@ export function inicializarModuloOverhaul(servicios) {
         `checklist-card ${
           completado ? "completed" : ""
         }`;
+      div.dataset.checklistIndex = String(i);
 
       div.innerHTML = `
         <div class="checklist-card-header">
@@ -318,7 +353,7 @@ export function inicializarModuloOverhaul(servicios) {
 
             <input
               type="file"
-              accept="image/*"
+              accept="image/*,.pdf,application/pdf"
               multiple
               onchange="subirFotoOverhaul(event, ${i})"
             >
@@ -332,13 +367,7 @@ export function inicializarModuloOverhaul(servicios) {
           class="checklist-fotos-pro"
         ></div>
 
-        <div class="checklist-comment-box">
-
-          <input
-            id="tec-overhaul-${i}"
-            placeholder="Técnico"
-          >
-
+        <div class="checklist-comment-box checklist-comment-box--single">
           <input
             id="com-overhaul-${i}"
             placeholder="Trabajo realizado"
@@ -359,8 +388,10 @@ export function inicializarModuloOverhaul(servicios) {
 
       cont.appendChild(div);
 
-      mostrarFotosOverhaul(i);
-      renderComentariosOverhaul(i);
+      programarRenderDiferido(div, () => {
+        mostrarFotosOverhaul(i);
+        renderComentariosOverhaul(i);
+      });
     });
   }
 
@@ -389,7 +420,8 @@ export function inicializarModuloOverhaul(servicios) {
 
         autoguardarCambiosOT();
 
-    renderOverhaul();
+    actualizarTarjetaChecklist("listaOverhaul", i, ot.overhaul[i], itemCompleto);
+    renderProgresoEtapa("progresoOverhaul", ot.overhaul);
 
     if (
     ot.gantt?.actividades?.length &&
@@ -424,19 +456,11 @@ export function inicializarModuloOverhaul(servicios) {
       }
 
       for (const file of files) {
-        const imagenBlob =
-          await comprimirImagenBlob(file);
-
-        const imagenComprimida =
-          new File(
-            [imagenBlob],
-            `overhaul_${Date.now()}.jpg`,
-            { type: "image/jpeg" }
-          );
+        const archivoEvidencia = await prepararEvidencia(file, "overhaul");
 
         const urlFoto =
           await subirArchivoStorage(
-            imagenComprimida,
+            archivoEvidencia,
             "overhaul",
             i
           );
@@ -499,17 +523,7 @@ export function inicializarModuloOverhaul(servicios) {
 
       container.className = "foto-box";
 
-      const img =
-        document.createElement("img");
-
-      img.loading = "lazy";
-      img.decoding = "async";
-      img.alt = `Evidencia ${index + 1} de mantención`;
-      img.src = foto;
-      img.width = 100;
-      img.style.cursor = "pointer";
-      img.onclick = () =>
-        verImagenModal(foto);
+      const vista = crearVistaEvidencia(foto, `Evidencia ${index + 1} de mantención`);
 
       const btn =
         document.createElement("button");
@@ -520,7 +534,7 @@ export function inicializarModuloOverhaul(servicios) {
       btn.onclick = () =>
         eliminarFotoOverhaul(i, index);
 
-      container.appendChild(img);
+      container.appendChild(vista);
       container.appendChild(btn);
 
       div.appendChild(container);
@@ -585,24 +599,19 @@ export function inicializarModuloOverhaul(servicios) {
 
     if (!ot?.overhaul?.[i]) return;
 
-    const inputNombre =
-      document.getElementById(
-        `tec-overhaul-${i}`
-      );
-
     const inputTexto =
       document.getElementById(
         `com-overhaul-${i}`
       );
 
     const nombre =
-      inputNombre?.value.trim() || "";
+      usuario?.nombre || usuario?.email || "Usuario";
 
     const texto =
       inputTexto?.value.trim() || "";
 
-    if (!nombre || !texto) {
-      alert("Completa técnico y comentario");
+    if (!texto) {
+      alert("Ingresa el trabajo realizado");
       return;
     }
 
@@ -617,7 +626,7 @@ export function inicializarModuloOverhaul(servicios) {
       nombre,
       texto,
       fecha: new Date().toLocaleString(),
-      rol: usuario?.rol || "usuario_taller",
+      rol: usuario?.rol || "tecnico",
       creadoPorUid: usuario?.uid || "",
       creadoPorNombre:
         usuario?.nombre || nombre,
@@ -713,7 +722,7 @@ export function inicializarModuloOverhaul(servicios) {
                   ✅ Respondido por
                   ${escaparHTML(
                     comentario.atendidoPor ||
-                    "Usuario Taller"
+                    "Técnico"
                   )}
                 </strong>
 

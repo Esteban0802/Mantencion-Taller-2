@@ -6,6 +6,8 @@ import {
   capturarBorradoresFormulario,
   restaurarBorradoresFormulario
 } from "./core/utilidades.js";
+import { programarRenderDiferido } from "./core/renderDiferido.js?v=20261007-2";
+import { actualizarTarjetaChecklist } from "./core/actualizacionParcial.js?v=20261007-1";
 
 export function inicializarModuloEvaluacion(servicios) {
 
@@ -47,6 +49,38 @@ export function inicializarModuloEvaluacion(servicios) {
     agregarBitacora
 
   } = servicios;
+
+  const esArchivoPdf = archivo => archivo?.type === "application/pdf" || /\.pdf$/i.test(archivo?.name || "");
+  const prepararEvidencia = async (archivo, prefijo) => {
+    if (esArchivoPdf(archivo)) return archivo;
+    try {
+      return new File([await comprimirImagenBlob(archivo)], `${prefijo}_${Date.now()}.jpg`, { type: "image/jpeg" });
+    } catch (error) {
+      console.warn("La imagen se subirá en su formato original:", archivo.name, error);
+      return archivo;
+    }
+  };
+  const esUrlPdf = url => /\.pdf(?:\?|$)/i.test(String(url || ""));
+  const crearVistaEvidencia = (url, descripcion) => {
+    if (esUrlPdf(url)) {
+      const enlace = document.createElement("a");
+      enlace.className = "evidencia-pdf-card";
+      enlace.href = url;
+      enlace.target = "_blank";
+      enlace.rel = "noopener";
+      enlace.setAttribute("aria-label", `${descripcion}: abrir PDF`);
+      enlace.innerHTML = "<span>PDF</span><small>Ver documento</small>";
+      return enlace;
+    }
+    const img = document.createElement("img");
+    img.loading = "lazy";
+    img.decoding = "async";
+    img.alt = descripcion;
+    img.src = url;
+    img.width = 100;
+    img.onclick = () => verImagenModal(url);
+    return img;
+  };
 
   const alert = (mensaje) => {
     const texto = String(mensaje || "");
@@ -340,6 +374,7 @@ export function inicializarModuloEvaluacion(servicios) {
         `checklist-card ${
           completado ? "completed" : ""
         }`;
+      div.dataset.checklistIndex = String(i);
 
 
       div.innerHTML = `
@@ -392,7 +427,7 @@ export function inicializarModuloEvaluacion(servicios) {
 
             <input
               type="file"
-              accept="image/*"
+              accept="image/*,.pdf,application/pdf"
               multiple
               onchange="subirFotoEvaluacion(event, ${i})"
             >
@@ -408,13 +443,7 @@ export function inicializarModuloEvaluacion(servicios) {
         ></div>
 
 
-        <div class="checklist-comment-box">
-
-          <input
-            id="tecnico-eval-${i}"
-            placeholder="Técnico"
-          >
-
+        <div class="checklist-comment-box checklist-comment-box--single">
           <input
             id="comentario-eval-${i}"
             placeholder="Trabajo realizado"
@@ -438,8 +467,10 @@ export function inicializarModuloEvaluacion(servicios) {
 
       cont.appendChild(div);
 
-      mostrarFotosEvaluacion(i);
-      renderComentariosEvaluacion(i);
+      programarRenderDiferido(div, () => {
+        mostrarFotosEvaluacion(i);
+        renderComentariosEvaluacion(i);
+      });
 
     });
 
@@ -470,7 +501,8 @@ export function inicializarModuloEvaluacion(servicios) {
     autoguardarCambiosOT();
 
 
-    window.renderEvaluacion();
+    actualizarTarjetaChecklist("listaEvaluacion", i, ot.evaluacion[i], itemCompleto);
+    renderProgresoEtapa("progresoEvaluacion", ot.evaluacion);
 
 
     if (ot.gantt?.actividades?.length) {
@@ -514,18 +546,7 @@ export function inicializarModuloEvaluacion(servicios) {
       cont.className = "foto-box";
 
 
-      const img =
-        document.createElement("img");
-
-      img.loading = "lazy";
-      img.decoding = "async";
-      img.alt = `Evidencia ${index + 1} de evaluación`;
-      img.src = foto;
-      img.style.cursor = "pointer";
-      img.width = 100;
-
-      img.onclick = () =>
-        verImagenModal(foto);
+      const vista = crearVistaEvidencia(foto, `Evidencia ${index + 1} de evaluación`);
 
 
       const btn =
@@ -538,7 +559,7 @@ export function inicializarModuloEvaluacion(servicios) {
         eliminarFotoEvaluacion(i, index);
 
 
-      cont.appendChild(img);
+      cont.appendChild(vista);
       cont.appendChild(btn);
 
       div.appendChild(cont);
@@ -639,24 +660,12 @@ export function inicializarModuloEvaluacion(servicios) {
 
 
       for (const file of files) {
-
-        const imagenBlob =
-          await comprimirImagenBlob(file);
-
-
-        const imagenComprimida =
-          new File(
-            [imagenBlob],
-            `evaluacion_${Date.now()}.jpg`,
-            {
-              type: "image/jpeg"
-            }
-          );
+        const archivoEvidencia = await prepararEvidencia(file, "evaluacion");
 
 
         const urlFoto =
           await subirArchivoStorage(
-            imagenComprimida,
+            archivoEvidencia,
             "evaluacion",
             i
           );
@@ -664,11 +673,7 @@ export function inicializarModuloEvaluacion(servicios) {
         if (!urlFoto) throw new Error("La fotografía no obtuvo una URL válida");
 
         urlsSubidasEnEsteIntento.push(urlFoto);
-
-        ot.evaluacion[i].fotos.push(
-          urlFoto
-        );
-
+        ot.evaluacion[i].fotos.push(urlFoto);
       }
 
 
@@ -1424,7 +1429,7 @@ async function continuarEvaluacionSinAprobacion() {
             comentario: "La empresa tiene deshabilitado el módulo Aprobaciones.",
             documentos: [],
             usuario: usuario?.nombre || "Usuario",
-            rol: usuario?.rol || "usuario_taller",
+            rol: usuario?.rol || "tecnico",
             fecha: new Date().toLocaleString()
         };
 

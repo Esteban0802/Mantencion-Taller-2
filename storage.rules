@@ -21,7 +21,7 @@ service firebase.storage {
       let empresa = firestore.get(
         /databases/(default)/documents/empresas/$(empresaId)
       ).data;
-      return empresa.activa != false;
+      return !('activa' in empresa) || empresa.activa != false;
     }
 
     function isSuperAdmin() {
@@ -32,6 +32,12 @@ service firebase.storage {
       return firestore.get(
         /databases/(default)/documents/ots/$(otId)
       ).data;
+    }
+
+    function otOpen(otId) {
+      let orden = ot(otId);
+      return (!('cerrada' in orden) || orden.cerrada != true) &&
+        (!('estado' in orden) || orden.estado != 'CERRADA');
     }
 
     function canAccessOT(otId) {
@@ -85,7 +91,7 @@ service firebase.storage {
         isSuperAdmin() ||
         (profile().empresaId == empresaId && (
           profile().rol == 'admin_empresa' ||
-          (profile().sucursalId == sucursalId && profile().rol in ['admin_sucursal', 'jefe_taller', 'usuario_taller', 'planificador', 'bodeguero'])
+          (profile().sucursalId == sucursalId && profile().rol in ['admin_sucursal', 'jefe_taller', 'planificador', 'bodeguero'])
         ))
       );
     }
@@ -109,7 +115,7 @@ service firebase.storage {
       return request.resource != null &&
         request.resource.size < 20 * 1024 * 1024 &&
         request.resource.contentType != null && (
-          request.resource.contentType.matches('image/(png|jpeg|webp|heic|heif)') ||
+          request.resource.contentType.matches('image/.*') ||
           request.resource.contentType == 'application/pdf' ||
           request.resource.contentType == 'application/vnd.ms-excel' ||
           request.resource.contentType == 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
@@ -124,13 +130,11 @@ service firebase.storage {
       allow read: if canAccessOT(otId);
 
       allow create, update: if canAccessOT(otId) &&
-        (isSuperAdmin() || companyOperational(ot(otId).empresaId)) &&
-        ot(otId).cerrada != true &&
+        otOpen(otId) &&
         validUpload();
 
       allow delete: if canAccessOT(otId) &&
-        (isSuperAdmin() || companyOperational(ot(otId).empresaId)) &&
-        ot(otId).cerrada != true;
+        otOpen(otId);
     }
 
     match /empresas/{empresaId}/informe/{fileName} {

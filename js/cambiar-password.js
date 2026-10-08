@@ -88,6 +88,7 @@ async function cambiarPassword() {
   }
 
   btnCambiar.disabled = true;
+  const cargaUI = window.OverTrackUI?.iniciarCarga?.("Actualizando contraseña…");
 
   try {
     await updatePassword(auth.currentUser, nueva);
@@ -119,6 +120,7 @@ async function cambiarPassword() {
     passwordError.textContent = "No fue posible cambiar la contraseña.";
   } finally {
     btnCambiar.disabled = false;
+    window.OverTrackUI?.finalizarCarga?.(cargaUI);
   }
 }
 
@@ -130,7 +132,6 @@ function redirigirPorRol(perfil) {
     case "admin_empresa":
     case "admin_sucursal":
     case "jefe_taller":
-    case "usuario_taller":
     case "supervisor":
     case "tecnico":
       window.location.replace("dashboard.html");

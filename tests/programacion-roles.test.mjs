@@ -9,7 +9,6 @@ import {
 
 test("clasifica los roles definitivos en su grupo de programación", () => {
   assert.equal(grupoProgramacionUsuario({ rol: "tecnico" }), "tecnico");
-  assert.equal(grupoProgramacionUsuario({ rol: "usuario_taller" }), "tecnico");
   assert.equal(grupoProgramacionUsuario({ rol: "supervisor" }), "supervisor");
   assert.equal(grupoProgramacionUsuario({ rol: "jefe_taller" }), "supervisor");
   assert.equal(grupoProgramacionUsuario({ rol: "sheq" }), "sheq");

@@ -23,7 +23,6 @@ const usuario = protegerPagina([
   "admin_empresa",
   "admin_sucursal",
   "jefe_taller",
-  "usuario_taller",
   "supervisor",
   "tecnico",
   "planificador"
@@ -377,7 +376,7 @@ function configurarNavegacionPorPermisos() {
   const rol = usuario.rol;
   const esAdministradorConsulta = ["admin_empresa", "admin_sucursal"].includes(rol);
   const esPlanificador = rol === "planificador";
-  const esTrabajador = ["usuario_taller", "supervisor", "tecnico"].includes(rol);
+  const esTrabajador = ["supervisor", "tecnico"].includes(rol);
   const btnPanelEmpresa =
     document.getElementById("btnPanelEmpresa");
 
@@ -1293,7 +1292,7 @@ function esAutoridadSucursal() {
 }
 
 function esTecnicoTaller() {
-  return usuario?.rol === "usuario_taller";
+  return usuario?.rol === "tecnico";
 }
 
 function obtenerEtapaListaParaRevision(ot) {
@@ -1878,8 +1877,10 @@ function renderUsuarioActivo() {
   rol.textContent = "Admin Sucursal";
   } else if (usuarioActivo.rol === "jefe_taller") {
     rol.textContent = "Jefe Taller";
-  } else if (usuarioActivo.rol === "usuario_taller") {
-    rol.textContent = "Usuario Taller";
+  } else if (usuarioActivo.rol === "supervisor") {
+    rol.textContent = "Supervisor";
+  } else if (usuarioActivo.rol === "tecnico") {
+    rol.textContent = "Técnico";
   } else {
     rol.textContent = usuarioActivo.rol || "Sin rol";
   }

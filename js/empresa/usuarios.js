@@ -385,7 +385,7 @@ function renderTablaUsuariosEmpresa(lista) {
   }
 
   tbody.innerHTML = lista.map(usuario => {
-    const requiereSucursal = ["admin_sucursal", "jefe_taller", "usuario_taller", "supervisor", "tecnico", "planificador", "bodeguero", "sheq"].includes(usuario.rol);
+    const requiereSucursal = ["admin_sucursal", "jefe_taller", "supervisor", "tecnico", "planificador", "bodeguero", "sheq"].includes(usuario.rol);
     const pendienteSucursal = requiereSucursal && !usuario.sucursalId;
     const puedeCambiarSucursal = ["super_admin", "admin_empresa"].includes(usuarioActivo?.rol) && requiereSucursal;
 
@@ -863,7 +863,6 @@ function formatearRol(rol) {
   if (rol === "admin_empresa") return "Admin Empresa";
   if (rol === "admin_sucursal") return "Admin Sucursal";
   if (rol === "jefe_taller") return "Jefe Taller";
-  if (rol === "usuario_taller") return "Técnico";
   if (rol === "supervisor") return "Supervisor";
   if (rol === "tecnico") return "Técnico";
   if (rol === "planificador") return "Planificador";
