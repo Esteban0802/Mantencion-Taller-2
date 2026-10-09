@@ -79,7 +79,7 @@
         <input type="hidden" id="asignacionId">
         <div class="campo"><label for="asignacionFecha">Fecha</label><input type="date" id="asignacionFecha" required></div>
         <div class="campo"><label for="asignacionGrupo">Grupo</label><select id="asignacionGrupo" required><option value="tecnico">Técnicos</option><option value="supervisor">Supervisores</option><option value="sheq">SHEQ</option></select></div>
-        <div class="campo campo-ancho"><label for="asignacionUsuarios">Trabajadores</label><div id="listaAsignacionUsuarios" class="lista-asignacion-usuarios"><div class="fila-asignacion-usuario"><select id="asignacionUsuarios" class="asignacion-usuario-select" required aria-describedby="ayudaAsignacionUsuarios"><option value="">Cargando usuarios...</option></select></div></div><button type="button" id="btnAgregarTrabajador" class="btn-agregar-trabajador">+ Agregar otro trabajador</button><small id="ayudaAsignacionUsuarios">Agrega a todos los técnicos que participarán en la misma actividad.</small><div id="resumenAsignacionUsuarios" class="resumen-seleccion-programacion" aria-live="polite">Ningún trabajador seleccionado.</div><div id="alertaSheqProgramacion" class="alerta-sheq-programacion" role="status" hidden></div></div>
+        <div class="campo campo-ancho"><label for="asignacionUsuarios">Trabajadores</label><div id="listaAsignacionUsuarios" class="lista-asignacion-usuarios"><div class="fila-asignacion-usuario"><select id="asignacionUsuarios" class="asignacion-usuario-select" aria-describedby="ayudaAsignacionUsuarios"><option value="">Cargando usuarios...</option></select></div></div><button type="button" id="btnAgregarTrabajador" class="btn-agregar-trabajador">+ Agregar otro trabajador</button><small id="ayudaAsignacionUsuarios">Agrega trabajadores o selecciona solamente un supervisor responsable.</small><div id="resumenAsignacionUsuarios" class="resumen-seleccion-programacion" aria-live="polite">Ningún trabajador seleccionado.</div><div id="alertaSheqProgramacion" class="alerta-sheq-programacion" role="status" hidden></div></div>
         <div class="campo campo-ancho"><label for="asignacionSupervisor">Supervisor</label><select id="asignacionSupervisor"><option value="">Cargando usuarios...</option></select><small>Selecciona al supervisor responsable de acompañar o supervisar la actividad.</small></div>
         <div class="campo campo-ancho"><label for="asignacionSheq">Asesor SHEQ</label><select id="asignacionSheq"><option value="">Cargando usuarios...</option></select><small>Opcional. Asígnalo cuando la actividad en terreno requiera acompañamiento SHEQ.</small></div>
         <div class="campo-ancho fila-modalidad-asignacion">
@@ -104,6 +104,6 @@
   </div>
 
 <script src="js/components/notificaciones.js?v=20261007-1"></script>
-  <script type="module" src="js/programacion.js?v=20261006-16"></script>
+  <script type="module" src="js/programacion.js?v=20261008-17"></script>
 </body>
 </html>

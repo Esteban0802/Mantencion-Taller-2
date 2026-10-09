@@ -244,23 +244,101 @@
   function asegurarIndicadorCarga() {
     let fondo = document.getElementById("overtrackLoadingOverlay");
     if (fondo) return fondo;
+
     fondo = document.createElement("div");
     fondo.id = "overtrackLoadingOverlay";
     fondo.className = "ot-loading-overlay";
     fondo.setAttribute("role", "status");
     fondo.setAttribute("aria-live", "polite");
     fondo.setAttribute("aria-hidden", "true");
-    fondo.innerHTML = `<div class="ot-loading-card"><div class="ot-loading-spinner" aria-hidden="true"></div><div class="ot-loading-copy"><strong>Procesando</strong><span>Espera un momento…</span></div></div>`;
+    fondo.innerHTML = `
+      <div class="ot-loading-card">
+        <div class="ot-loading-spinner" aria-hidden="true"></div>
+        <div class="ot-loading-copy">
+          <strong>Procesando</strong>
+          <span>Espera un momento…</span>
+        </div>
+      </div>`;
     document.body.appendChild(fondo);
     return fondo;
   }
-  function actualizarMensajeCarga(mensaje) { const texto = asegurarIndicadorCarga().querySelector(".ot-loading-copy span"); if (texto) texto.textContent = mensaje || "Espera un momento…"; }
-  function mostrarIndicadorCarga() { if (!cargasActivas.size) return; const fondo = asegurarIndicadorCarga(); cargaVisibleDesde = Date.now(); fondo.classList.add("is-visible"); fondo.setAttribute("aria-hidden", "false"); document.documentElement.classList.add("ot-is-loading"); }
-  function iniciarCarga(mensaje = "Espera un momento…") { const token = Symbol("carga-overtrack"); cargasActivas.add(token); actualizarMensajeCarga(mensaje); if (!temporizadorCarga && !document.getElementById("overtrackLoadingOverlay")?.classList.contains("is-visible")) { temporizadorCarga = window.setTimeout(() => { temporizadorCarga = null; mostrarIndicadorCarga(); }, 160); } return token; }
-  function finalizarCarga(token) { if (token) cargasActivas.delete(token); else cargasActivas.clear(); if (cargasActivas.size) return; if (temporizadorCarga) { window.clearTimeout(temporizadorCarga); temporizadorCarga = null; } const fondo = document.getElementById("overtrackLoadingOverlay"); if (!fondo?.classList.contains("is-visible")) return; const espera = Math.max(0, 320 - (Date.now() - cargaVisibleDesde)); window.setTimeout(() => { if (cargasActivas.size) return; fondo.classList.remove("is-visible"); fondo.setAttribute("aria-hidden", "true"); document.documentElement.classList.remove("ot-is-loading"); }, espera); }
-  async function ejecutarConCarga(tarea, mensaje) { const token = iniciarCarga(mensaje); try { return await (typeof tarea === "function" ? tarea() : tarea); } finally { finalizarCarga(token); } }
-  document.addEventListener("click", evento => { const enlace = evento.target.closest("a[href]"); if (!enlace || evento.defaultPrevented || enlace.target === "_blank" || enlace.hasAttribute("download")) return; const destino = enlace.getAttribute("href") || ""; if (!destino || destino.startsWith("#") || destino.startsWith("javascript:")) return; iniciarCarga("Abriendo la sección…"); });
+
+  function actualizarMensajeCarga(mensaje) {
+    const fondo = asegurarIndicadorCarga();
+    const texto = fondo.querySelector(".ot-loading-copy span");
+    if (texto) texto.textContent = mensaje || "Espera un momento…";
+  }
+
+  function mostrarIndicadorCarga() {
+    if (!cargasActivas.size) return;
+    const fondo = asegurarIndicadorCarga();
+    cargaVisibleDesde = Date.now();
+    fondo.classList.add("is-visible");
+    fondo.setAttribute("aria-hidden", "false");
+    document.documentElement.classList.add("ot-is-loading");
+  }
+
+  function iniciarCarga(mensaje = "Espera un momento…") {
+    const token = Symbol("carga-overtrack");
+    cargasActivas.add(token);
+    actualizarMensajeCarga(mensaje);
+
+    if (!temporizadorCarga && !document.getElementById("overtrackLoadingOverlay")?.classList.contains("is-visible")) {
+      temporizadorCarga = window.setTimeout(() => {
+        temporizadorCarga = null;
+        mostrarIndicadorCarga();
+      }, 160);
+    }
+
+    return token;
+  }
+
+  function finalizarCarga(token) {
+    if (token) cargasActivas.delete(token);
+    else cargasActivas.clear();
+    if (cargasActivas.size) return;
+
+    if (temporizadorCarga) {
+      window.clearTimeout(temporizadorCarga);
+      temporizadorCarga = null;
+    }
+
+    const fondo = document.getElementById("overtrackLoadingOverlay");
+    if (!fondo?.classList.contains("is-visible")) return;
+    const espera = Math.max(0, 320 - (Date.now() - cargaVisibleDesde));
+    window.setTimeout(() => {
+      if (cargasActivas.size) return;
+      fondo.classList.remove("is-visible");
+      fondo.setAttribute("aria-hidden", "true");
+      document.documentElement.classList.remove("ot-is-loading");
+    }, espera);
+  }
+
+  async function ejecutarConCarga(tarea, mensaje) {
+    const token = iniciarCarga(mensaje);
+    try {
+      return await (typeof tarea === "function" ? tarea() : tarea);
+    } finally {
+      finalizarCarga(token);
+    }
+  }
+
+  document.addEventListener("click", evento => {
+    const enlace = evento.target.closest("a[href]");
+    if (!enlace || evento.defaultPrevented || enlace.target === "_blank" || enlace.hasAttribute("download")) return;
+    const destino = enlace.getAttribute("href") || "";
+    if (!destino || destino.startsWith("#") || destino.startsWith("javascript:")) return;
+    iniciarCarga("Abriendo la sección…");
+  });
+
   window.addEventListener("pageshow", () => finalizarCarga());
 
-  window.OverTrackUI = Object.freeze({ mostrarMensaje, confirmarAccion, solicitarTexto, iniciarCarga, finalizarCarga, ejecutarConCarga });
+  window.OverTrackUI = Object.freeze({
+    mostrarMensaje,
+    confirmarAccion,
+    solicitarTexto,
+    iniciarCarga,
+    finalizarCarga,
+    ejecutarConCarga
+  });
 })();

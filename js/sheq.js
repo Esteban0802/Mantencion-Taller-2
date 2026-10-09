@@ -16,6 +16,7 @@ const puedeEditar = rolesEdicion.includes(usuario.rol);
 let empresa = null, empresaId = "", sucursales = [], usuarios = [], contratos = [], vehiculos = [], documentos = [];
 
 const catalogoDocumentosPersonal = {
+  "Documentación base del trabajador": ["IRL Interna", "Contrato", "Anexo", "Altura Física", "Altura Geográfica", "Psicosensotécnico", "Alcohol y Drogas", "Licencia Municipal", "Cédula de Identidad", "Horas Extras", "Entrega EPP", "Curso Manejo a la Defensiva", "Examen Ruido", "Examen Sílice", "Evaluación Aversión al Riesgo"],
   "Identificación y relación laboral": ["Cédula de identidad", "Contrato de trabajo", "Anexo de contrato", "Descripción o perfil de cargo", "Certificado de afiliación AFP", "Certificado de afiliación Fonasa o Isapre", "Comprobante de cotizaciones previsionales"],
   "Seguridad y prevención de riesgos": ["Inducción general de seguridad", "Inducción específica de la empresa", "Inducción específica de la faena", "Registro de información de riesgos laborales", "Capacitación sobre riesgos del cargo", "Registro de entrega de elementos de protección personal", "Recepción del Reglamento Interno de Orden, Higiene y Seguridad", "Procedimiento de trabajo seguro", "Capacitación de emergencias", "Capacitación de uso de extintores", "Registro de difusión de protocolos de seguridad"],
   "Salud ocupacional": ["Examen preocupacional", "Examen ocupacional periódico", "Certificado de aptitud para el cargo", "Examen de altura física", "Examen de altura geográfica", "Examen psicosensotécnico", "Audiometría", "Espirometría", "Evaluación musculoesquelética", "Examen para exposición a sílice", "Examen para exposición a ruido", "Evaluación de vigilancia ocupacional", "Test de alcohol y drogas"],
@@ -79,6 +80,15 @@ function contratoActivo(contrato) {
   return !contrato.fechaTermino || (diasHasta(contrato.fechaTermino) ?? 0) >= 0;
 }
 
+function alertaVencimientoContrato(contrato) {
+  const dias = diasHasta(contrato.fechaTermino);
+  if (dias === null || dias > 90) return null;
+  if (dias < 0) return { key:"vencido", texto:`Vencido hace ${Math.abs(dias)} día(s)`, dias };
+  if (dias <= 15) return { key:"critico", texto:`Vence en ${dias} día(s)`, dias };
+  if (dias <= 30) return { key:"proximo", texto:`Vence en ${dias} día(s)`, dias };
+  return { key:"aviso", texto:`Vence en ${dias} día(s)`, dias };
+}
+
 function entidadCorrespondeContrato(tipo, entidad, contrato) {
   const ids = tipo === "vehiculo" ? contrato.vehiculoIds : contrato.personalIds;
   return Array.isArray(ids) && ids.includes(entidad?.id);
@@ -116,8 +126,49 @@ function alertasMatriz() {
       }
     }
   }
-  const prioridad = { faltante: 7, vencido: 7, critico: 4, proximo: 3, aviso: 2 };
+  const prioridad = { faltante:7, vencido:7, critico:4, proximo:3, aviso:2 };
   return alertas.sort((a, b) => (prioridad[b.detalle.key] || 0) - (prioridad[a.detalle.key] || 0));
+}
+
+function filasMatrizCumplimiento() {
+  const filas = [];
+  for (const contrato of contratos) {
+    for (const entidad of usuarios.filter(item => entidadCorrespondeContrato("persona", item, contrato))) {
+      filas.push({ tipo:"persona", entidad, contrato, evaluacion:evaluarEntidadEnContrato({ tipo:"persona", entidadId:entidad.id, contrato, documentos }) });
+    }
+    for (const entidad of vehiculos.filter(item => entidadCorrespondeContrato("vehiculo", item, contrato))) {
+      filas.push({ tipo:"vehiculo", entidad, contrato, evaluacion:evaluarEntidadEnContrato({ tipo:"vehiculo", entidadId:entidad.id, contrato, documentos }) });
+    }
+  }
+  return filas;
+}
+
+function renderMatrizCumplimiento() {
+  const todas = filasMatrizCumplimiento();
+  const contratoId = $("filtroMatrizContrato").value;
+  const tipo = $("filtroMatrizTipo").value;
+  const estado = $("filtroMatrizEstado").value;
+  const termino = $("buscarMatrizSheq").value.trim().toLowerCase();
+  const filtradas = todas.filter(item => {
+    const nombre = item.tipo === "vehiculo" ? `${item.entidad.patente || ""} ${item.entidad.marca || ""} ${item.entidad.modelo || ""}` : `${nombreUsuario(item.entidad)} ${item.entidad.rut || ""} ${item.entidad.rol || ""}`;
+    const texto = `${nombre} ${item.contrato.cliente || ""} ${ubicacionContrato(item.contrato)}`.toLowerCase();
+    return (!contratoId || item.contrato.id === contratoId) && (!tipo || item.tipo === tipo) && (!estado || item.evaluacion.key === estado) && (!termino || texto.includes(termino));
+  });
+  $("matrizKpiTotal").textContent = todas.length;
+  $("matrizKpiConformes").textContent = todas.filter(item => item.evaluacion.key === "vigente").length;
+  $("matrizKpiObservados").textContent = todas.filter(item => item.evaluacion.key === "proximo").length;
+  $("matrizKpiCriticos").textContent = todas.filter(item => item.evaluacion.key === "vencido").length;
+  $("tablaMatrizCumplimiento").innerHTML = filtradas.length ? filtradas.map(item => {
+    const detalles = item.evaluacion.detalles || [];
+    const faltantes = detalles.filter(detalle => detalle.key === "faltante").length;
+    const vencidos = detalles.filter(detalle => detalle.key === "vencido").length;
+    const porVencer = detalles.filter(detalle => ["aviso", "proximo", "critico"].includes(detalle.key)).length;
+    const porcentaje = item.evaluacion.total ? Math.round((item.evaluacion.cumplidos / item.evaluacion.total) * 100) : 0;
+    const titulo = item.tipo === "vehiculo" ? item.entidad.patente || "Vehículo" : nombreUsuario(item.entidad);
+    const subtitulo = item.tipo === "vehiculo" ? `${item.entidad.marca || ""} ${item.entidad.modelo || ""}`.trim() : item.entidad.rol || "Sin cargo";
+    const accion = item.tipo === "vehiculo" ? `data-matriz-contrato="${escapar(item.contrato.id)}"` : `data-matriz-persona="${escapar(item.entidad.id)}"`;
+    return `<tr><td><strong>${escapar(titulo)}</strong><small>${escapar(subtitulo)}</small></td><td><span class="sheq-tipo-entidad ${item.tipo}">${item.tipo === "vehiculo" ? "Vehículo" : "Trabajador"}</span></td><td><strong>${escapar(item.contrato.cliente || "Sin cliente")}</strong><small>${escapar(ubicacionContrato(item.contrato))}</small></td><td><div class="sheq-cumplimiento-celda"><strong>${porcentaje}%</strong><span><i style="width:${porcentaje}%"></i></span><small>${item.evaluacion.cumplidos}/${item.evaluacion.total} requisitos</small></div></td><td>${faltantes}</td><td>${vencidos}</td><td>${porVencer}</td><td><span class="sheq-status ${item.evaluacion.key}">${escapar(item.evaluacion.texto)}</span></td><td><button class="sheq-action" ${accion}>Ver detalle</button></td></tr>`;
+  }).join("") : '<tr><td colspan="9" class="sheq-empty">No hay asignaciones que coincidan con los filtros seleccionados.</td></tr>';
 }
 
 async function obtenerColeccion(nombre) {
@@ -162,6 +213,10 @@ function opciones(select, items, etiqueta, incluirVacio = true) {
 function prepararSelectores() {
   const opsSuc = sucursales.map(s => ({ id:s.id, texto:s.nombre || s.codigo || s.id }));
   opciones($("vehiculoSucursal"), opsSuc, "Sin sucursal");
+  const filtroContrato = $("filtroMatrizContrato");
+  const seleccionContrato = filtroContrato.value;
+  opciones(filtroContrato, contratos.map(item => ({ id:item.id, texto:`${item.cliente} · ${ubicacionContrato(item)}` })), "Todos los contratos");
+  filtroContrato.value = seleccionContrato;
   actualizarEntidadesDocumento();
 }
 
@@ -179,20 +234,24 @@ function renderPanel() {
   const vencidos = estadosDoc.filter(x => x.estado.key === "vencido");
   const proximos = estadosDoc.filter(x => ["aviso", "proximo", "critico"].includes(x.estado.key));
   const observaciones = estadosDoc.filter(x => ["aviso", "proximo", "critico", "vencido"].includes(x.estado.key));
+  const alertasContratos = contratos.map(contrato => ({ tipo:"contrato", contrato, estado:alertaVencimientoContrato(contrato) })).filter(item => item.estado);
   $("kpiPersonalAcreditado").textContent = personalEstados.filter(e => e.key === "vigente").length;
   $("kpiPersonalPendiente").textContent = personalEstados.filter(e => e.key !== "vigente").length;
   $("kpiVencidos").textContent = vencidos.length; $("kpiPorVencer").textContent = proximos.length;
-  $("kpiVehiculos").textContent = vehiculosEstados.filter(e => e.key === "vigente").length; $("kpiObservaciones").textContent = observaciones.length;
+  $("kpiVehiculos").textContent = vehiculosEstados.filter(e => e.key === "vigente").length; $("kpiObservaciones").textContent = observaciones.length + alertasContratos.length;
   const faltantesFaena = alertasMatriz();
   const alertasDocumentales = [...vencidos, ...proximos].map(item => ({ tipo: "documento", ...item }));
-  const alertas = [...faltantesFaena.map(item => ({ tipo: "matriz", ...item })), ...alertasDocumentales].slice(0, 8);
-  $("resumenAlertas").textContent = `${faltantesFaena.length + vencidos.length + proximos.length} alerta(s)`;
+  const prioridad = { faltante:6, vencido:6, critico:5, proximo:4, aviso:3 };
+  const alertas = [...alertasContratos, ...alertasDocumentales, ...faltantesFaena.map(item => ({ tipo: "matriz", ...item }))].sort((a,b) => (prioridad[b.estado?.key || b.detalle?.key] || 0) - (prioridad[a.estado?.key || a.detalle?.key] || 0)).slice(0, 12);
+  $("resumenAlertas").textContent = `${faltantesFaena.length + vencidos.length + proximos.length + alertasContratos.length} alerta(s)`;
   $("listaAlertas").innerHTML = alertas.length ? alertas.map(item => {
     if (item.tipo === "matriz") {
       const grave = ["faltante", "vencido"].includes(item.detalle.key);
-      return `<div class="sheq-alert ${grave ? "sheq-alarm-missing" : "proximo"}"><i></i><div><strong>${escapar(item.detalle.requisito)}</strong><small>${escapar(nombreUsuario(item.entidad))} · ${escapar(ubicacionContrato(item.contrato))} · ${escapar(item.detalle.texto)}</small></div><time>${item.detalle.documento ? escapar(fechaVisible(item.detalle.documento.fechaVencimiento)) : "Faltante"}</time></div>`;
+      const destino = item.detalle.documento ? `data-alerta-documento="${escapar(item.detalle.documento.id)}"` : `data-alerta-faltante="${escapar(item.entidad.id)}" data-alerta-contrato="${escapar(item.contrato.id)}" data-alerta-requisito="${escapar(item.detalle.requisito)}"`;
+      return `<button type="button" class="sheq-alert sheq-alert-link ${grave ? "sheq-alarm-missing" : "proximo"}" ${destino} title="${item.detalle.documento ? "Abrir documento" : "Cargar documento faltante"}"><i></i><span><strong>${escapar(item.detalle.requisito)}</strong><small>${escapar(nombreUsuario(item.entidad))} · ${escapar(ubicacionContrato(item.contrato))} · ${escapar(item.detalle.texto)}</small></span><time>${item.detalle.documento ? escapar(fechaVisible(item.detalle.documento.fechaVencimiento)) : "Faltante"}</time></button>`;
     }
-    return `<div class="sheq-alert ${item.estado.key === "vencido" ? "" : item.estado.key === "aviso" ? "aviso" : "proximo"}"><i></i><div><strong>${escapar(item.doc.tipoDocumento)}</strong><small>${escapar(nombreEntidad(item.doc.entidadTipo,item.doc.entidadId))} · ${escapar(item.estado.texto)}</small></div><time>${escapar(fechaVisible(item.doc.fechaVencimiento))}</time></div>`;
+    if (item.tipo === "contrato") return `<button type="button" class="sheq-alert sheq-alert-link ${item.estado.key === "vencido" ? "" : item.estado.key}" data-alerta-contrato-editar="${escapar(item.contrato.id)}" title="Abrir contrato"><i></i><span><strong>Vencimiento de contrato</strong><small>${escapar(item.contrato.cliente)} · ${escapar(ubicacionContrato(item.contrato))} · ${escapar(item.estado.texto)}</small></span><time>${escapar(fechaVisible(item.contrato.fechaTermino))}</time></button>`;
+    return `<button type="button" class="sheq-alert sheq-alert-link ${item.estado.key === "vencido" ? "" : item.estado.key === "aviso" ? "aviso" : "proximo"}" data-alerta-documento="${escapar(item.doc.id)}" title="Abrir documento"><i></i><span><strong>${escapar(item.doc.tipoDocumento)}</strong><small>${escapar(nombreEntidad(item.doc.entidadTipo,item.doc.entidadId))} · ${escapar(item.estado.texto)}</small></span><time>${escapar(fechaVisible(item.doc.fechaVencimiento))}</time></button>`;
   }).join("") : '<div class="sheq-empty">No existen vencimientos ni requisitos faltantes.</div>';
   const evaluados = personalEstados.length + vehiculosEstados.length, habilitados = [...personalEstados,...vehiculosEstados].filter(e => e.key === "vigente").length;
   const porcentaje = evaluados ? Math.round(habilitados * 100 / evaluados) : 0;
@@ -247,6 +306,22 @@ document.addEventListener("click", evento => {
   if (boton.dataset.verDocumentosPersona) abrirListaDocumentos("persona", boton.dataset.verDocumentosPersona);
   if (boton.dataset.verDocumentosVehiculo) abrirListaDocumentos("vehiculo", boton.dataset.verDocumentosVehiculo);
   if (boton.hasAttribute("data-desde-lista-documentos")) cerrarModal("modalListaDocumentos");
+});
+
+document.addEventListener("click", evento => {
+  const alerta = evento.target.closest(".sheq-alert-link");
+  if (!alerta) return;
+  if (!puedeEditar) { mensaje("Acceso de consulta", "Solo el encargado SHEQ puede modificar documentos o contratos.", "advertencia"); return; }
+  if (alerta.dataset.alertaDocumento) {
+    const item = documentos.find(documento => documento.id === alerta.dataset.alertaDocumento);
+    if (item) abrirDocumento(item);
+    return;
+  }
+  if (alerta.dataset.alertaFaltante) {
+    abrirDocumento(null, { tipo:"persona", id:alerta.dataset.alertaFaltante, contratoId:alerta.dataset.alertaContrato, requisitos:[alerta.dataset.alertaRequisito] });
+    return;
+  }
+  if (alerta.dataset.alertaContratoEditar) abrirContrato(contratos.find(contrato => contrato.id === alerta.dataset.alertaContratoEditar));
 });
 
 function bloqueMatriz(titulo, subtitulo, evaluacion) {
@@ -318,19 +393,38 @@ async function eliminarArchivoHistorico(id, indice) {
   await mensaje("Archivo eliminado", "El archivo histórico fue eliminado y la auditoría se conservó.", "exito");
 }
 
-function renderTodo(){prepararSelectores();renderPanel();renderPersonal();renderVehiculos();renderContratos();renderDocumentos();}
+function renderTodo(){prepararSelectores();renderPanel();renderMatrizCumplimiento();renderPersonal();renderVehiculos();renderContratos();renderDocumentos();}
 function abrirModal(id){$(id).hidden=false;document.body.style.overflow="hidden";} function cerrarModal(id){$(id).hidden=true;document.body.style.overflow=document.querySelector(".sheq-modal:not([hidden])")?"hidden":"";}
 function limpiarForm(id){$(id).reset();$(id).querySelectorAll('input[type="hidden"]').forEach(i=>i.value="");}
 
 function renderCatalogoRequisitos(tipo, seleccionados = []) {
   const catalogo = tipo === "personal" ? catalogoDocumentosPersonal : catalogoDocumentosVehiculos;
   const contenedor = $(tipo === "personal" ? "listaRequisitosPersonal" : "listaRequisitosVehiculos");
+  if (tipo === "personal" && !$("requisitoPersonalNuevo")) {
+    const manual = document.createElement("div");
+    manual.className = "sheq-requisito-manual";
+    manual.innerHTML = '<input id="requisitoPersonalNuevo" maxlength="120" placeholder="Nombre del nuevo documento"><button type="button" data-agregar-requisito="personal">+ Agregar</button>';
+    contenedor.before(manual);
+  }
   const seleccion = new Set(seleccionados);
   const catalogados = new Set(Object.values(catalogo).flat());
   const adicionales = seleccionados.filter(item => !catalogados.has(item));
   const grupos = adicionales.length ? [...Object.entries(catalogo), ["Documentos anteriores o personalizados", adicionales]] : Object.entries(catalogo);
   contenedor.innerHTML = grupos.map(([grupo, items]) => `<section class="sheq-requisitos-grupo"><h4>${escapar(grupo)}</h4>${items.map(item => `<label><input type="checkbox" value="${escapar(item)}" ${seleccion.has(item) ? "checked" : ""}><span>${escapar(item)}</span></label>`).join("")}</section>`).join("");
   actualizarResumenRequisitos(tipo);
+}
+
+function agregarRequisitoManual(tipo) {
+  const input = $("requisitoPersonalNuevo");
+  const nombre = input?.value.trim() || "";
+  if (!nombre) { input?.focus(); return; }
+  const catalogo = tipo === "personal" ? catalogoDocumentosPersonal : catalogoDocumentosVehiculos;
+  const canonico = Object.values(catalogo).flat().find(item => claveDocumento(item) === claveDocumento(nombre)) || nombre;
+  const seleccionados = requisitosSeleccionados(tipo);
+  if (!seleccionados.some(item => claveDocumento(item) === claveDocumento(canonico))) seleccionados.push(canonico);
+  renderCatalogoRequisitos(tipo, seleccionados);
+  $("requisitoPersonalNuevo").value = "";
+  $("requisitoPersonalNuevo").focus();
 }
 
 function requisitosSeleccionados(tipo) {
@@ -374,7 +468,13 @@ document.addEventListener("click", evento => {
     actualizarResumenRequisitos(tipo);
     return;
   }
+  const agregar = evento.target.closest("[data-agregar-requisito]");
+  if (agregar) { agregarRequisitoManual(agregar.dataset.agregarRequisito); return; }
   if (!evento.target.closest(".sheq-requisitos-selector")) cerrarSelectoresRequisitos();
+});
+
+document.addEventListener("keydown", evento => {
+  if (evento.key === "Enter" && evento.target.id === "requisitoPersonalNuevo") { evento.preventDefault(); agregarRequisitoManual("personal"); }
 });
 
 document.addEventListener("change", evento => {
@@ -427,6 +527,35 @@ async function guardarAsignacion(e) {
   await recargar("Asignación actualizada");
 }
 
+function claveDocumento(valor) {
+  return String(valor || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+function catalogoCargaActual() {
+  if ($("documentoEntidadTipo").value === "vehiculo") return catalogoDocumentosVehiculos;
+  return { "Documentación base del trabajador": catalogoDocumentosPersonal["Documentación base del trabajador"] };
+}
+
+function actualizarSeleccionCatalogoCarga() {
+  const cargados = new Set(Array.from($("listaDocumentacion").querySelectorAll(".documento-nombre")).map(input => claveDocumento(input.value)));
+  $("listaCatalogoCarga").querySelectorAll('input[type="checkbox"]').forEach(input => { input.checked = cargados.has(claveDocumento(input.value)); });
+}
+
+function renderCatalogoCarga() {
+  const esVehiculo = $("documentoEntidadTipo").value === "vehiculo";
+  $("catalogoCargaTitulo").textContent = esVehiculo ? "Documentación de vehículos" : "Documentación base del trabajador";
+  $("listaCatalogoCarga").innerHTML = Object.entries(catalogoCargaActual()).map(([grupo, opciones]) => `<section class="sheq-requisitos-grupo"><h4>${escapar(grupo)}</h4>${opciones.map(nombre => `<label><input type="checkbox" value="${escapar(nombre)}"><span>${escapar(nombre)}</span></label>`).join("")}</section>`).join("");
+  actualizarSeleccionCatalogoCarga();
+}
+
+function alternarCatalogoCarga() {
+  const panel = $("catalogoCargaDocumentos");
+  const abrir = panel.hidden;
+  if (abrir) renderCatalogoCarga();
+  panel.hidden = !abrir;
+  $("btnAgregarDocumentacion").setAttribute("aria-expanded", String(abrir));
+}
+
 function actualizarRutDocumento() {
   const select = $("documentoEntidadId");
   const opcion = select.options[select.selectedIndex];
@@ -443,19 +572,21 @@ function actualizarRutDocumento() {
     rut.disabled = true;
     rut.placeholder = "No aplica a vehículos";
   }
+  if (!$("catalogoCargaDocumentos").hidden) renderCatalogoCarga();
 }
 
 function crearFilaDocumento(item = null) {
   const fila = document.createElement("article");
   fila.className = "sheq-documento-fila";
   fila.dataset.documentoId = item?.id || "";
-  fila.innerHTML = `<div class="sheq-documento-fila-numero" aria-hidden="true"></div><label class="sheq-documento-nombre-campo">Documento<input class="documento-nombre" maxlength="120" placeholder="Nombre del documento" required ${item?.requisito ? "readonly" : ""} value="${escapar(item?.tipoDocumento || "")}"></label><label class="sheq-fecha-inicio-campo">Fecha de inicio<input class="documento-inicio" type="date" value="${escapar(fechaISO(item?.fechaEmision))}"></label><label class="sheq-fecha-final-campo">Fecha final<input class="documento-final" type="date" value="${escapar(fechaISO(item?.fechaVencimiento))}"></label><label class="sheq-archivo-campo">Adjuntar documento<span class="sheq-archivo-control"><input class="documento-archivo" type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx" ${item?.requisito ? "required" : ""}><span class="sheq-archivo-boton">Seleccionar archivo</span><span class="sheq-archivo-nombre">Ningún archivo seleccionado</span></span><small>${item?.archivoUrl ? "Se conservará el archivo actual si no adjuntas otro." : "PDF, imagen o documento (máx. 20 MB)."}</small></label>${item?.id ? "" : '<button type="button" class="sheq-quitar-documento" aria-label="Quitar documento">Quitar</button>'}`;
+  fila.innerHTML = `<div class="sheq-documento-fila-numero" aria-hidden="true"></div><label class="sheq-documento-nombre-campo">Documento<input class="documento-nombre" maxlength="120" placeholder="Nombre del documento" required ${item?.requisito || item?.catalogo ? "readonly" : ""} value="${escapar(item?.tipoDocumento || "")}"></label><label class="sheq-fecha-inicio-campo">Fecha de inicio<input class="documento-inicio" type="date" value="${escapar(fechaISO(item?.fechaEmision))}"></label><label class="sheq-fecha-final-campo">Fecha final<input class="documento-final" type="date" value="${escapar(fechaISO(item?.fechaVencimiento))}"></label><label class="sheq-archivo-campo">Adjuntar documento<span class="sheq-archivo-control"><input class="documento-archivo" type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx" ${item?.requisito ? "required" : ""}><span class="sheq-archivo-boton">Seleccionar archivo</span><span class="sheq-archivo-nombre">Ningún archivo seleccionado</span></span><small>${item?.archivoUrl ? "Se conservará el archivo actual si no adjuntas otro." : "PDF, imagen o documento (máx. 20 MB)."}</small></label>${item?.id ? "" : '<button type="button" class="sheq-quitar-documento" aria-label="Quitar documento">Quitar</button>'}`;
   fila.querySelector(".documento-archivo").addEventListener("change", evento => {
     const nombre = evento.target.files[0]?.name || "Ningún archivo seleccionado";
     fila.querySelector(".sheq-archivo-nombre").textContent = nombre;
   });
   $("listaDocumentacion").appendChild(fila);
   actualizarNumeracionDocumentos();
+  actualizarSeleccionCatalogoCarga();
   fila.querySelector(".documento-nombre").focus();
 }
 
@@ -470,6 +601,8 @@ function abrirDocumento(item=null,preset={}) {
   $("formDocumento").dataset.contratoId = preset.contratoId || item?.contratoId || "";
   actualizarEntidadesDocumento();
   $("listaDocumentacion").innerHTML = "";
+  $("catalogoCargaDocumentos").hidden = true;
+  $("btnAgregarDocumentacion").setAttribute("aria-expanded", "false");
   $("documentoMotivoCampo").hidden = !item;
   $("documentoMotivo").required = Boolean(item);
   if (item) {
@@ -481,7 +614,6 @@ function abrirDocumento(item=null,preset={}) {
     if (preset.id) $("documentoEntidadId").value = preset.id;
     const requisitos = Array.isArray(preset.requisitos) ? preset.requisitos : [];
     if (requisitos.length) requisitos.forEach(tipoDocumento => crearFilaDocumento({ tipoDocumento, requisito:true }));
-    else crearFilaDocumento();
   }
   actualizarRutDocumento();
   abrirModal("modalDocumento");
@@ -567,7 +699,12 @@ async function eliminarDocumentoCompleto(id){
 
 function exportarCSV(){const filas=[["Entidad","Tipo entidad","Documento","Contrato/faena","Emisión","Vencimiento","Estado","Observaciones"],...documentos.map(d=>[nombreEntidad(d.entidadTipo,d.entidadId),d.entidadTipo,d.tipoDocumento,nombreContrato(d.contratoId),fechaISO(d.fechaEmision),fechaISO(d.fechaVencimiento),estadoDocumento(d).texto,d.observaciones||""])];const csv=filas.map(f=>f.map(v=>`"${String(v).replaceAll('"','""')}"`).join(";")).join("\r\n");const blob=new Blob(["\ufeff",csv],{type:"text/csv;charset=utf-8"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=`Acreditaciones_SHEQ_${new Date().toISOString().slice(0,10)}.csv`;a.click();URL.revokeObjectURL(a.href);}
 
-function enlazarEventos(){document.querySelectorAll(".sheq-tabs button").forEach(b=>b.addEventListener("click",()=>{document.querySelectorAll(".sheq-tabs button,.sheq-vista").forEach(x=>x.classList.remove("active"));b.classList.add("active");document.querySelector(`[data-panel="${b.dataset.vista}"]`).classList.add("active");}));document.querySelectorAll("[data-cerrar-modal]").forEach(b=>b.addEventListener("click",()=>cerrarModal(b.dataset.cerrarModal)));$("documentoEntidadId").addEventListener("change",actualizarRutDocumento);$("btnAgregarDocumentacion").addEventListener("click",()=>crearFilaDocumento());$("listaDocumentacion").addEventListener("click",evento=>{const boton=evento.target.closest(".sheq-quitar-documento");if(!boton)return;boton.closest(".sheq-documento-fila").remove();actualizarNumeracionDocumentos();});$("buscarPersonalSheq").addEventListener("input",renderPersonal);$("buscarDocumentoSheq").addEventListener("input",renderDocumentos);$("filtroEstadoDocumento").addEventListener("change",renderDocumentos);$("buscarAsignacionPersonal").addEventListener("input",()=>filtrarAsignacion("persona"));$("buscarAsignacionVehiculos").addEventListener("input",()=>filtrarAsignacion("vehiculo"));$("btnNuevoContrato").addEventListener("click",()=>abrirContrato());$("btnNuevoVehiculo").addEventListener("click",()=>abrirVehiculo());$("btnNuevoDocumento").addEventListener("click",()=>abrirDocumento());$("btnExportarSheq").addEventListener("click",exportarCSV);$("formContrato").addEventListener("submit",e=>guardarContrato(e).catch(error=>mensaje("No se pudo guardar",error.message,"error")));$("formAsignacion").addEventListener("submit",e=>guardarAsignacion(e).catch(error=>mensaje("No se pudo asignar",error.message,"error")));$("formVehiculo").addEventListener("submit",e=>guardarVehiculo(e).catch(error=>mensaje("No se pudo guardar",error.message,"error")));$("formDocumento").addEventListener("submit",e=>guardarDocumento(e).catch(error=>mensaje("No se pudo guardar",error.message,"error")));document.addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;if(b.dataset.editarContrato)abrirContrato(contratos.find(x=>x.id===b.dataset.editarContrato));if(b.dataset.asignarContrato)abrirAsignacion(b.dataset.asignarContrato);if(b.dataset.cargarFaltantes){const contrato=contratos.find(x=>x.id===$("asignacionContratoId").value);const tipo=b.dataset.entidadTipo,id=b.dataset.cargarFaltantes;const requisitos=requisitosFaltantes(tipo,id,contrato);abrirDocumento(null,{tipo,id,contratoId:contrato.id,requisitos});}if(b.dataset.eliminarContrato)eliminar("sheqContratos",b.dataset.eliminarContrato,"Se eliminará el contrato o faena. Los documentos conservarán su historial.");if(b.dataset.editarVehiculo)abrirVehiculo(vehiculos.find(x=>x.id===b.dataset.editarVehiculo));if(b.dataset.documentoPersona)abrirDocumento(null,{tipo:"persona",id:b.dataset.documentoPersona});if(b.dataset.documentoVehiculo)abrirDocumento(null,{tipo:"vehiculo",id:b.dataset.documentoVehiculo});if(b.dataset.matrizPersona)abrirMatrizPersona(b.dataset.matrizPersona);if(b.dataset.matrizContrato)abrirMatrizContrato(b.dataset.matrizContrato);if(b.dataset.historialDocumento)abrirHistorialDocumento(b.dataset.historialDocumento);if(b.dataset.purgarVersion)eliminarArchivoHistorico(b.dataset.purgarVersion,Number(b.dataset.versionIndice)).catch(error=>mensaje("No se pudo eliminar",error.message,"error"));if(b.dataset.editarDocumento)abrirDocumento(documentos.find(x=>x.id===b.dataset.editarDocumento));if(b.dataset.eliminarDocumento)eliminarDocumentoCompleto(b.dataset.eliminarDocumento).catch(error=>mensaje("No se pudo eliminar",error.message,"error"));});[$("btnSalirSheq"),$("btnSalirSheqTop")].forEach(b=>b.addEventListener("click",cerrarSesion));const toggle=document.querySelector(".mobile-menu-toggle"),back=document.querySelector(".mobile-menu-backdrop"),side=$("sheqSidebar");const cerrar=()=>{side.classList.remove("open");back.classList.remove("active");toggle.setAttribute("aria-expanded","false")};toggle.addEventListener("click",()=>{side.classList.toggle("open");back.classList.toggle("active");toggle.setAttribute("aria-expanded",String(side.classList.contains("open")))});back.addEventListener("click",cerrar);}
+function enlazarEventos(){document.querySelectorAll(".sheq-tabs button").forEach(b=>b.addEventListener("click",()=>{document.querySelectorAll(".sheq-tabs button,.sheq-vista").forEach(x=>x.classList.remove("active"));b.classList.add("active");document.querySelector(`[data-panel="${b.dataset.vista}"]`).classList.add("active");}));document.querySelectorAll("[data-cerrar-modal]").forEach(b=>b.addEventListener("click",()=>cerrarModal(b.dataset.cerrarModal)));$("documentoEntidadId").addEventListener("change",actualizarRutDocumento);$("btnAgregarDocumentacion").addEventListener("click",alternarCatalogoCarga);$("btnDocumentoPersonalizado").addEventListener("click",()=>crearFilaDocumento());$("listaCatalogoCarga").addEventListener("change",evento=>{const input=evento.target.closest('input[type="checkbox"]');if(!input)return;const clave=claveDocumento(input.value),filas=Array.from($("listaDocumentacion").querySelectorAll(".sheq-documento-fila"));const existente=filas.find(fila=>claveDocumento(fila.querySelector(".documento-nombre").value)===clave);if(input.checked&&!existente)crearFilaDocumento({tipoDocumento:input.value,catalogo:true});if(!input.checked&&existente&&!existente.dataset.documentoId)existente.remove();actualizarNumeracionDocumentos();actualizarSeleccionCatalogoCarga();});$("listaDocumentacion").addEventListener("click",evento=>{const boton=evento.target.closest(".sheq-quitar-documento");if(!boton)return;boton.closest(".sheq-documento-fila").remove();actualizarNumeracionDocumentos();actualizarSeleccionCatalogoCarga();});$("buscarPersonalSheq").addEventListener("input",renderPersonal);$("buscarDocumentoSheq").addEventListener("input",renderDocumentos);$("filtroEstadoDocumento").addEventListener("change",renderDocumentos);$("buscarAsignacionPersonal").addEventListener("input",()=>filtrarAsignacion("persona"));$("buscarAsignacionVehiculos").addEventListener("input",()=>filtrarAsignacion("vehiculo"));$("btnNuevoContrato").addEventListener("click",()=>abrirContrato());$("btnNuevoVehiculo").addEventListener("click",()=>abrirVehiculo());$("btnNuevoDocumento").addEventListener("click",()=>abrirDocumento());$("btnExportarSheq").addEventListener("click",exportarCSV);$("formContrato").addEventListener("submit",e=>guardarContrato(e).catch(error=>mensaje("No se pudo guardar",error.message,"error")));$("formAsignacion").addEventListener("submit",e=>guardarAsignacion(e).catch(error=>mensaje("No se pudo asignar",error.message,"error")));$("formVehiculo").addEventListener("submit",e=>guardarVehiculo(e).catch(error=>mensaje("No se pudo guardar",error.message,"error")));$("formDocumento").addEventListener("submit",e=>guardarDocumento(e).catch(error=>mensaje("No se pudo guardar",error.message,"error")));document.addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;if(b.dataset.editarContrato)abrirContrato(contratos.find(x=>x.id===b.dataset.editarContrato));if(b.dataset.asignarContrato)abrirAsignacion(b.dataset.asignarContrato);if(b.dataset.cargarFaltantes){const contrato=contratos.find(x=>x.id===$("asignacionContratoId").value);const tipo=b.dataset.entidadTipo,id=b.dataset.cargarFaltantes;const requisitos=requisitosFaltantes(tipo,id,contrato);abrirDocumento(null,{tipo,id,contratoId:contrato.id,requisitos});}if(b.dataset.eliminarContrato)eliminar("sheqContratos",b.dataset.eliminarContrato,"Se eliminará el contrato o faena. Los documentos conservarán su historial.");if(b.dataset.editarVehiculo)abrirVehiculo(vehiculos.find(x=>x.id===b.dataset.editarVehiculo));if(b.dataset.documentoPersona)abrirDocumento(null,{tipo:"persona",id:b.dataset.documentoPersona});if(b.dataset.documentoVehiculo)abrirDocumento(null,{tipo:"vehiculo",id:b.dataset.documentoVehiculo});if(b.dataset.matrizPersona)abrirMatrizPersona(b.dataset.matrizPersona);if(b.dataset.matrizContrato)abrirMatrizContrato(b.dataset.matrizContrato);if(b.dataset.historialDocumento)abrirHistorialDocumento(b.dataset.historialDocumento);if(b.dataset.purgarVersion)eliminarArchivoHistorico(b.dataset.purgarVersion,Number(b.dataset.versionIndice)).catch(error=>mensaje("No se pudo eliminar",error.message,"error"));if(b.dataset.editarDocumento)abrirDocumento(documentos.find(x=>x.id===b.dataset.editarDocumento));if(b.dataset.eliminarDocumento)eliminarDocumentoCompleto(b.dataset.eliminarDocumento).catch(error=>mensaje("No se pudo eliminar",error.message,"error"));});[$("btnSalirSheq"),$("btnSalirSheqTop")].forEach(b=>b.addEventListener("click",cerrarSesion));const toggle=document.querySelector(".mobile-menu-toggle"),back=document.querySelector(".mobile-menu-backdrop"),side=$("sheqSidebar");const cerrar=()=>{side.classList.remove("open");back.classList.remove("active");toggle.setAttribute("aria-expanded","false")};toggle.addEventListener("click",()=>{side.classList.toggle("open");back.classList.toggle("active");toggle.setAttribute("aria-expanded",String(side.classList.contains("open")))});back.addEventListener("click",cerrar);}
 
-async function iniciar(){try{if(!await cargarBase())return;$("usuarioNombre").textContent=usuario.nombre||usuario.email||"Usuario";$("usuarioRol").textContent=usuario.rol;$("menuDashboardSheq").style.display=usuario.rol==="sheq"?"none":"";$("menuPanelEmpresaSheq").style.display=["super_admin","admin_empresa","admin_sucursal"].includes(usuario.rol)?"":"none";$("menuPanelEmpresaSheq").onclick=()=>location.href=`empresa-admin.html?id=${empresaId}`;$("menuProgramacionSheq").style.display=moduloActivo(empresa,"programacion")?"":"none";if(!puedeEditar)[$("btnNuevoContrato"),$("btnNuevoVehiculo"),$("btnNuevoDocumento")].forEach(b=>b.hidden=true);enlazarEventos();renderTodo();}catch(error){console.error(error);await mensaje("No se pudo abrir SHEQ",error.message||"Intenta nuevamente.","error");}}
+function enlazarEventosMatriz() {
+  ["filtroMatrizContrato", "filtroMatrizTipo", "filtroMatrizEstado"].forEach(id => $(id).addEventListener("change", renderMatrizCumplimiento));
+  $("buscarMatrizSheq").addEventListener("input", renderMatrizCumplimiento);
+}
+
+async function iniciar(){try{if(!await cargarBase())return;$("usuarioNombre").textContent=usuario.nombre||usuario.email||"Usuario";$("usuarioRol").textContent=usuario.rol;$("menuDashboardSheq").style.display=usuario.rol==="sheq"?"none":"";$("menuPanelEmpresaSheq").style.display=["super_admin","admin_empresa","admin_sucursal"].includes(usuario.rol)?"":"none";$("menuPanelEmpresaSheq").onclick=()=>location.href=`empresa-admin.html?id=${empresaId}`;$("menuProgramacionSheq").style.display=moduloActivo(empresa,"programacion")?"":"none";if(!puedeEditar)[$("btnNuevoContrato"),$("btnNuevoVehiculo"),$("btnNuevoDocumento")].forEach(b=>b.hidden=true);enlazarEventos();enlazarEventosMatriz();renderTodo();}catch(error){console.error(error);await mensaje("No se pudo abrir SHEQ",error.message||"Intenta nuevamente.","error");}}
 iniciar();

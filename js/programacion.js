@@ -115,7 +115,7 @@ function etiquetaRol(perfil) {
 
 function puedeVerAsignacion(asignacion) {
   if (grupoActivo === "mi-semana") return asignacion.usuarioIds?.includes(usuario.uid) || asignacion.supervisorIds?.includes(usuario.uid) || asignacion.sheqIds?.includes(usuario.uid);
-  if (grupoActivo === "supervisor") return Boolean(asignacion.supervisorIds?.length);
+  if (grupoActivo === "supervisor") return Boolean(asignacion.supervisorIds?.length || (asignacion.grupo === "supervisor" && asignacion.usuarioIds?.length));
   if (grupoActivo === "sheq") return asignacion.grupo === "sheq" || Boolean(asignacion.sheqIds?.length);
   return asignacion.grupo === grupoActivo;
 }
@@ -129,7 +129,7 @@ function usuariosVisibles() {
     asignacionesSemana
       .filter(puedeVerAsignacion)
       .flatMap(asignacion => {
-        if (grupoActivo === "supervisor") return asignacion.supervisorIds || [];
+        if (grupoActivo === "supervisor") return [...new Set([...(asignacion.supervisorIds || []), ...(asignacion.grupo === "supervisor" ? asignacion.usuarioIds || [] : [])])];
         if (grupoActivo === "sheq") return [
           ...(asignacion.grupo === "sheq" ? (asignacion.usuarioIds || []) : []),
           ...(asignacion.sheqIds || [])
@@ -230,7 +230,7 @@ function opcionesTrabajador(trabajadores, seleccionado = "", trabajadoresGuardad
 function crearFilaTrabajador(trabajadores, seleccionado = "", trabajadoresGuardados = [], removible = true, idsOcupados = new Set()) {
   const fila = document.createElement("div");
   fila.className = "fila-asignacion-usuario";
-  fila.innerHTML = `<select class="asignacion-usuario-select" required>${opcionesTrabajador(trabajadores, seleccionado, trabajadoresGuardados, idsOcupados)}</select>${removible ? '<button type="button" class="btn-quitar-trabajador" aria-label="Quitar trabajador">Quitar</button>' : ""}`;
+  fila.innerHTML = `<select class="asignacion-usuario-select">${opcionesTrabajador(trabajadores, seleccionado, trabajadoresGuardados, idsOcupados)}</select>${removible ? '<button type="button" class="btn-quitar-trabajador" aria-label="Quitar trabajador">Quitar</button>' : ""}`;
   return fila;
 }
 
@@ -325,7 +325,8 @@ function actualizarResumenTrabajadores() {
 function actualizarSelectoresAsignacion({ usuariosSeleccionados = [], usuarioSeleccionado = "", supervisorSeleccionado = "", sheqSeleccionado = "" } = {}) {
   const grupo = $("asignacionGrupo").value || "tecnico";
   const fecha = $("asignacionFecha").value;
-  const idsOcupados = idsOcupadosEnFecha(fecha, $("asignacionId").value);
+  const permiteRepetidos = $("asignacionTipo").value === "capacitacion";
+  const idsOcupados = permiteRepetidos ? new Set() : idsOcupadosEnFecha(fecha, $("asignacionId").value);
   const idsSeleccionados = new Set([
     ...usuariosSeleccionados,
     ...(usuarioSeleccionado ? [usuarioSeleccionado] : [])
@@ -343,7 +344,7 @@ function actualizarSelectoresAsignacion({ usuariosSeleccionados = [], usuarioSel
   if (ayuda) {
     ayuda.textContent = cantidadOcupados
       ? `${cantidadOcupados} trabajador(es) ya tiene(n) una asignación en esta fecha y aparecen deshabilitados.`
-      : "Todos los trabajadores mostrados están disponibles en esta fecha.";
+      : permiteRepetidos ? "En capacitaciones puedes seleccionar trabajadores aunque tengan otra actividad el mismo día." : "Todos los trabajadores mostrados están disponibles en esta fecha.";
   }
 
   $("asignacionSupervisor").innerHTML = `<option value="">Sin supervisor asignado</option>${supervisores
@@ -483,7 +484,7 @@ function asignacionesCelda(fecha, usuarioId) {
     (grupoActivo === "mi-semana"
       ? item.usuarioIds?.includes(usuarioId) || item.supervisorIds?.includes(usuarioId) || item.sheqIds?.includes(usuarioId)
       : grupoActivo === "supervisor"
-      ? item.supervisorIds?.includes(usuarioId)
+      ? item.supervisorIds?.includes(usuarioId) || (item.grupo === "supervisor" && item.usuarioIds?.includes(usuarioId))
       : grupoActivo === "sheq"
         ? item.sheqIds?.includes(usuarioId) || (item.grupo === "sheq" && item.usuarioIds?.includes(usuarioId))
         : item.usuarioIds?.includes(usuarioId)) &&
@@ -597,12 +598,12 @@ function abrirAsignacion(id) {
   $("asignacionId").value = asignacion.id;
   $("asignacionFecha").value = asignacion.fecha || "";
   $("asignacionGrupo").value = asignacion.grupo || "tecnico";
+  $("asignacionTipo").value = asignacion.tipo || "terreno";
   actualizarSelectoresAsignacion({
     usuariosSeleccionados: asignacion.usuarioIds || [],
     supervisorSeleccionado: asignacion.supervisorIds?.[0] || "",
     sheqSeleccionado: asignacion.sheqIds?.[0] || ""
   });
-  $("asignacionTipo").value = asignacion.tipo || "terreno";
   $("asignacionCliente").value = asignacion.cliente || "";
   $("asignacionContrato").checked = asignacion.contrato === true;
   $("asignacionFixPrice").checked = asignacion.fixPrice === true;
@@ -622,8 +623,8 @@ async function guardarAsignacion(evento) {
   const usuarioIds = idsUsuariosSeleccionados();
   const supervisorId = $("asignacionSupervisor").value;
   const sheqId = $("asignacionSheq").value;
-  if (!usuarioIds.length) {
-    alert("Selecciona al menos un trabajador.");
+  if (!usuarioIds.length && !supervisorId && !sheqId) {
+    alert("Selecciona al menos un trabajador, supervisor o asesor SHEQ.");
     return;
   }
 
@@ -647,7 +648,7 @@ async function guardarAsignacion(evento) {
     });
   });
 
-  if (idsConConflicto.size) {
+  if (idsConConflicto.size && $("asignacionTipo").value !== "capacitacion") {
     const personasConConflicto = participantesSeleccionados
       .filter((item, indice, lista) => idsConConflicto.has(item.id) && lista.findIndex(otro => otro.id === item.id) === indice)
       .map(item => {
@@ -787,7 +788,7 @@ async function publicarSemana() {
 }
 
 function idsPersonaPorGrupo(asignacion, grupo) {
-  if (grupo === "supervisor") return asignacion.supervisorIds || [];
+  if (grupo === "supervisor") return [...new Set([...(asignacion.supervisorIds || []), ...(asignacion.grupo === "supervisor" ? asignacion.usuarioIds || [] : [])])];
   if (grupo === "sheq") return [
     ...(asignacion.grupo === "sheq" ? (asignacion.usuarioIds || []) : []),
     ...(asignacion.sheqIds || [])
@@ -854,7 +855,7 @@ function renderVistaCorreo(grupo = "tecnico", personaId = "") {
         <div class="correo-encabezado"><h3>Programación individual · Semana ${numeroSemana(semanaInicio)}</h3><p>${escapar(nombreUsuario(persona))} · ${escapar(etiquetaRol(persona))} · ${escapar(empresa?.nombre || "Empresa")}</p></div>
         <div class="correo-cuerpo">
           ${asignaciones.length ? asignaciones.map(item => `
-            <div class="correo-dia"><strong>${escapar(DIAS[Math.max(0, Math.round((new Date(`${item.fecha}T12:00:00`) - semanaInicio) / 86400000))])} ${escapar(fechaCorta(new Date(`${item.fecha}T12:00:00`)))}</strong><p>${escapar(item.cliente || "Sin cliente")}${detalleOperacionalCorreo(item)}${companerosAsignacionCorreo(item, persona.id)}${item.observaciones ? `<br>${escapar(item.observaciones)}` : ""}</p></div>
+            <div class="correo-dia"><strong>${escapar(DIAS[Math.max(0, Math.round((new Date(`${item.fecha}T12:00:00`) - new Date(`${fechaISO(semanaInicio)}T12:00:00`)) / 86400000))])} ${escapar(fechaCorta(new Date(`${item.fecha}T12:00:00`)))}</strong><p>${escapar(item.cliente || "Sin cliente")}${detalleOperacionalCorreo(item)}${companerosAsignacionCorreo(item, persona.id)}${item.observaciones ? `<br>${escapar(item.observaciones)}` : ""}</p></div>
           `).join("") : '<div class="correo-vacio">Esta persona todavía no tiene asignaciones durante la semana seleccionada.</div>'}
         </div>
       </div>
@@ -907,7 +908,7 @@ function configurarInterfaz() {
   $("btnPublicarSemana").addEventListener("click", publicarSemana);
   $("formAsignacion").addEventListener("submit", guardarAsignacion);
   $("asignacionFecha").addEventListener("change", () => {
-    const ocupados = idsOcupadosEnFecha($("asignacionFecha").value, $("asignacionId").value);
+    const ocupados = $("asignacionTipo").value === "capacitacion" ? new Set() : idsOcupadosEnFecha($("asignacionFecha").value, $("asignacionId").value);
     const seleccionadosDisponibles = idsUsuariosSeleccionados().filter(id => !ocupados.has(id));
     actualizarSelectoresAsignacion({
       usuariosSeleccionados: seleccionadosDisponibles,
@@ -916,6 +917,11 @@ function configurarInterfaz() {
     });
   });
   $("asignacionGrupo").addEventListener("change", () => actualizarSelectoresAsignacion({
+    supervisorSeleccionado: $("asignacionSupervisor").value,
+    sheqSeleccionado: $("asignacionSheq").value
+  }));
+  $("asignacionTipo").addEventListener("change", () => actualizarSelectoresAsignacion({
+    usuariosSeleccionados: idsUsuariosSeleccionados(),
     supervisorSeleccionado: $("asignacionSupervisor").value,
     sheqSeleccionado: $("asignacionSheq").value
   }));
@@ -940,7 +946,7 @@ function configurarInterfaz() {
   $("btnAgregarTrabajador").addEventListener("click", () => {
     const grupo = $("asignacionGrupo").value || "tecnico";
     const trabajadores = usuariosDisponiblesPorGrupo(usuariosEmpresa, grupo);
-    const ocupados = idsOcupadosEnFecha($("asignacionFecha").value, $("asignacionId").value);
+    const ocupados = $("asignacionTipo").value === "capacitacion" ? new Set() : idsOcupadosEnFecha($("asignacionFecha").value, $("asignacionId").value);
     $("listaAsignacionUsuarios").appendChild(crearFilaTrabajador(trabajadores, "", [], true, ocupados));
     $("listaAsignacionUsuarios").lastElementChild?.querySelector("select")?.focus();
   });

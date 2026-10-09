@@ -9,8 +9,8 @@
   <link rel="stylesheet" href="css/brand-overtrack.css">
   <link rel="stylesheet" href="css/brand-overtrack-light.css">
   <link rel="stylesheet" href="css/notificaciones.css?v=20261007-1">
-  <link rel="stylesheet" href="css/sheq.css?v=20261007-8">
-  <link rel="stylesheet" href="css/sheq-matriz.css">
+  <link rel="stylesheet" href="css/sheq.css?v=20261008-4">
+  <link rel="stylesheet" href="css/sheq-matriz.css?v=20261008-2">
   <link rel="stylesheet" href="css/desktop-density.css?v=20261004-7">
 </head>
 <body class="dashboard-overtrack sheq-page">
@@ -39,9 +39,25 @@
 
     <section class="sheq-toolbar card">
       <div class="sheq-tabs" role="tablist">
-        <button class="active" data-vista="panel">Resumen</button><button data-vista="personal">Personal</button><button data-vista="vehiculos">Vehículos</button><button data-vista="contratos">Contratos y faenas</button><button data-vista="documentos">Documentos</button>
+        <button class="active" data-vista="panel">Resumen</button><button data-vista="matriz">Matriz de cumplimiento</button><button data-vista="personal">Personal</button><button data-vista="vehiculos">Vehículos</button><button data-vista="contratos">Contratos y faenas</button><button data-vista="documentos">Documentos</button>
       </div>
       <div class="sheq-toolbar-actions"><button class="btn-sheq-secondary" id="btnExportarSheq">Exportar CSV</button><button class="btn-sheq-primary" id="btnNuevoDocumento">+ Documento</button></div>
+    </section>
+
+    <section class="sheq-vista" data-panel="matriz">
+      <div class="sheq-matriz-kpis">
+        <article><span>Asignaciones evaluadas</span><strong id="matrizKpiTotal">0</strong></article>
+        <article class="ok"><span>Conformes</span><strong id="matrizKpiConformes">0</strong></article>
+        <article class="warning"><span>Con observaciones</span><strong id="matrizKpiObservados">0</strong></article>
+        <article class="danger"><span>Críticos</span><strong id="matrizKpiCriticos">0</strong></article>
+      </div>
+      <div class="card sheq-list-card">
+        <div class="sheq-list-header sheq-matriz-header">
+          <div><h3>Matriz central de cumplimiento</h3><p>Estado documental de trabajadores y vehículos asignados a cada contrato.</p></div>
+          <div class="sheq-matriz-filtros"><select id="filtroMatrizContrato"><option value="">Todos los contratos</option></select><select id="filtroMatrizTipo"><option value="">Personal y vehículos</option><option value="persona">Solo trabajadores</option><option value="vehiculo">Solo vehículos</option></select><select id="filtroMatrizEstado"><option value="">Todos los estados</option><option value="vigente">Conformes</option><option value="proximo">Con observaciones</option><option value="vencido">Críticos</option><option value="sin-requisitos">Sin requisitos</option></select><input id="buscarMatrizSheq" type="search" placeholder="Buscar persona, patente o contrato"></div>
+        </div>
+        <div class="sheq-table-wrap"><table class="sheq-table sheq-matriz-tabla"><thead><tr><th>Entidad</th><th>Tipo</th><th>Contrato / faena</th><th>Cumplimiento</th><th>Faltantes</th><th>Vencidos</th><th>Por vencer</th><th>Estado</th><th></th></tr></thead><tbody id="tablaMatrizCumplimiento"></tbody></table></div>
+      </div>
     </section>
 
     <section class="sheq-vista active" data-panel="panel">
@@ -51,7 +67,7 @@
         <article class="sheq-kpi rojo"><span>Documentos vencidos</span><strong id="kpiVencidos">0</strong></article>
         <article class="sheq-kpi amarillo"><span>Próximos a vencer (90 días)</span><strong id="kpiPorVencer">0</strong></article>
         <article class="sheq-kpi azul"><span>Vehículos habilitados</span><strong id="kpiVehiculos">0</strong></article>
-        <article class="sheq-kpi naranja"><span>Alertas documentales</span><strong id="kpiObservaciones">0</strong></article>
+        <article class="sheq-kpi naranja"><span>Alertas de vencimiento</span><strong id="kpiObservaciones">0</strong></article>
       </div>
       <div class="sheq-panel-grid">
         <article class="card sheq-card"><div class="sheq-card-title"><h3>Alertas prioritarias</h3><span id="resumenAlertas">0 alertas</span></div><div id="listaAlertas" class="sheq-alertas"></div></article>
@@ -83,7 +99,7 @@
 
 <div class="sheq-modal" id="modalAsignacion" hidden><section class="sheq-modal-content sheq-modal-asignacion"><header><div><h2 id="asignacionTitulo">Asignar al contrato</h2><p>Selecciona trabajadores y vehículos. Se comparará automáticamente la documentación existente.</p></div><button data-cerrar-modal="modalAsignacion">×</button></header><form id="formAsignacion"><input type="hidden" id="asignacionContratoId"><div class="sheq-asignacion-resumen" id="asignacionResumen"></div><div class="sheq-asignacion-columnas"><section><div class="sheq-asignacion-cabecera"><h3>Trabajadores</h3><input type="search" id="buscarAsignacionPersonal" placeholder="Buscar trabajador"></div><div id="listaAsignacionPersonal" class="sheq-asignacion-lista"></div></section><section><div class="sheq-asignacion-cabecera"><h3>Vehículos</h3><input type="search" id="buscarAsignacionVehiculos" placeholder="Buscar patente o vehículo"></div><div id="listaAsignacionVehiculos" class="sheq-asignacion-lista"></div></section></div><div class="sheq-form-actions"><button type="button" class="btn-sheq-secondary" data-cerrar-modal="modalAsignacion">Cancelar</button><button class="btn-sheq-primary">Guardar asignación</button></div></form></section></div>
 
-<div class="sheq-modal" id="modalDocumento" hidden><section class="sheq-modal-content sheq-modal-documentos"><header><div><h2>Documentación SHEQ</h2><p>Actualiza el RUT y registra uno o varios antecedentes del trabajador.</p></div><button data-cerrar-modal="modalDocumento">×</button></header><form id="formDocumento" class="sheq-form"><input type="hidden" id="documentoId"><input type="hidden" id="documentoEntidadTipo" value="persona"><label>Asociado a<select id="documentoEntidadId" required></select></label><label>RUT<input id="documentoRut" maxlength="12" placeholder="Ej.: 12.345.678-9" autocomplete="off"></label><div class="wide sheq-documentos-toolbar"><div><strong>Documentación</strong><small>Agrega todos los documentos que necesites en una sola operación.</small></div><button type="button" class="btn-sheq-secondary" id="btnAgregarDocumentacion">+ Agregar documentación</button></div><div id="listaDocumentacion" class="wide sheq-documentos-lista"></div><label class="wide">Observaciones<textarea id="documentoObservaciones" placeholder="Observaciones generales (opcional)"></textarea></label><label class="wide" id="documentoMotivoCampo" hidden>Motivo de la modificación<textarea id="documentoMotivo" placeholder="Explica brevemente qué información se corrigió"></textarea></label><div class="sheq-form-actions wide"><button type="button" class="btn-sheq-secondary" data-cerrar-modal="modalDocumento">Cancelar</button><button class="btn-sheq-primary">Guardar documentación</button></div></form></section></div>
+<div class="sheq-modal" id="modalDocumento" hidden><section class="sheq-modal-content sheq-modal-documentos"><header><div><h2>Documentación SHEQ</h2><p>Actualiza el RUT y registra uno o varios antecedentes del trabajador.</p></div><button data-cerrar-modal="modalDocumento">×</button></header><form id="formDocumento" class="sheq-form"><input type="hidden" id="documentoId"><input type="hidden" id="documentoEntidadTipo" value="persona"><label>Asociado a<select id="documentoEntidadId" required></select></label><label>RUT<input id="documentoRut" maxlength="12" placeholder="Ej.: 12.345.678-9" autocomplete="off"></label><div class="wide sheq-documentos-toolbar"><div><strong>Documentación</strong><small>Agrega todos los documentos que necesites en una sola operación.</small></div><button type="button" class="btn-sheq-secondary" id="btnAgregarDocumentacion" aria-expanded="false">+ Agregar documentación</button></div><div class="wide sheq-catalogo-carga" id="catalogoCargaDocumentos" hidden><div class="sheq-catalogo-carga-header"><div><strong id="catalogoCargaTitulo">Seleccionar documentación</strong><small>Marca uno o varios documentos para completar sus antecedentes.</small></div><button type="button" id="btnDocumentoPersonalizado">+ Documento personalizado</button></div><div id="listaCatalogoCarga" class="sheq-requisitos-opciones"></div></div><div id="listaDocumentacion" class="wide sheq-documentos-lista"></div><label class="wide">Observaciones<textarea id="documentoObservaciones" placeholder="Observaciones generales (opcional)"></textarea></label><label class="wide" id="documentoMotivoCampo" hidden>Motivo de la modificación<textarea id="documentoMotivo" placeholder="Explica brevemente qué información se corrigió"></textarea></label><div class="sheq-form-actions wide"><button type="button" class="btn-sheq-secondary" data-cerrar-modal="modalDocumento">Cancelar</button><button class="btn-sheq-primary">Guardar documentación</button></div></form></section></div>
 
 <div class="sheq-modal" id="modalListaDocumentos" hidden><section class="sheq-modal-content sheq-modal-lista-documentos"><header><div><h2 id="listaDocumentosTitulo">Documentos registrados</h2><p id="listaDocumentosSubtitulo">Antecedentes y vigencias asociados.</p></div><button data-cerrar-modal="modalListaDocumentos">×</button></header><div id="listaDocumentosEntidad" class="sheq-documentos-entidad"></div><div class="sheq-form-actions"><button type="button" class="btn-sheq-secondary" data-cerrar-modal="modalListaDocumentos">Cerrar</button></div></section></div>
 
@@ -91,5 +107,5 @@
 
 <div class="sheq-modal" id="modalHistorialDocumento" hidden><section class="sheq-modal-content sheq-modal-matriz"><header><div><h2 id="historialDocumentoTitulo">Historial del documento</h2><p>Versiones anteriores, responsables y motivos de modificación.</p></div><button data-cerrar-modal="modalHistorialDocumento">×</button></header><div id="historialDocumentoContenido" class="sheq-historial-contenido"></div><div class="sheq-form-actions"><button type="button" class="btn-sheq-secondary" data-cerrar-modal="modalHistorialDocumento">Cerrar</button></div></section></div>
 
-<script src="js/components/notificaciones.js?v=20261007-1"></script><script type="module" src="js/sheq.js?v=20261007-5"></script>
+<script src="js/components/notificaciones.js?v=20261007-1"></script><script type="module" src="js/sheq.js?v=20261008-6"></script>
 </body></html>

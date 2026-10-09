@@ -331,3 +331,83 @@
     gap: 6px;
   }
 }
+
+.sheq-matriz-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 15px;
+}
+
+.sheq-matriz-kpis article {
+  padding: 15px 17px;
+  border: 1px solid #d8e4ed;
+  border-left: 4px solid #607d8b;
+  border-radius: 13px;
+  background: #fff;
+  box-shadow: 0 7px 20px rgba(20, 50, 77, .05);
+}
+
+.sheq-matriz-kpis article.ok { border-left-color: #2e9d57; }
+.sheq-matriz-kpis article.warning { border-left-color: #e4a823; }
+.sheq-matriz-kpis article.danger { border-left-color: #e54555; }
+.sheq-matriz-kpis span,
+.sheq-matriz-kpis strong { display: block; }
+.sheq-matriz-kpis span { color: #64798b; font-size: 12px; font-weight: 750; }
+.sheq-matriz-kpis strong { margin-top: 7px; color: #17324a; font-size: 25px; }
+
+.sheq-matriz-header { align-items: flex-start; }
+.sheq-matriz-filtros {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(170px, 1fr));
+  gap: 8px;
+  width: min(720px, 70%);
+}
+
+.sheq-matriz-filtros select,
+.sheq-matriz-filtros input {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.sheq-matriz-tabla { min-width: 1120px; }
+.sheq-tipo-entidad {
+  display: inline-flex;
+  padding: 5px 8px;
+  border-radius: 7px;
+  color: #23668f;
+  background: #eaf5fc;
+  font-size: 11px;
+  font-weight: 800;
+}
+.sheq-tipo-entidad.vehiculo { color: #6d5310; background: #fff5d8; }
+
+.sheq-cumplimiento-celda { min-width: 125px; }
+.sheq-cumplimiento-celda > strong,
+.sheq-cumplimiento-celda > small { display: block; }
+.sheq-cumplimiento-celda > span {
+  display: block;
+  height: 6px;
+  margin: 5px 0;
+  overflow: hidden;
+  border-radius: 99px;
+  background: #dfe8ef;
+}
+.sheq-cumplimiento-celda > span i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #1689e8, #2e9d57);
+}
+.sheq-cumplimiento-celda > small { color: #718595; font-size: 10px; }
+
+@media (max-width: 900px) {
+  .sheq-matriz-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .sheq-matriz-filtros { width: 100%; }
+}
+
+@media (max-width: 520px) {
+  .sheq-matriz-kpis,
+  .sheq-matriz-filtros { grid-template-columns: 1fr; }
+}

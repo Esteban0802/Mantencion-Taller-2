@@ -979,6 +979,27 @@ canvas {
   transform: scale(1.03);
 }
 
+.evidencia-pdf-card {
+  display: flex;
+  width: 100px;
+  height: 76px;
+  box-sizing: border-box;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border: 2px solid #e5484d;
+  border-radius: 8px;
+  background: #fff5f5;
+  color: #a82026;
+  text-decoration: none;
+  transition: transform .2s, background .2s;
+}
+
+.evidencia-pdf-card span { font-size: 15px; font-weight: 900; }
+.evidencia-pdf-card small { font-size: 9px; font-weight: 700; }
+.evidencia-pdf-card:hover { transform: scale(1.03); background: #ffe9e9; }
+
 /* 🔥 BOTÓN BORRAR COMENTARIO PRO */
 .btn-delete-comment {
   width: 32px;
