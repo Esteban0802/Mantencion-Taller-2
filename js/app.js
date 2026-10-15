@@ -57,7 +57,7 @@ import {
     esUsuarioTaller,
     puedeEliminarComentario,
     aplicarPermisosRol
-} from "./modulos/core/permisos.js";
+} from "./modulos/core/permisos.js?v=20261014-1";
 
 
 import {
@@ -137,7 +137,8 @@ const usuario = protegerPagina([
   "admin_sucursal",
   "jefe_taller",
   "supervisor",
-  "tecnico"
+  "tecnico",
+  "planificador"
 ]);
 
 if (!usuario) throw new Error("Acceso no autorizado");

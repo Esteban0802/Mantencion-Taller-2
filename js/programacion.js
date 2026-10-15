@@ -35,13 +35,14 @@ const usuario = protegerPagina([
   "supervisor",
   "tecnico",
   "sheq",
-  "tecnico"
+  "bodeguero"
 ]);
 
 if (!usuario) throw new Error("Acceso no autorizado");
 
 const PUEDE_EDITAR = ["super_admin", "planificador"].includes(usuario.rol);
-const PUEDE_VER_PROGRAMACION_COMPLETA = ["super_admin", "admin_empresa", "admin_sucursal", "jefe_taller", "planificador"].includes(usuario.rol);
+const PUEDE_VER_PROGRAMACION_COMPLETA = ["super_admin", "admin_empresa", "admin_sucursal", "jefe_taller", "planificador", "bodeguero", "sheq"].includes(usuario.rol);
+const PUEDE_VER_BORRADORES = PUEDE_EDITAR || usuario.rol === "bodeguero";
 const DIAS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
 const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
 
@@ -173,7 +174,7 @@ async function cargarUsuariosYSucursales() {
       : [{ id: usuario.uid, ...usuario }];
   } else {
     const restriccionesUsuarios = [where("empresaId", "==", empresaId)];
-    if (["admin_sucursal", "jefe_taller", "planificador"].includes(usuario.rol) && usuario.sucursalId) {
+    if (["admin_sucursal", "jefe_taller", "planificador", "bodeguero", "sheq"].includes(usuario.rol) && usuario.sucursalId) {
       restriccionesUsuarios.push(where("sucursalId", "==", usuario.sucursalId));
     }
     const usuariosSnap = await getDocs(
@@ -438,7 +439,7 @@ async function cargarSemana() {
   estadoSemanaActual = semanaGuardada?.estado || "borrador";
   actualizarEncabezadoSemana();
 
-  if (!PUEDE_EDITAR && estadoSemanaActual !== "publicada") {
+  if (!PUEDE_VER_BORRADORES && estadoSemanaActual !== "publicada") {
     asignacionesSemana = [];
     mostrarMensaje("La programación de esta semana todavía no ha sido publicada.");
     $("resumenProgramacion").textContent = "Programación pendiente de publicación";
@@ -502,7 +503,7 @@ function renderBloque(asignacion) {
     ["Indicación", asignacion.observaciones]
   ].filter(([, valor]) => valor);
   return `
-    <article class="bloque-asignacion ${escapar(asignacion.tipo || "terreno")}" data-asignacion-id="${escapar(asignacion.id)}" tabindex="0">
+    <article class="bloque-asignacion ${escapar(asignacion.tipo || "terreno")}" data-asignacion-id="${escapar(asignacion.id)}"${PUEDE_EDITAR ? ' tabindex="0"' : ""}>
       ${filas.map(([etiqueta, valor]) => `<div class="asignacion-dato"><strong>${etiqueta}</strong><span>${escapar(valor)}</span></div>`).join("")}
       ${ordenes.length ? `<div class="asignacion-os-lista">${ordenes.map(item => `<div class="asignacion-os-item${item.cerrada ? " os-cerrada" : ""}"><strong>OS</strong><span>${escapar([item.numero, item.equipo, item.actividad, item.observacion ? `Obs: ${item.observacion}` : ""].filter(Boolean).join(" · "))}${item.cerrada ? ' · <b class="indicacion-cerrar-os">Cerrar OS</b>' : ""}</span></div>`).join("")}</div>` : ""}
     </article>
@@ -539,7 +540,7 @@ function renderCuadro() {
   });
 
   cuadro.innerHTML = html;
-  cuadro.querySelectorAll("[data-asignacion-id]").forEach(elemento => {
+  if (PUEDE_EDITAR) cuadro.querySelectorAll("[data-asignacion-id]").forEach(elemento => {
     const abrir = () => abrirAsignacion(elemento.dataset.asignacionId);
     elemento.addEventListener("click", abrir);
     elemento.addEventListener("keydown", evento => {

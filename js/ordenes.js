@@ -1,8 +1,8 @@
 import { protegerPagina, cerrarSesion } from "./session.js?v=20261004-2";
 import { db } from "./firebase-config.js";
-import { obtenerModulosEmpresa } from "./modulos.js";
+import { obtenerModulosEmpresa, moduloActivo } from "./modulos.js";
 import { asegurarResumenesOT } from "./modulos/core/resumenOT.js";
-import { puedeVerOrdenesServicio, puedeCrearOT, puedeAbrirOT, puedeEntrarPanelEmpresa } from "./permisos.js";
+import { puedeVerOrdenesServicio, puedeCrearOT, puedeAbrirOT, puedeEntrarPanelEmpresa } from "./permisos.js?v=20261014-1";
 import {
   collection,
   query,
@@ -237,6 +237,9 @@ function configurarInterfaz() {
   document.getElementById("usuarioRol").textContent = String(usuario.rol || "").replaceAll("_", " ");
   document.getElementById("menuNuevaOT").style.display = puedeCrearOT(usuario, empresaActual) ? "" : "none";
   document.getElementById("btnPanelEmpresa").style.display = puedeEntrarPanelEmpresa(usuario, empresaActual) ? "" : "none";
+  const rolesModulosOperativos = ["super_admin", "admin_empresa", "admin_sucursal", "jefe_taller", "planificador"];
+  document.getElementById("menuInventarioOrdenes").style.display = moduloActivo(empresaActual, "inventario") && rolesModulosOperativos.includes(usuario.rol) ? "" : "none";
+  document.getElementById("menuSheqOrdenes").style.display = moduloActivo(empresaActual, "sheq") && rolesModulosOperativos.includes(usuario.rol) ? "" : "none";
 
   document.getElementById("buscarOrdenes").addEventListener("input", () => { pagina = 1; aplicarFiltros(); });
   document.getElementById("estadoOrdenes").addEventListener("change", () => { pagina = 1; aplicarFiltros(); });

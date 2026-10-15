@@ -9,7 +9,7 @@
   <link rel="stylesheet" href="css/brand-overtrack.css">
   <link rel="stylesheet" href="css/brand-overtrack-light.css">
   <link rel="stylesheet" href="css/notificaciones.css?v=20261007-1">
-  <link rel="stylesheet" href="css/inventario.css?v=20261007-18">
+  <link rel="stylesheet" href="css/inventario.css?v=20261014-21">
   <link rel="stylesheet" href="css/desktop-density.css?v=20261004-7">
 </head>
 <body class="dashboard-overtrack inventario-page">
@@ -30,6 +30,7 @@
       <li id="menuDashboardInventario" role="button" tabindex="0" onclick="location.href='dashboard.html'"><svg class="ot-icon nav-icon" aria-hidden="true"><use href="img/icons-overtrack.svg#dashboard"></use></svg><span>Taller</span></li>
       <li id="menuOrdenesInventario" role="button" tabindex="0" onclick="location.href='ordenes.html'"><svg class="ot-icon nav-icon" aria-hidden="true"><use href="img/icons-overtrack.svg#list"></use></svg><span>Todas las OT</span></li>
       <li class="active"><svg class="ot-icon nav-icon" aria-hidden="true"><use href="img/icons-overtrack.svg#clipboard"></use></svg><span>Inventario</span></li>
+      <li id="menuSheqInventario" role="button" tabindex="0" style="display:none" onclick="location.href='sheq.html'"><span class="nav-icon" aria-hidden="true">🛡️</span><span>SHEQ</span></li>
       <li id="menuProgramacionInventario" role="button" tabindex="0" style="display:none" onclick="location.href='programacion.html'"><svg class="ot-icon nav-icon" aria-hidden="true"><use href="img/icons-overtrack.svg#calendar"></use></svg><span>Programación</span></li>
       <li id="menuPanelEmpresaInventario" role="button" tabindex="0" style="display:none"><svg class="ot-icon nav-icon" aria-hidden="true"><use href="img/icons-overtrack.svg#building-cog"></use></svg><span>Panel Empresa</span></li>
     </ul>
@@ -83,6 +84,7 @@
       <div class="inventario-form-grid inventario-form-os">
         <label><span>Cliente</span><input type="text" id="inventarioOsCliente" maxlength="180" required></label>
         <label><span>Equipo</span><input type="text" id="inventarioOsEquipo" maxlength="180" required></label>
+        <label><span>Serie</span><input type="text" id="inventarioOsSerie" maxlength="180" required></label>
         <label><span>OS</span><input type="text" id="inventarioOsNumero" maxlength="100" required></label>
       </div>
       <div class="inventario-modal-acciones"><button type="button" class="btn-secondary-inventario" id="cancelarModalOsInventario">Cancelar</button><button type="submit" class="btn-primary-inventario">Agregar repuestos</button></div>
@@ -99,7 +101,7 @@
         <div id="filasRepuestosOs" class="inventario-repuestos-filas"></div>
       </div>
       <button type="button" class="btn-secondary-inventario inventario-agregar-fila" id="btnAgregarFilaRepuesto">+ Agregar otro repuesto</button>
-      <div class="inventario-modal-acciones"><button type="button" class="btn-secondary-inventario" id="volverModalOsInventario">Volver</button><button type="submit" class="btn-primary-inventario">Guardar OS y repuestos</button></div>
+      <div class="inventario-modal-acciones"><button type="button" class="btn-secondary-inventario" id="volverModalOsInventario">Volver</button><button type="submit" class="btn-primary-inventario" id="guardarOsRepuestos">Guardar OS y repuestos</button></div>
     </form>
   </section>
 </div>
@@ -119,6 +121,6 @@
 
 <script src="js/components/notificaciones.js?v=20261007-1"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script type="module" src="js/inventario.js?v=20261007-16"></script>
+<script type="module" src="js/inventario.js?v=20261014-20"></script>
 </body>
 </html>

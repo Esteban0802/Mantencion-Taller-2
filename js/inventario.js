@@ -3,7 +3,7 @@ import { protegerPagina, cerrarSesion } from "./session.js?v=20261004-2";
 import { moduloActivo } from "./modulos.js";
 import { evaluarCuotaStorage, mensajeCuotaStorage } from "./storage-quota.js";
 import {
-  addDoc, collection, deleteDoc, doc, getDoc, getDocs,
+  addDoc, collection, deleteDoc, deleteField, doc, getDoc, getDocs,
   getCountFromServer, limit, orderBy, query, serverTimestamp, setDoc,
   startAfter, updateDoc, where, writeBatch
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
@@ -262,14 +262,14 @@ async function asegurarInventarioCompleto() {
 }
 
 function claveOsInventario(item) {
-  return [item.datos?.CLIENTE, item.datos?.EQUIPO, item.datos?.OS].map(valor => String(valor || "").trim().toLowerCase()).join("||");
+  return [item.datos?.CLIENTE, item.datos?.EQUIPO, item.datos?.SERIE, item.datos?.OS].map(valor => String(valor || "").trim().toLowerCase()).join("||");
 }
 
 function gruposOsInventario(lista = itemsFiltrados) {
   const grupos = new Map();
   lista.forEach(item => {
     const clave = claveOsInventario(item);
-    if (!grupos.has(clave)) grupos.set(clave, { clave, cliente: item.datos?.CLIENTE || "", equipo: item.datos?.EQUIPO || "", os: item.datos?.OS || "", repuestos: [] });
+    if (!grupos.has(clave)) grupos.set(clave, { clave, cliente: item.datos?.CLIENTE || "", equipo: item.datos?.EQUIPO || "", serie: item.datos?.SERIE || "", os: item.datos?.OS || "", repuestos: [] });
     grupos.get(clave).repuestos.push(item);
   });
   return [...grupos.values()];
@@ -294,6 +294,20 @@ function repuestoRecibido(item) {
   return item.recibido === true || (item.recibido == null && ["Completa", "Despachada", "Recepción Cliente"].includes(item.estado));
 }
 
+function fechaHoraRecepcion(valor) {
+  const fecha = valor?.toDate?.() || (valor instanceof Date ? valor : valor ? new Date(valor) : null);
+  if (!fecha || Number.isNaN(fecha.getTime())) return "Fecha de recepción no registrada";
+  return fecha.toLocaleString("es-CL", { dateStyle: "medium", timeStyle: "short" });
+}
+
+function detalleRecepcion(item) {
+  if (!repuestoRecibido(item)) return "";
+  const responsable = item.recibidoPorNombre || "Usuario no registrado";
+  return item.fechaRecepcion
+    ? `Recibido el ${fechaHoraRecepcion(item.fechaRecepcion)} por ${responsable}`
+    : "Recepción registrada antes de habilitar el historial de fecha";
+}
+
 function renderInventario() {
   const thead = $("tablaInventario").querySelector("thead");
   const tbody = $("tablaInventario").querySelector("tbody");
@@ -309,24 +323,25 @@ function renderInventario() {
   botonCargarMas.hidden = !sucursalId || inventarioCompleto || Boolean($("buscarInventario").value.trim());
   botonCargarMas.disabled = cargaInventarioEnCurso;
 
-  thead.innerHTML = '<tr><th>Cliente</th><th>Equipo</th><th>OS</th><th>Repuestos</th><th>Estado</th></tr>';
+  thead.innerHTML = '<tr><th>Cliente</th><th>Equipo</th><th>Serie</th><th>OS</th><th>Repuestos</th><th>Estado</th><th>Acciones</th></tr>';
   if (!grupos.length) {
-    tbody.innerHTML = '<tr><td colspan="5" class="inventario-vacio">No se encontraron órdenes de servicio.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" class="inventario-vacio">No se encontraron órdenes de servicio.</td></tr>';
     return;
   }
   tbody.innerHTML = grupos.map(grupo => {
     const estado = estadoGeneralOs(grupo);
-    return `<tr data-os-clave="${escapar(grupo.clave)}"><td><strong class="inventario-os-cliente">${escapar(grupo.cliente)}</strong></td><td><span class="inventario-os-equipo">${escapar(grupo.equipo)}</span></td><td><span class="inventario-os-numero">${escapar(grupo.os)}</span></td><td><div class="inventario-os-accion"><span class="inventario-repuestos-conteo">${grupo.repuestos.length}</span><button type="button" class="inventario-mostrar-repuestos">Mostrar repuestos <span aria-hidden="true">→</span></button></div></td><td><select class="inventario-estado-os ${claseEstadoRepuesto(estado)}" data-estado-os aria-label="Estado de la OS ${escapar(grupo.os)}" ${puedeGestionarEstados ? "" : "disabled"}>${opcionesEstadoInventario(estado)}</select></td></tr>`;
+    return `<tr data-os-clave="${escapar(grupo.clave)}"><td><strong class="inventario-os-cliente">${escapar(grupo.cliente)}</strong></td><td><span class="inventario-os-equipo">${escapar(grupo.equipo)}</span></td><td><span class="inventario-os-serie">${escapar(grupo.serie || "Sin serie")}</span></td><td><span class="inventario-os-numero">${escapar(grupo.os)}</span></td><td><div class="inventario-os-accion"><span class="inventario-repuestos-conteo">${grupo.repuestos.length}</span><button type="button" class="inventario-mostrar-repuestos">Mostrar repuestos <span aria-hidden="true">→</span></button></div></td><td><select class="inventario-estado-os ${claseEstadoRepuesto(estado)}" data-estado-os aria-label="Estado de la OS ${escapar(grupo.os)}" ${puedeGestionarEstados ? "" : "disabled"}>${opcionesEstadoInventario(estado)}</select></td><td>${puedeEditar ? '<button type="button" class="inventario-editar-os">Editar</button>' : ''}</td></tr>`;
   }).join("");
 }
 
 function abrirDetalleRepuestosOs(clave) {
   const grupo = gruposOsInventario(items).find(item => item.clave === clave);
   if (!grupo) return;
-  $("resumenDetalleOsInventario").textContent = `${grupo.cliente} · ${grupo.equipo} · OS ${grupo.os}`;
+  $("resumenDetalleOsInventario").textContent = `${grupo.cliente} · ${grupo.equipo}${grupo.serie ? ` · Serie ${grupo.serie}` : ""} · OS ${grupo.os}`;
   $("detalleRepuestosOsBody").innerHTML = grupo.repuestos.map(item => {
     const recibido = repuestoRecibido(item);
-    return `<tr data-item-id="${item.id}"><td>${escapar(item.datos?.NP || "")}</td><td>${escapar(item.datos?.DESCRIPCION || "")}</td><td>${escapar(item.datos?.CANTIDAD || "")}</td><td><label class="inventario-recibido-check"><input type="checkbox" data-repuesto-recibido ${recibido ? "checked" : ""} ${puedeGestionarEstados ? "" : "disabled"}><span aria-hidden="true"></span><strong>Recibido</strong></label></td></tr>`;
+    const informacion = detalleRecepcion(item);
+    return `<tr data-item-id="${item.id}"><td>${escapar(item.datos?.NP || "")}</td><td>${escapar(item.datos?.DESCRIPCION || "")}</td><td>${escapar(item.datos?.CANTIDAD || "")}</td><td><label class="inventario-recibido-check"${informacion ? ` title="${escapar(informacion)}"` : ""}><input type="checkbox" data-repuesto-recibido ${recibido ? "checked" : ""} ${puedeGestionarEstados ? "" : "disabled"}><span aria-hidden="true"></span><strong>Recibido</strong>${recibido ? '<em class="inventario-recepcion-info" aria-hidden="true">ⓘ</em>' : ""}</label></td></tr>`;
   }).join("");
   $("modalDetalleRepuestosOs").hidden = false;
 }
@@ -339,7 +354,13 @@ async function actualizarRecepcionRepuesto(checkbox) {
   const item = items.find(registro => registro.id === fila?.dataset.itemId);
   if (!item) return;
   const valorAnterior = item.recibido;
+  const fechaRecepcionAnterior = item.fechaRecepcion;
+  const recibidoPorAnterior = item.recibidoPor;
+  const recibidoPorNombreAnterior = item.recibidoPorNombre;
   item.recibido = checkbox.checked;
+  item.fechaRecepcion = checkbox.checked ? new Date() : null;
+  item.recibidoPor = checkbox.checked ? usuario.uid : "";
+  item.recibidoPorNombre = checkbox.checked ? (usuario.nombreCompleto || usuario.nombre || usuario.email || "Usuario") : "";
   const grupo = gruposOsInventario(items).find(registro => registro.clave === claveOsInventario(item));
   const estadoOs = grupo.repuestos.every(repuestoRecibido) ? "Completa" : "Parcial";
   checkbox.disabled = true;
@@ -347,14 +368,26 @@ async function actualizarRecepcionRepuesto(checkbox) {
     const lote = writeBatch(db);
     grupo.repuestos.forEach(repuesto => {
       const cambios = { estado: estadoOs, fechaActualizacion: serverTimestamp(), actualizadoPor: usuario.uid };
-      if (repuesto.id === item.id) cambios.recibido = checkbox.checked;
+      if (repuesto.id === item.id) {
+        cambios.recibido = checkbox.checked;
+        cambios.fechaRecepcion = checkbox.checked ? serverTimestamp() : deleteField();
+        cambios.recibidoPor = checkbox.checked ? usuario.uid : deleteField();
+        cambios.recibidoPorNombre = checkbox.checked ? item.recibidoPorNombre : deleteField();
+      }
       lote.update(doc(db, "inventarioItems", repuesto.id), cambios);
     });
     await lote.commit();
     grupo.repuestos.forEach(repuesto => { repuesto.estado = estadoOs; });
+    const etiqueta = checkbox.closest(".inventario-recibido-check");
+    etiqueta.title = detalleRecepcion(item);
+    etiqueta.querySelector(".inventario-recepcion-info")?.remove();
+    if (checkbox.checked) etiqueta.insertAdjacentHTML("beforeend", '<em class="inventario-recepcion-info" aria-hidden="true">ⓘ</em>');
     renderInventario();
   } catch (error) {
     item.recibido = valorAnterior;
+    item.fechaRecepcion = fechaRecepcionAnterior;
+    item.recibidoPor = recibidoPorAnterior;
+    item.recibidoPorNombre = recibidoPorNombreAnterior;
     checkbox.checked = repuestoRecibido(item);
     throw error;
   } finally {
@@ -563,7 +596,31 @@ async function eliminarFila(fila) {
 function abrirModalOsInventario() {
   if (!sucursalId) return mensaje({ titulo: "Sucursal requerida", texto: "Selecciona una sucursal antes de agregar una OS.", tipo: "advertencia" });
   $("formOsInventario").reset();
+  $("formOsInventario").dataset.osClave = "";
   $("filasRepuestosOs").innerHTML = "";
+  $("tituloModalOsInventario").textContent = "Agregar OS";
+  $("tituloModalRepuestosOs").textContent = "Repuestos de la OS";
+  $("guardarOsRepuestos").textContent = "Guardar OS y repuestos";
+  $("modalOsInventario").hidden = false;
+  $("inventarioOsCliente").focus();
+}
+
+async function abrirEditarOs(clave) {
+  if (!puedeEditar) return;
+  await asegurarInventarioCompleto();
+  const grupo = gruposOsInventario(items).find(item => item.clave === clave);
+  if (!grupo) throw new Error("No se encontró la OS seleccionada.");
+  $("formOsInventario").reset();
+  $("formOsInventario").dataset.osClave = grupo.clave;
+  $("inventarioOsCliente").value = grupo.cliente;
+  $("inventarioOsEquipo").value = grupo.equipo;
+  $("inventarioOsSerie").value = grupo.serie;
+  $("inventarioOsNumero").value = grupo.os;
+  $("filasRepuestosOs").innerHTML = "";
+  grupo.repuestos.forEach(item => agregarFilaRepuesto({ id: item.id, np: item.datos?.NP, descripcion: item.datos?.DESCRIPCION, cantidad: item.datos?.CANTIDAD }));
+  $("tituloModalOsInventario").textContent = "Editar OS";
+  $("tituloModalRepuestosOs").textContent = "Editar repuestos de la OS";
+  $("guardarOsRepuestos").textContent = "Guardar cambios";
   $("modalOsInventario").hidden = false;
   $("inventarioOsCliente").focus();
 }
@@ -572,6 +629,7 @@ function cerrarModalOsInventario() {
   $("modalOsInventario").hidden = true;
   $("modalRepuestosOs").hidden = true;
   $("formOsInventario").reset();
+  $("formOsInventario").dataset.osClave = "";
   $("formRepuestosOs").reset();
   $("filasRepuestosOs").innerHTML = "";
 }
@@ -579,6 +637,7 @@ function cerrarModalOsInventario() {
 function agregarFilaRepuesto(valores = {}) {
   const fila = document.createElement("div");
   fila.className = "inventario-repuesto-fila";
+  fila.dataset.itemId = valores.id || "";
   fila.innerHTML = `<input type="text" data-repuesto-np maxlength="100" placeholder="Número de parte" value="${escapar(valores.np || "")}" required><input type="text" data-repuesto-descripcion maxlength="300" placeholder="Descripción del repuesto" value="${escapar(valores.descripcion || "")}" required><input type="number" data-repuesto-cantidad min="1" step="1" placeholder="0" value="${escapar(valores.cantidad || "")}" required><button type="button" class="inventario-quitar-fila" aria-label="Quitar repuesto">×</button>`;
   $("filasRepuestosOs").appendChild(fila);
   fila.querySelector("[data-repuesto-np]").focus();
@@ -588,7 +647,7 @@ function abrirModalRepuestosOs(evento) {
   evento.preventDefault();
   $("modalOsInventario").hidden = true;
   $("modalRepuestosOs").hidden = false;
-  $("resumenOsInventario").textContent = `${$("inventarioOsCliente").value.trim()} · ${$("inventarioOsEquipo").value.trim()} · OS ${$("inventarioOsNumero").value.trim()}`;
+  $("resumenOsInventario").textContent = `${$("inventarioOsCliente").value.trim()} · ${$("inventarioOsEquipo").value.trim()} · Serie ${$("inventarioOsSerie").value.trim()} · OS ${$("inventarioOsNumero").value.trim()}`;
   if (!$("filasRepuestosOs").children.length) agregarFilaRepuesto();
 }
 
@@ -600,12 +659,15 @@ function volverModalOsInventario() {
 
 async function guardarOsConRepuestos(evento) {
   evento.preventDefault();
-  const claveOperacion = "nueva-os-inventario";
+  const claveOriginal = $("formOsInventario").dataset.osClave || "";
+  const claveOperacion = claveOriginal ? `editar-os-${claveOriginal}` : "nueva-os-inventario";
   if (operacionesInventarioEnCurso.has(claveOperacion)) return;
   const cliente = $("inventarioOsCliente").value.trim();
   const equipo = $("inventarioOsEquipo").value.trim();
+  const serie = $("inventarioOsSerie").value.trim();
   const os = $("inventarioOsNumero").value.trim();
   const repuestos = [...$("filasRepuestosOs").querySelectorAll(".inventario-repuesto-fila")].map(fila => ({
+    id: fila.dataset.itemId || "",
     np: fila.querySelector("[data-repuesto-np]").value.trim(),
     descripcion: fila.querySelector("[data-repuesto-descripcion]").value.trim(),
     cantidad: fila.querySelector("[data-repuesto-cantidad]").value.trim()
@@ -617,12 +679,45 @@ async function guardarOsConRepuestos(evento) {
   try {
     operacionesInventarioEnCurso.add(claveOperacion);
     if (boton) { boton.disabled = true; boton.textContent = "Guardando…"; }
-    const columnasOs = ["CLIENTE", "EQUIPO", "OS", "NP", "DESCRIPCION", "CANTIDAD"];
+    const columnasOs = ["CLIENTE", "EQUIPO", "SERIE", "OS", "NP", "DESCRIPCION", "CANTIDAD"];
+    const datosComunes = { CLIENTE: cliente, EQUIPO: equipo, SERIE: serie, OS: os };
+    if (claveOriginal) {
+      await asegurarInventarioCompleto();
+      const grupoOriginal = gruposOsInventario(items).find(item => item.clave === claveOriginal);
+      if (!grupoOriginal) throw new Error("La OS que intentas editar ya no existe.");
+      const nuevaClave = [cliente, equipo, serie, os].map(valor => String(valor || "").trim().toLowerCase()).join("||");
+      if (nuevaClave !== claveOriginal && gruposOsInventario(items).some(item => item.clave === nuevaClave)) throw new Error("Ya existe otra OS con el mismo cliente, equipo, serie y número.");
+      const idsConservados = new Set(repuestos.map(item => item.id).filter(Boolean));
+      const eliminados = grupoOriginal.repuestos.filter(item => !idsConservados.has(item.id));
+      if (eliminados.length) {
+        const confirmar = await window.OverTrackUI.confirmarAccion({ titulo: "Quitar repuestos", mensaje: `Se eliminarán ${eliminados.length} repuesto(s) y sus evidencias asociadas.`, tipo: "advertencia", textoConfirmar: "Guardar cambios", textoCancelar: "Cancelar", peligrosa: true });
+        if (!confirmar) return;
+      }
+      const loteEdicion = writeBatch(db);
+      repuestos.forEach(item => {
+        const existente = grupoOriginal.repuestos.find(registro => registro.id === item.id);
+        const datos = { ...(existente?.datos || {}), ...datosComunes, NP: item.np, DESCRIPCION: item.descripcion, CANTIDAD: item.cantidad };
+        if (existente) loteEdicion.update(doc(db, "inventarioItems", existente.id), { datos, fechaActualizacion: serverTimestamp(), actualizadoPor: usuario.uid });
+        else {
+          const referencia = doc(collection(db, "inventarioItems"));
+          loteEdicion.set(referencia, { empresaId, sucursalId, datos, estado: estadoGeneralOs(grupoOriginal), recibido: false, fechaCreacion: serverTimestamp(), fechaActualizacion: serverTimestamp(), creadoPor: usuario.uid, actualizadoPor: usuario.uid });
+        }
+      });
+      eliminados.forEach(item => loteEdicion.delete(doc(db, "inventarioItems", item.id)));
+      loteEdicion.set(doc(db, "inventarioConfiguraciones", claveConfiguracion()), { empresaId, sucursalId, columnas: columnasOs, fechaActualizacion: serverTimestamp(), actualizadoPor: usuario.uid }, { merge: true });
+      await loteEdicion.commit();
+      await Promise.all(eliminados.flatMap(item => evidenciasItem(item).map(evidencia => evidencia.ruta ? deleteObject(ref(storage, evidencia.ruta)).catch(() => {}) : Promise.resolve())));
+      columnas = columnasOs;
+      cerrarModalOsInventario();
+      await cargarInventario();
+      await mensaje({ titulo: "OS actualizada", texto: "Los datos y repuestos fueron actualizados correctamente.", tipo: "exito" });
+      return;
+    }
     const lote = writeBatch(db);
     lote.set(doc(db, "inventarioConfiguraciones", claveConfiguracion()), { empresaId, sucursalId, columnas: columnasOs, fechaActualizacion: serverTimestamp(), actualizadoPor: usuario.uid }, { merge: true });
     repuestos.forEach(item => {
       const referencia = doc(collection(db, "inventarioItems"));
-      lote.set(referencia, { empresaId, sucursalId, datos: { CLIENTE: cliente, EQUIPO: equipo, OS: os, NP: item.np, DESCRIPCION: item.descripcion, CANTIDAD: item.cantidad }, estado: "Parcial", recibido: false, fechaCreacion: serverTimestamp(), fechaActualizacion: serverTimestamp(), creadoPor: usuario.uid, actualizadoPor: usuario.uid });
+      lote.set(referencia, { empresaId, sucursalId, datos: { ...datosComunes, NP: item.np, DESCRIPCION: item.descripcion, CANTIDAD: item.cantidad }, estado: "Parcial", recibido: false, fechaCreacion: serverTimestamp(), fechaActualizacion: serverTimestamp(), creadoPor: usuario.uid, actualizadoPor: usuario.uid });
     });
     await lote.commit();
     columnas = columnasOs;
@@ -631,7 +726,7 @@ async function guardarOsConRepuestos(evento) {
     await mensaje({ titulo: "OS agregada", texto: `Se guardaron ${repuestos.length} repuesto(s) para la OS ${os}.`, tipo: "exito" });
   } finally {
     operacionesInventarioEnCurso.delete(claveOperacion);
-    if (boton?.isConnected) { boton.disabled = false; boton.textContent = "Guardar OS y repuestos"; }
+    if (boton?.isConnected) { boton.disabled = false; boton.textContent = claveOriginal ? "Guardar cambios" : "Guardar OS y repuestos"; }
   }
 }
 
@@ -687,6 +782,8 @@ function configurarEventos() {
   $("tablaInventario").addEventListener("click", evento => {
     const boton = evento.target.closest(".inventario-mostrar-repuestos");
     if (boton) abrirDetalleRepuestosOs(boton.closest("tr[data-os-clave]").dataset.osClave);
+    const editar = evento.target.closest(".inventario-editar-os");
+    if (editar) abrirEditarOs(editar.closest("tr[data-os-clave]").dataset.osClave).catch(error => mensaje({ titulo: "No se pudo abrir la edición", texto: error.message || "Intenta nuevamente.", tipo: "error" }));
   });
   $("tablaInventario").addEventListener("change", evento => {
     if (evento.target.matches("[data-estado-os]")) actualizarEstadoOs(evento.target).catch(error => mensaje({ titulo: "No se pudo actualizar", texto: error.message || "Intenta nuevamente.", tipo: "error" }));
@@ -730,7 +827,11 @@ async function iniciar() {
   puedeGestionarEstados = ["super_admin", "bodeguero"].includes(usuario.rol);
   if (!puedeEditar) $("accionesEdicionInventario").querySelectorAll("button").forEach(b => { if (b.id !== "btnExportarInventario") b.style.display = "none"; });
   if (["super_admin", "admin_empresa"].includes(usuario.rol)) $("menuPanelEmpresaInventario").style.display = "";
-  try { if (!(await cargarEmpresa())) return; await cargarSucursales(); } catch (error) { await mensaje({ titulo: "No se pudo cargar Inventario", texto: error.message || "Intenta nuevamente.", tipo: "error" }); }
+  try {
+    if (!(await cargarEmpresa())) return;
+    $("menuSheqInventario").style.display = moduloActivo(empresa, "sheq") && ["super_admin", "admin_empresa", "admin_sucursal", "jefe_taller", "planificador"].includes(usuario.rol) ? "" : "none";
+    await cargarSucursales();
+  } catch (error) { await mensaje({ titulo: "No se pudo cargar Inventario", texto: error.message || "Intenta nuevamente.", tipo: "error" }); }
 }
 
 document.addEventListener("DOMContentLoaded", iniciar);

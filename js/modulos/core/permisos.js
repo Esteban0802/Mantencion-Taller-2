@@ -44,7 +44,7 @@ export function aplicarPermisosRol() {
 
     if (!usuario) return;
 
-    if (["admin_empresa", "admin_sucursal"].includes(usuario.rol)) {
+    if (["admin_empresa", "admin_sucursal", "planificador"].includes(usuario.rol)) {
         document.querySelectorAll(".solo-jefe, .solo-usuario")
             .forEach(el => el.style.display = "none");
         document.querySelectorAll("input, textarea, select, button").forEach(el => {

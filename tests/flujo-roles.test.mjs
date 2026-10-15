@@ -8,6 +8,7 @@ import {
   inicializarPermisos,
   puedeEliminarComentario,
 } from "../js/modulos/core/permisos.js";
+import { puedeAbrirOT, puedeCrearOT } from "../js/permisos.js";
 
 function usarUsuario(usuario) {
   inicializarPermisos({ getUsuario: () => usuario });
@@ -37,4 +38,20 @@ for (const rol of ["supervisor", "tecnico"]) {
 test("la aplicación de permisos no falla sin usuario cargado", () => {
   usarUsuario(null);
   assert.doesNotThrow(() => aplicarPermisosRol());
+});
+
+test("Planificador puede abrir una OT, pero no crearla", () => {
+  const usuario = {
+    uid: "planificador-1",
+    rol: "planificador",
+    empresaId: "empresa-1",
+    activo: true,
+  };
+  const empresa = {
+    id: "empresa-1",
+    modulos: { ordenesServicio: true },
+  };
+
+  assert.equal(puedeAbrirOT(usuario, empresa), true);
+  assert.equal(puedeCrearOT(usuario, empresa), false);
 });

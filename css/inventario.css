@@ -52,7 +52,7 @@
 .inventario-form-grid input { min-height:43px!important;padding:9px 11px!important;border:1px solid #c8d8e5!important;border-radius:9px!important;color:#173047!important;background:#fafdff!important;font-family:inherit!important;font-size:13px!important;font-weight:400!important;color-scheme:light;box-shadow:none!important; }.inventario-form-grid input:hover { border-color:#9fbdd3!important;background:#fff!important; }.inventario-form-grid input:focus { outline:0!important;border-color:#1689e8!important;background:#fff!important;box-shadow:0 0 0 3px rgba(22,137,232,.14)!important; }
 .inventario-modal-acciones { display: flex; justify-content: flex-end; gap: 10px; margin-top: 22px; padding-top:14px;border-top:1px solid #e5ecf2; }.inventario-modal-acciones button { min-height:42px;padding:9px 15px;border-radius:9px;font-size:13px; }
 .inventario-modal-os{width:min(720px,100%)}
-.inventario-form-os{grid-template-columns:minmax(0,1.15fr) minmax(0,1.15fr) minmax(150px,.7fr)}
+.inventario-form-os{grid-template-columns:repeat(2,minmax(0,1fr))}
 .inventario-form-os label:last-child:nth-child(odd){grid-column:auto}
 .inventario-modal-repuestos-os{width:min(980px,100%)}
 .inventario-repuestos-tabla-wrap{overflow-x:auto;border:1px solid #d7e2eb;border-radius:12px;background:#f8fbfd}
@@ -67,7 +67,7 @@
 .inventario-agregar-fila{margin-top:12px}
 .inventario-os-accion{display:flex;align-items:center;gap:8px}
 .inventario-tabla-os{min-width:900px;table-layout:fixed}
-.inventario-page .inventario-tabla.inventario-tabla-os th:nth-child(1){width:24%!important}.inventario-page .inventario-tabla.inventario-tabla-os th:nth-child(2){width:18%!important}.inventario-page .inventario-tabla.inventario-tabla-os th:nth-child(3){width:17%!important}.inventario-page .inventario-tabla.inventario-tabla-os th:nth-child(4){width:25%!important}.inventario-page .inventario-tabla.inventario-tabla-os th:nth-child(5){width:16%!important}
+.inventario-page .inventario-tabla.inventario-tabla-os th:nth-child(1){width:18%!important}.inventario-page .inventario-tabla.inventario-tabla-os th:nth-child(2){width:14%!important}.inventario-page .inventario-tabla.inventario-tabla-os th:nth-child(3){width:14%!important}.inventario-page .inventario-tabla.inventario-tabla-os th:nth-child(4){width:12%!important}.inventario-page .inventario-tabla.inventario-tabla-os th:nth-child(5){width:20%!important}.inventario-page .inventario-tabla.inventario-tabla-os th:nth-child(6){width:13%!important}.inventario-page .inventario-tabla.inventario-tabla-os th:nth-child(7){width:9%!important}
 .inventario-tabla-os th{padding:12px 18px;font-family:inherit;font-size:10px;font-weight:800;line-height:1.2;letter-spacing:.025em;text-transform:uppercase}
 .inventario-tabla-os td{height:58px;padding:10px 18px;font-family:inherit;font-size:12px;font-weight:400;line-height:1.35}
 .inventario-page .inventario-tabla.inventario-tabla-os th,.inventario-page .inventario-tabla.inventario-tabla-os td{box-sizing:border-box;text-align:center;vertical-align:middle;overflow:visible}
@@ -81,6 +81,7 @@
 .inventario-repuestos-conteo{display:grid;place-items:center;flex:0 0 auto;width:30px;height:30px;border-radius:50%;background:#e5f2fd;color:#0878e8;font-family:inherit;font-size:11px;font-weight:700;line-height:1}
 .inventario-mostrar-repuestos{display:inline-flex;align-items:center;justify-content:center;gap:9px;max-width:calc(100% - 42px);min-height:36px;padding:7px 13px;border:1px solid #1689e8;border-radius:9px;background:#fff;color:#0878e8;font-family:inherit;font-size:11px;font-weight:700;line-height:1.2;cursor:pointer;white-space:nowrap}
 .inventario-mostrar-repuestos:hover{background:#1689e8;color:#fff}
+.inventario-editar-os{min-height:34px;padding:7px 12px;border:1px solid #1689e8;border-radius:9px;background:#fff;color:#0878e8;font:inherit;font-size:11px;font-weight:700;cursor:pointer}.inventario-editar-os:hover{background:#eaf5ff}
 .inventario-detalle-tabla-wrap{overflow:auto;border:1px solid #d7e2eb;border-radius:12px}
 .inventario-detalle-tabla{width:100%;min-width:660px;border-collapse:collapse;background:#fff}
 .inventario-detalle-tabla th{padding:11px 12px;text-align:left;background:#102c49;color:#fff;font-size:12px;text-transform:uppercase}
@@ -98,7 +99,9 @@
 .inventario-recibido-check span{display:grid;place-items:center;width:20px;height:20px;box-sizing:border-box;border:2px solid #9db2c3;border-radius:6px;background:#fff;transition:.15s}
 .inventario-recibido-check span::after{content:"";width:9px;height:5px;border-left:2px solid #fff;border-bottom:2px solid #fff;transform:translateY(-1px) rotate(-45deg);opacity:0}
 .inventario-recibido-check strong{font-family:inherit;font-size:12px;font-weight:700}
+.inventario-recepcion-info{margin-left:1px;color:#1689e8;font-size:13px;font-style:normal;line-height:1}
 .inventario-recibido-check:has(input:checked){border-color:#79c994;background:#effaf2;color:#176b35}
+.inventario-recibido-check:has(input:checked) .inventario-recepcion-info{color:#176b35}
 .inventario-recibido-check input:checked + span{border-color:#22a653;background:#22a653}
 .inventario-recibido-check input:checked + span::after{opacity:1}
 .inventario-recibido-check:has(input:focus-visible){outline:3px solid rgba(22,137,232,.18);border-color:#1689e8}

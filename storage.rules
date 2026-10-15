@@ -56,6 +56,12 @@ service firebase.storage {
       );
     }
 
+    function canManageOT(otId) {
+      return canAccessOT(otId) && (
+        isSuperAdmin() || profile().rol in ['jefe_taller', 'supervisor', 'tecnico']
+      );
+    }
+
     function canManageCompanyBranding(empresaId) {
       return activeUser() && (
         isSuperAdmin() ||
@@ -129,11 +135,11 @@ service firebase.storage {
     match /ots/{otId}/{allPaths=**} {
       allow read: if canAccessOT(otId);
 
-      allow create, update: if canAccessOT(otId) &&
+      allow create, update: if canManageOT(otId) &&
         otOpen(otId) &&
         validUpload();
 
-      allow delete: if canAccessOT(otId) &&
+      allow delete: if canManageOT(otId) &&
         otOpen(otId);
     }
 

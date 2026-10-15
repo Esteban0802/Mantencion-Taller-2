@@ -4,7 +4,7 @@ import { moduloActivo } from "./modulos.js";
 import { evaluarCuotaStorage, mensajeCuotaStorage } from "./storage-quota.js";
 import { estadoDocumentoAcreditacion, evaluarEntidadEnContrato, peorEvaluacion } from "./sheq-acreditacion.js?v=20261007-1";
 import { addDoc, collection, deleteDoc, deleteField, doc, getDoc, getDocs, query, serverTimestamp, setDoc, updateDoc, where, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-import { deleteObject, getDownloadURL, ref, uploadBytes } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
+import { deleteObject, getDownloadURL, listAll, ref, uploadBytes } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 
 const usuario = protegerPagina(["super_admin", "admin_empresa", "admin_sucursal", "jefe_taller", "planificador", "sheq"]);
 if (!usuario) throw new Error("Acceso no autorizado");
@@ -230,6 +230,11 @@ function actualizarEntidadesDocumento() {
 function renderPanel() {
   const personalEstados = usuarios.map(u => estadoEntidad("persona", u.id));
   const vehiculosEstados = vehiculos.map(v => estadoEntidad("vehiculo", v.id));
+  const contratosActivos = contratos.filter(contratoActivo);
+  const personalAsignado = usuarios.filter(persona => contratosActivos.some(contrato => entidadCorrespondeContrato("persona", persona, contrato)));
+  const vehiculosAsignados = vehiculos.filter(vehiculo => contratosActivos.some(contrato => entidadCorrespondeContrato("vehiculo", vehiculo, contrato)));
+  const personalEvaluadoEstados = personalAsignado.map(persona => estadoEntidad("persona", persona.id));
+  const vehiculosEvaluadosEstados = vehiculosAsignados.map(vehiculo => estadoEntidad("vehiculo", vehiculo.id));
   const estadosDoc = documentos.map(d => ({ doc:d, estado:estadoDocumento(d) }));
   const vencidos = estadosDoc.filter(x => x.estado.key === "vencido");
   const proximos = estadosDoc.filter(x => ["aviso", "proximo", "critico"].includes(x.estado.key));
@@ -253,10 +258,11 @@ function renderPanel() {
     if (item.tipo === "contrato") return `<button type="button" class="sheq-alert sheq-alert-link ${item.estado.key === "vencido" ? "" : item.estado.key}" data-alerta-contrato-editar="${escapar(item.contrato.id)}" title="Abrir contrato"><i></i><span><strong>Vencimiento de contrato</strong><small>${escapar(item.contrato.cliente)} · ${escapar(ubicacionContrato(item.contrato))} · ${escapar(item.estado.texto)}</small></span><time>${escapar(fechaVisible(item.contrato.fechaTermino))}</time></button>`;
     return `<button type="button" class="sheq-alert sheq-alert-link ${item.estado.key === "vencido" ? "" : item.estado.key === "aviso" ? "aviso" : "proximo"}" data-alerta-documento="${escapar(item.doc.id)}" title="Abrir documento"><i></i><span><strong>${escapar(item.doc.tipoDocumento)}</strong><small>${escapar(nombreEntidad(item.doc.entidadTipo,item.doc.entidadId))} · ${escapar(item.estado.texto)}</small></span><time>${escapar(fechaVisible(item.doc.fechaVencimiento))}</time></button>`;
   }).join("") : '<div class="sheq-empty">No existen vencimientos ni requisitos faltantes.</div>';
-  const evaluados = personalEstados.length + vehiculosEstados.length, habilitados = [...personalEstados,...vehiculosEstados].filter(e => e.key === "vigente").length;
+  const evaluados = personalEvaluadoEstados.length + vehiculosEvaluadosEstados.length;
+  const habilitados = [...personalEvaluadoEstados, ...vehiculosEvaluadosEstados].filter(e => e.key === "vigente").length;
   const porcentaje = evaluados ? Math.round(habilitados * 100 / evaluados) : 0;
   $("porcentajeCumplimiento").textContent = `${porcentaje}%`; $("barraCumplimiento").style.width = `${porcentaje}%`;
-  $("resumenCumplimiento").innerHTML = `<div><span>Personal evaluado</span><strong>${personalEstados.length}</strong></div><div><span>Vehículos evaluados</span><strong>${vehiculosEstados.length}</strong></div><div><span>Contratos activos</span><strong>${contratos.filter(c => !c.fechaTermino || (diasHasta(c.fechaTermino) ?? 0) >= 0).length}</strong></div><div><span>Documentos registrados</span><strong>${documentos.length}</strong></div>`;
+  $("resumenCumplimiento").innerHTML = `<div><span>Personal evaluado</span><strong>${personalAsignado.length}</strong></div><div><span>Personal sin asignación</span><strong>${usuarios.length - personalAsignado.length}</strong></div><div><span>Vehículos evaluados</span><strong>${vehiculosAsignados.length}</strong></div><div><span>Vehículos sin asignación</span><strong>${vehiculos.length - vehiculosAsignados.length}</strong></div><div><span>Contratos activos</span><strong>${contratosActivos.length}</strong></div><div><span>Documentos registrados</span><strong>${documentos.length}</strong></div>`;
 }
 
 function renderPersonal() {
@@ -266,7 +272,7 @@ function renderPersonal() {
 }
 
 function renderVehiculos() {
-  $("tablaVehiculosSheq").innerHTML = vehiculos.length ? vehiculos.map(v => { const docs=documentos.filter(d=>d.entidadTipo==="vehiculo"&&d.entidadId===v.id),e=estadoEntidad("vehiculo",v.id),asignados=contratos.filter(c=>entidadCorrespondeContrato("vehiculo",v,c)).map(c=>nombreContrato(c.id)); return `<tr><td><strong>${escapar(v.patente)}</strong><small>${escapar(v.tipo || "")}</small></td><td>${escapar(`${v.marca||""} ${v.modelo||""}`.trim() || "Sin detalle")}</td><td>${escapar(nombreSucursal(v.sucursalId))}</td><td>${escapar(asignados.join(", ") || "Sin asignación")}</td><td>${docs.length}</td><td><span class="sheq-status ${e.key}">${e.texto}</span></td><td>${puedeEditar?`<div class="sheq-row-actions"><button class="sheq-action" data-editar-vehiculo="${v.id}">Editar</button><button class="sheq-action" data-documento-vehiculo="${v.id}">Agregar documento</button><button class="sheq-action" data-ver-documentos-vehiculo="${v.id}">Ver documentos</button></div>`:"Consulta"}</td></tr>`; }).join("") : '<tr><td colspan="7" class="sheq-empty">Aún no se registran vehículos.</td></tr>';
+  $("tablaVehiculosSheq").innerHTML = vehiculos.length ? vehiculos.map(v => { const docs=documentos.filter(d=>d.entidadTipo==="vehiculo"&&d.entidadId===v.id),e=estadoEntidad("vehiculo",v.id),asignados=contratos.filter(c=>entidadCorrespondeContrato("vehiculo",v,c)).map(c=>nombreContrato(c.id)); return `<tr><td><strong>${escapar(v.patente)}</strong><small>${escapar(v.tipo || "")}</small></td><td>${escapar(`${v.marca||""} ${v.modelo||""}`.trim() || "Sin detalle")}</td><td>${escapar(nombreSucursal(v.sucursalId))}</td><td>${escapar(asignados.join(", ") || "Sin asignación")}</td><td>${docs.length}</td><td><span class="sheq-status ${e.key}">${e.texto}</span></td><td>${puedeEditar?`<div class="sheq-row-actions"><button class="sheq-action" data-editar-vehiculo="${v.id}">Editar</button><button class="sheq-action" data-documento-vehiculo="${v.id}">Agregar documento</button><button class="sheq-action" data-ver-documentos-vehiculo="${v.id}">Ver documentos</button><button class="sheq-action danger" data-eliminar-vehiculo="${v.id}">Eliminar</button></div>`:"Consulta"}</td></tr>`; }).join("") : '<tr><td colspan="7" class="sheq-empty">Aún no se registran vehículos.</td></tr>';
 }
 
 function renderContratos() {
@@ -684,6 +690,67 @@ async function guardarDocumento(e){
 async function recargar(texto){[usuarios,contratos,vehiculos,documentos]=await Promise.all([cargarUsuarios(),obtenerColeccion("sheqContratos"),obtenerColeccion("sheqVehiculos"),obtenerColeccion("sheqDocumentos")]);usuarios=usuarios.filter(u=>u.activo!==false&&u.rol!=="super_admin");renderTodo();await mensaje("Cambios guardados",texto,"exito");}
 async function eliminar(nombre,id,texto){const ok=await window.OverTrackUI.confirmarAccion({titulo:"Confirmar eliminación",mensaje:texto,tipo:"advertencia",textoConfirmar:"Eliminar",textoCancelar:"Cancelar",peligrosa:true});if(!ok)return;await deleteDoc(doc(db,nombre,id));await recargar("El registro fue eliminado.");}
 
+async function eliminarCarpetaStorage(referencia) {
+  const contenido = await listAll(referencia);
+  await Promise.all(contenido.items.map(item => deleteObject(item)));
+  for (const carpeta of contenido.prefixes) await eliminarCarpetaStorage(carpeta);
+}
+
+async function ejecutarOperacionesEnLotes(operaciones) {
+  for (let inicio = 0; inicio < operaciones.length; inicio += 450) {
+    const lote = writeBatch(db);
+    operaciones.slice(inicio, inicio + 450).forEach(operacion => operacion(lote));
+    await lote.commit();
+  }
+}
+
+async function eliminarVehiculoCompleto(id) {
+  const vehiculo = vehiculos.find(item => item.id === id);
+  if (!vehiculo) return;
+  const documentosVehiculo = documentos.filter(item => item.entidadTipo === "vehiculo" && item.entidadId === id);
+  const contratosRelacionados = contratos.filter(item => Array.isArray(item.vehiculoIds) && item.vehiculoIds.includes(id));
+  const programacionesSnap = await getDocs(query(collection(db, "programaciones"), where("empresaId", "==", empresaId)));
+  const programacionesRelacionadas = programacionesSnap.docs.filter(item => item.data().vehiculoId === id);
+  const detalle = `${documentosVehiculo.length} documento(s), ${contratosRelacionados.length} contrato(s) y ${programacionesRelacionadas.length} actividad(es) relacionada(s)`;
+  const ok = await window.OverTrackUI.confirmarAccion({
+    titulo:"Eliminar vehículo definitivamente",
+    mensaje:`Se eliminará ${vehiculo.patente || "este vehículo"} junto con ${detalle}. También se borrarán sus archivos actuales e históricos de Firebase Storage. Esta acción no se puede deshacer.`,
+    tipo:"advertencia",
+    textoConfirmar:"Eliminar todo",
+    textoCancelar:"Cancelar",
+    peligrosa:true
+  });
+  if (!ok) return;
+
+  const operaciones = [];
+  documentosVehiculo.forEach(item => operaciones.push(lote => lote.delete(doc(db, "sheqDocumentos", item.id))));
+  contratosRelacionados.forEach(item => operaciones.push(lote => lote.update(doc(db, "sheqContratos", item.id), {
+    vehiculoIds:item.vehiculoIds.filter(vehiculoId => vehiculoId !== id),
+    actualizadoPor:usuario.uid,
+    fechaActualizacion:serverTimestamp()
+  })));
+  programacionesRelacionadas.forEach(item => operaciones.push(lote => lote.update(doc(db, "programaciones", item.id), {
+    vehiculoId:deleteField(),
+    vehiculoNombre:deleteField(),
+    actualizadoPor:usuario.uid,
+    fechaActualizacion:serverTimestamp()
+  })));
+  operaciones.push(lote => lote.delete(doc(db, "sheqVehiculos", id)));
+  await ejecutarOperacionesEnLotes(operaciones);
+
+  let errorArchivos = null;
+  try {
+    await eliminarCarpetaStorage(ref(storage, `empresas/${empresaId}/sheq/vehiculo/${id}`));
+  } catch (error) {
+    if (error.code !== "storage/object-not-found") errorArchivos = error;
+  }
+  await recargar(`${vehiculo.patente || "El vehículo"} y toda su información relacionada fueron eliminados.`);
+  if (errorArchivos) {
+    console.error("No se pudieron eliminar todos los archivos del vehículo:", errorArchivos);
+    await mensaje("Vehículo eliminado", "Los registros fueron eliminados, pero uno o más archivos de Storage requieren revisión manual.", "advertencia");
+  }
+}
+
 async function eliminarDocumentoCompleto(id){
   const item=documentos.find(documento=>documento.id===id);
   if(!item)return;
@@ -704,7 +771,11 @@ function enlazarEventos(){document.querySelectorAll(".sheq-tabs button").forEach
 function enlazarEventosMatriz() {
   ["filtroMatrizContrato", "filtroMatrizTipo", "filtroMatrizEstado"].forEach(id => $(id).addEventListener("change", renderMatrizCumplimiento));
   $("buscarMatrizSheq").addEventListener("input", renderMatrizCumplimiento);
+  document.addEventListener("click", evento => {
+    const boton = evento.target.closest("[data-eliminar-vehiculo]");
+    if (boton) eliminarVehiculoCompleto(boton.dataset.eliminarVehiculo).catch(error => mensaje("No se pudo eliminar el vehículo", error.message || "Intenta nuevamente.", "error"));
+  });
 }
 
-async function iniciar(){try{if(!await cargarBase())return;$("usuarioNombre").textContent=usuario.nombre||usuario.email||"Usuario";$("usuarioRol").textContent=usuario.rol;$("menuDashboardSheq").style.display=usuario.rol==="sheq"?"none":"";$("menuPanelEmpresaSheq").style.display=["super_admin","admin_empresa","admin_sucursal"].includes(usuario.rol)?"":"none";$("menuPanelEmpresaSheq").onclick=()=>location.href=`empresa-admin.html?id=${empresaId}`;$("menuProgramacionSheq").style.display=moduloActivo(empresa,"programacion")?"":"none";if(!puedeEditar)[$("btnNuevoContrato"),$("btnNuevoVehiculo"),$("btnNuevoDocumento")].forEach(b=>b.hidden=true);enlazarEventos();enlazarEventosMatriz();renderTodo();}catch(error){console.error(error);await mensaje("No se pudo abrir SHEQ",error.message||"Intenta nuevamente.","error");}}
+async function iniciar(){try{if(!await cargarBase())return;$("usuarioNombre").textContent=usuario.nombre||usuario.email||"Usuario";$("usuarioRol").textContent=usuario.rol;const soloSheq=usuario.rol==="sheq";$("menuDashboardSheq").style.display=soloSheq?"none":"";$("menuOrdenesSheq").style.display=soloSheq?"none":"";$("menuInventarioSheq").style.display=!soloSheq&&moduloActivo(empresa,"inventario")&&["super_admin","admin_empresa","admin_sucursal","jefe_taller","planificador"].includes(usuario.rol)?"":"none";$("menuPanelEmpresaSheq").style.display=["super_admin","admin_empresa","admin_sucursal"].includes(usuario.rol)?"":"none";$("menuPanelEmpresaSheq").onclick=()=>location.href=`empresa-admin.html?id=${empresaId}`;$("menuProgramacionSheq").style.display=moduloActivo(empresa,"programacion")&&["super_admin","admin_empresa","admin_sucursal","planificador","sheq"].includes(usuario.rol)?"":"none";if(!puedeEditar)[$("btnNuevoContrato"),$("btnNuevoVehiculo"),$("btnNuevoDocumento")].forEach(b=>b.hidden=true);enlazarEventos();enlazarEventosMatriz();renderTodo();}catch(error){console.error(error);await mensaje("No se pudo abrir SHEQ",error.message||"Intenta nuevamente.","error");}}
 iniciar();

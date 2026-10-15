@@ -580,6 +580,18 @@ service cloud.firestore {
         request.resource.data.empresaId == resource.data.empresaId &&
         canWriteCompany(resource.data) &&
         moduloEtapaActivo(empresaDeOT(resource.data), 'programacion')
+      ) || (
+        canManageSheq(resource.data) &&
+        sameCompany(request.resource.data) &&
+        request.resource.data.empresaId == resource.data.empresaId &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'vehiculoId',
+          'vehiculoNombre',
+          'actualizadoPor',
+          'fechaActualizacion'
+        ]) &&
+        !('vehiculoId' in request.resource.data) &&
+        !('vehiculoNombre' in request.resource.data)
       );
 
       allow delete: if isSuperAdmin() || (

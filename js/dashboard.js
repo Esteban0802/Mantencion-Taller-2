@@ -15,7 +15,7 @@ import {
   puedeVerDespacho,
   puedeVerReportes,
   puedeEntrarPanelEmpresa
-} from "./permisos.js";
+} from "./permisos.js?v=20261014-1";
 
 
 const usuario = protegerPagina([
@@ -376,6 +376,7 @@ function configurarNavegacionPorPermisos() {
   const rol = usuario.rol;
   const esAdministradorConsulta = ["admin_empresa", "admin_sucursal"].includes(rol);
   const esPlanificador = rol === "planificador";
+  const esJefeTaller = rol === "jefe_taller";
   const esTrabajador = ["supervisor", "tecnico"].includes(rol);
   const btnPanelEmpresa =
     document.getElementById("btnPanelEmpresa");
@@ -430,7 +431,7 @@ function configurarNavegacionPorPermisos() {
 
   if (menuInventario) {
     menuInventario.style.display = moduloActivo(empresaActualDashboard, "inventario") &&
-      (["super_admin"].includes(rol) || esAdministradorConsulta || esPlanificador)
+      (["super_admin"].includes(rol) || esAdministradorConsulta || esPlanificador || esJefeTaller)
       ? ""
       : "none";
   }
@@ -442,7 +443,7 @@ function configurarNavegacionPorPermisos() {
       : "none";
   }
   if (menuSheq) {
-    menuSheq.style.display = moduloActivo(empresaActualDashboard, "sheq") && ["super_admin", "admin_empresa", "admin_sucursal", "planificador"].includes(rol)
+    menuSheq.style.display = moduloActivo(empresaActualDashboard, "sheq") && ["super_admin", "admin_empresa", "admin_sucursal", "jefe_taller", "planificador"].includes(rol)
       ? ""
       : "none";
   }

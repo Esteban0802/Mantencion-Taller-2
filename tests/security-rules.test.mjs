@@ -9,6 +9,7 @@ import {
 import {
   collection,
   deleteDoc,
+  deleteField,
   doc,
   getDoc,
   getDocs,
@@ -284,6 +285,18 @@ async function sembrarDatos() {
       estado: "aprobado",
       fechaVencimiento: "2027-01-01",
       creadoPor: "sheq-a",
+    });
+
+    await setDoc(doc(db, "programaciones", "programacion-vehiculo-a"), {
+      empresaId: "empresa-a",
+      semanaInicio: "2026-10-12",
+      fecha: "2026-10-14",
+      grupo: "tecnico",
+      usuarioIds: ["tecnico-a"],
+      vehiculoId: "vehiculo-a",
+      vehiculoNombre: "ABCD12 · Camioneta",
+      cliente: "Cliente A",
+      actualizadoPor: "planificador-a",
     });
 
     const storage = context.storage();
@@ -1231,6 +1244,22 @@ test("SHEQ puede actualizar únicamente el RUT de un trabajador de su sucursal",
   }));
   await assertFails(updateDoc(doc(db, "usuarios", "taller-a"), {
     rol: "admin_empresa",
+  }));
+});
+
+test("SHEQ puede retirar un vehículo eliminado de Programación sin modificar la actividad", async () => {
+  const db = firestoreComo("sheq-a");
+  const referencia = doc(db, "programaciones", "programacion-vehiculo-a");
+  await assertSucceeds(updateDoc(referencia, {
+    vehiculoId: deleteField(),
+    vehiculoNombre: deleteField(),
+    actualizadoPor: "sheq-a",
+    fechaActualizacion: new Date(),
+  }));
+  await assertFails(updateDoc(referencia, {
+    cliente: "Cliente modificado",
+    actualizadoPor: "sheq-a",
+    fechaActualizacion: new Date(),
   }));
 });
 
