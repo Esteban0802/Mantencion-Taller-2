@@ -91,6 +91,24 @@ service cloud.firestore {
         profile().sucursalId == data.sucursalId;
     }
 
+    // Valida una sola vez el ámbito inmutable de una actualización de OT.
+    // Evita repetir sameCompany/sameBranch y mantiene la evaluación bajo el
+    // límite de expresiones de Firestore sin ampliar los permisos existentes.
+    function validWorkshopOtUpdateScope() {
+      let user = profile();
+      return profileExists() &&
+        user.activo == true &&
+        user.rol in ['jefe_taller', 'supervisor', 'tecnico'] &&
+        resource.data.empresaId is string &&
+        resource.data.sucursalId is string &&
+        user.empresaId == resource.data.empresaId &&
+        user.sucursalId == resource.data.sucursalId &&
+        companyOperational(resource.data.empresaId) &&
+        request.resource.data.empresaId == resource.data.empresaId &&
+        request.resource.data.sucursalId == resource.data.sucursalId &&
+        request.resource.data.creadoPor == resource.data.creadoPor;
+    }
+
     function canReadBranchData(data) {
       return isSuperAdmin() ||
         (isCompanyWideAdmin() && sameCompany(data)) ||
@@ -339,6 +357,25 @@ service cloud.firestore {
         );
     }
 
+    // Ámbito común para editar un repuesto existente. Mantiene empresa,
+    // sucursal y autor originales, y evita repetir las mismas lecturas de
+    // perfil en cada alternativa de la regla.
+    function validInventoryItemUpdateScope() {
+      let user = profile();
+      return profileExists() &&
+        user.activo == true &&
+        user.rol in ['jefe_taller', 'planificador', 'bodeguero'] &&
+        resource.data.empresaId is string &&
+        resource.data.sucursalId is string &&
+        user.empresaId == resource.data.empresaId &&
+        user.sucursalId == resource.data.sucursalId &&
+        companyOperational(resource.data.empresaId) &&
+        request.resource.data.empresaId == resource.data.empresaId &&
+        request.resource.data.sucursalId == resource.data.sucursalId &&
+        request.resource.data.creadoPor == resource.data.creadoPor &&
+        moduloEtapaActivo(empresaDeOT(resource.data), 'inventario');
+    }
+
     function actualizacionOTValida() {
       let empresa = empresaDeOT(request.resource.data);
       return (
@@ -510,28 +547,15 @@ service cloud.firestore {
       );
 
       allow update: if (
-        activeUser() &&
-        canWriteCompany(resource.data) &&
-        sameCompany(resource.data) &&
-        sameCompany(request.resource.data) &&
-        sameBranch(resource.data) &&
-        sameBranch(request.resource.data) &&
+        validWorkshopOtUpdateScope() &&
         resource.data.cerrada != true &&
         resource.data.estado != 'CERRADA' &&
-          request.resource.data.empresaId == resource.data.empresaId &&
-          request.resource.data.sucursalId == resource.data.sucursalId &&
-          request.resource.data.creadoPor == resource.data.creadoPor &&
           request.resource.data.cerrada == true ==
             (request.resource.data.estado == 'CERRADA') &&
           (
             (solicitaCierreOT() && recentAuthentication() && cierreOTValido()) ||
             (!solicitaCierreOT() && actualizacionOTValida())
-          ) &&
-          hasRole([
-            'jefe_taller',
-            'supervisor',
-            'tecnico'
-          ])
+          )
         );
 
       allow delete: if (
@@ -673,27 +697,16 @@ service cloud.firestore {
       );
 
       allow update: if isSuperAdmin() || (
-        activeUser() &&
-        canWriteCompany(resource.data) &&
-        canReadBranchData(resource.data) &&
-        canReadBranchData(request.resource.data) &&
-        hasRole(['jefe_taller', 'planificador']) &&
-        request.resource.data.empresaId == resource.data.empresaId &&
-        request.resource.data.sucursalId == resource.data.sucursalId &&
-        request.resource.data.creadoPor == resource.data.creadoPor &&
-        request.resource.data.datos is map &&
-        moduloEtapaActivo(empresaDeOT(request.resource.data), 'inventario')
-      ) || (
-        activeUser() &&
-        canWriteCompany(resource.data) &&
-        canReadBranchData(resource.data) &&
-        canReadBranchData(request.resource.data) &&
-        request.resource.data.empresaId == resource.data.empresaId &&
-        request.resource.data.sucursalId == resource.data.sucursalId &&
-        request.resource.data.creadoPor == resource.data.creadoPor &&
-        request.resource.data.datos == resource.data.datos &&
-        moduloEtapaActivo(empresaDeOT(resource.data), 'inventario') &&
-        actualizacionRecepcionBodegueroValida()
+        validInventoryItemUpdateScope() && (
+          (
+            profile().rol in ['jefe_taller', 'planificador'] &&
+            request.resource.data.datos is map
+          ) || (
+            profile().rol == 'bodeguero' &&
+            request.resource.data.datos == resource.data.datos &&
+            actualizacionRecepcionBodegueroValida()
+          )
+        )
       );
 
       allow delete: if isSuperAdmin() || (
