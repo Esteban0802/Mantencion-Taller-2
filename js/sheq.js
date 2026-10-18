@@ -1,10 +1,25 @@
 import { db, storage } from "./firebase-config.js";
-import { protegerPagina, cerrarSesion } from "./session.js?v=20261004-1";
+import { protegerPagina, cerrarSesion, reautenticarAccionCritica } from "./session.js?v=20261017-1";
 import { moduloActivo } from "./modulos.js";
 import { evaluarCuotaStorage, mensajeCuotaStorage } from "./storage-quota.js";
+import { optimizarFotoParaCarga } from "./modulos/core/imagenes.js";
+import { validarFirmaArchivo } from "./file-validation.js";
 import { estadoDocumentoAcreditacion, evaluarEntidadEnContrato, peorEvaluacion } from "./sheq-acreditacion.js?v=20261007-1";
 import { addDoc, collection, deleteDoc, deleteField, doc, getDoc, getDocs, query, serverTimestamp, setDoc, updateDoc, where, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 import { deleteObject, getDownloadURL, listAll, ref, uploadBytes } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
+
+const TIPOS_DOCUMENTO_SHEQ = new Set([
+  "image/jpeg", "image/png", "image/webp", "image/heic", "image/heif", "image/avif",
+  "application/pdf", "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+]);
+function tipoDocumentoSheq(archivo) {
+  const declarado = String(archivo?.type || "").toLowerCase();
+  if (declarado === "image/jpg") return "image/jpeg";
+  if (declarado) return declarado;
+  const extension = String(archivo?.name || "").split(".").pop().toLowerCase();
+  return { jpg:"image/jpeg", jpeg:"image/jpeg", png:"image/png", webp:"image/webp", heic:"image/heic", heif:"image/heif", avif:"image/avif", pdf:"application/pdf", doc:"application/msword", docx:"application/vnd.openxmlformats-officedocument.wordprocessingml.document" }[extension] || "";
+}
 
 const usuario = protegerPagina(["super_admin", "admin_empresa", "admin_sucursal", "jefe_taller", "planificador", "sheq"]);
 if (!usuario) throw new Error("Acceso no autorizado");
@@ -585,7 +600,7 @@ function crearFilaDocumento(item = null) {
   const fila = document.createElement("article");
   fila.className = "sheq-documento-fila";
   fila.dataset.documentoId = item?.id || "";
-  fila.innerHTML = `<div class="sheq-documento-fila-numero" aria-hidden="true"></div><label class="sheq-documento-nombre-campo">Documento<input class="documento-nombre" maxlength="120" placeholder="Nombre del documento" required ${item?.requisito || item?.catalogo ? "readonly" : ""} value="${escapar(item?.tipoDocumento || "")}"></label><label class="sheq-fecha-inicio-campo">Fecha de inicio<input class="documento-inicio" type="date" value="${escapar(fechaISO(item?.fechaEmision))}"></label><label class="sheq-fecha-final-campo">Fecha final<input class="documento-final" type="date" value="${escapar(fechaISO(item?.fechaVencimiento))}"></label><label class="sheq-archivo-campo">Adjuntar documento<span class="sheq-archivo-control"><input class="documento-archivo" type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx" ${item?.requisito ? "required" : ""}><span class="sheq-archivo-boton">Seleccionar archivo</span><span class="sheq-archivo-nombre">Ningún archivo seleccionado</span></span><small>${item?.archivoUrl ? "Se conservará el archivo actual si no adjuntas otro." : "PDF, imagen o documento (máx. 20 MB)."}</small></label>${item?.id ? "" : '<button type="button" class="sheq-quitar-documento" aria-label="Quitar documento">Quitar</button>'}`;
+  fila.innerHTML = `<div class="sheq-documento-fila-numero" aria-hidden="true"></div><label class="sheq-documento-nombre-campo">Documento<input class="documento-nombre" maxlength="120" placeholder="Nombre del documento" required ${item?.requisito || item?.catalogo ? "readonly" : ""} value="${escapar(item?.tipoDocumento || "")}"></label><label class="sheq-fecha-inicio-campo">Fecha de inicio<input class="documento-inicio" type="date" value="${escapar(fechaISO(item?.fechaEmision))}"></label><label class="sheq-fecha-final-campo">Fecha final<input class="documento-final" type="date" value="${escapar(fechaISO(item?.fechaVencimiento))}"></label><label class="sheq-archivo-campo">Adjuntar documento<span class="sheq-archivo-control"><input class="documento-archivo" type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.heif,.avif,.doc,.docx,application/pdf,image/jpeg,image/png,image/webp,image/heic,image/heif,image/avif,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" ${item?.requisito ? "required" : ""}><span class="sheq-archivo-boton">Seleccionar archivo</span><span class="sheq-archivo-nombre">Ningún archivo seleccionado</span></span><small>${item?.archivoUrl ? "Se conservará el archivo actual si no adjuntas otro." : "PDF, foto móvil o documento Word (máx. 20 MB)."}</small></label>${item?.id ? "" : '<button type="button" class="sheq-quitar-documento" aria-label="Quitar documento">Quitar</button>'}`;
   fila.querySelector(".documento-archivo").addEventListener("change", evento => {
     const nombre = evento.target.files[0]?.name || "Ningún archivo seleccionado";
     fila.querySelector(".sheq-archivo-nombre").textContent = nombre;
@@ -649,17 +664,23 @@ async function guardarDocumento(e){
       if(fechaInicio&&fechaFinal&&fechaFinal<fechaInicio)throw new Error(`La fecha final de “${tipoDocumento}” no puede ser anterior a la fecha de inicio.`);
       let archivoUrl=anterior?.archivoUrl||"",archivoRuta=anterior?.archivoRuta||"";
       if(archivo){
+        const tipoArchivo=tipoDocumentoSheq(archivo);
+        if(!TIPOS_DOCUMENTO_SHEQ.has(tipoArchivo))throw new Error(`El formato de “${tipoDocumento}” no está permitido. Usa una foto JPG, PNG, WebP, HEIC, HEIF o AVIF, un PDF o un documento Word.`);
         if(archivo.size>20*1024*1024)throw new Error(`El archivo de “${tipoDocumento}” supera el máximo de 20 MB.`);
-        bytesAcumulados+=archivo.size;
+        await validarFirmaArchivo(archivo,tipoArchivo);
+        const resultadoOptimizacion=await optimizarFotoParaCarga(archivo);
+        const archivoCarga=resultadoOptimizacion.archivo;
+        const tipoCarga=tipoDocumentoSheq(archivoCarga);
+        bytesAcumulados+=archivoCarga.size;
         const cuota=evaluarCuotaStorage({usadoBytes:empresa.storageUsadoBytes||0,maxStorageGB:empresa.maxStorageGB,nuevoBytes:bytesAcumulados});
         const aviso=mensajeCuotaStorage(cuota);
         if(!cuota.permitido)throw new Error(aviso);
         if(aviso&&indice===filas.length-1)await mensaje("Uso de almacenamiento",aviso,"advertencia");
-        const seguro=archivo.name.replace(/[^a-zA-Z0-9._-]/g,"_");
+        const seguro=archivoCarga.name.replace(/[^a-zA-Z0-9._-]/g,"_");
         archivoRuta=`empresas/${empresaId}/sheq/${entidadTipo}/${entidadId}/${Date.now()}_${indice}_${seguro}`;
         nuevosArchivos.push(archivoRuta);
         const storageRef=ref(storage,archivoRuta);
-        await uploadBytes(storageRef,archivo);
+        await uploadBytes(storageRef,archivoCarga,{contentType:tipoCarga});
         archivoUrl=await getDownloadURL(storageRef);
       }
       preparados.push({id,anterior,datos:{empresaId,entidadTipo,entidadId,tipoDocumento,contratoId:anterior?.contratoId||$("formDocumento").dataset.contratoId||"",fechaEmision:fechaInicio,fechaVencimiento:fechaFinal,estado:"aprobado",observaciones:$("documentoObservaciones").value.trim(),archivoUrl,archivoRuta,historial:anterior?[...(anterior.historial||[]),versionDocumento(anterior,motivo)]:[],actualizadoPor:usuario.uid,fechaActualizacion:serverTimestamp()}});
@@ -721,6 +742,7 @@ async function eliminarVehiculoCompleto(id) {
     peligrosa:true
   });
   if (!ok) return;
+  if (!(await reautenticarAccionCritica("eliminar definitivamente este vehículo y toda su información"))) return;
 
   const operaciones = [];
   documentosVehiculo.forEach(item => operaciones.push(lote => lote.delete(doc(db, "sheqDocumentos", item.id))));
@@ -756,6 +778,7 @@ async function eliminarDocumentoCompleto(id){
   if(!item)return;
   const ok=await window.OverTrackUI.confirmarAccion({titulo:"Eliminar documento",mensaje:"Se eliminarán permanentemente el registro, el archivo actual y todos sus archivos históricos. Esta acción no se puede deshacer.",tipo:"advertencia",textoConfirmar:"Eliminar todo",textoCancelar:"Cancelar",peligrosa:true});
   if(!ok)return;
+  if(!(await reautenticarAccionCritica("eliminar definitivamente este documento y su historial")))return;
   const rutas=[item.archivoRuta,...(item.historial||[]).map(version=>version.archivoRuta)].filter(Boolean);
   for(const ruta of new Set(rutas)){
     try{await deleteObject(ref(storage,ruta));}catch(error){if(error.code!=="storage/object-not-found")throw error;}

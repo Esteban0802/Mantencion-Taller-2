@@ -14,6 +14,13 @@ import { actualizarTarjetaChecklist } from "./core/actualizacionParcial.js?v=202
 export function inicializarModuloPruebas(servicios = {}) {
 let avancePruebasEnCurso = false;
 
+  const escaparHTML = valor => String(valor ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+
   const {
     getOT,
     getUsuario,
@@ -365,7 +372,7 @@ function renderChecklist(tipo = "general") {
             onchange="togglePrueba('${tipo}', ${index})"
           >
 
-          <h4>${item.item}</h4>
+          <h4>${escaparHTML(item.item)}</h4>
 
         </div>
 
@@ -398,7 +405,7 @@ function renderChecklist(tipo = "general") {
 
           <input
             type="file"
-            accept="image/*,.pdf,application/pdf"
+            accept=".jpg,.jpeg,.png,.webp,.heic,.heif,.avif,.pdf,image/jpeg,image/png,image/webp,image/heic,image/heif,image/avif,application/pdf"
             multiple
             onchange="subirFotoPrueba(
               event,
@@ -523,21 +530,17 @@ async function subirFotoPrueba(event, tipo, index) {
 
     fotosOriginales = [...item.fotos];
 
-    for (const file of files) {
+    const cargas = await Promise.allSettled(files.map(async file => {
       const archivoEvidencia = await prepararEvidencia(file, `pruebas_${tipo}`);
-
-      const urlFoto =
-        await subirArchivoStorage(
-          archivoEvidencia,
-          `pruebas_${tipo}`,
-          index
-        );
-
+      const urlFoto = await subirArchivoStorage(archivoEvidencia, `pruebas_${tipo}`, index);
       if (!urlFoto) throw new Error("La fotografía no obtuvo una URL válida");
-
-      urlsSubidasEnEsteIntento.push(urlFoto);
-      item.fotos.push(urlFoto);
-    }
+      return urlFoto;
+    }));
+    const urls = cargas.filter(item => item.status === "fulfilled").map(item => item.value);
+    urlsSubidasEnEsteIntento.push(...urls);
+    const cargaFallida = cargas.find(item => item.status === "rejected");
+    if (cargaFallida) throw cargaFallida.reason;
+    item.fotos.push(...urls);
 
     const guardado = await guardarCambiosOT();
     if (!guardado) {
@@ -719,12 +722,15 @@ async function agregarComentarioPrueba(tipo, index) {
 
   if (inputComentario) inputComentario.value = "";
 
-  const guardado = await guardarCambiosOT();
+  renderComentariosPrueba(tipo, index);
+  const guardado = await guardarCambiosOT(true);
   if (!guardado) {
     item.comentarios.splice(cantidadComentariosAnterior);
     ot.alertaJefe = alertaJefeAnterior;
     item.fecha = fechaAnterior;
-    if (inputComentario) inputComentario.value = texto;
+    const inputActual = document.getElementById(`comentario-${tipo}-${index}`);
+    if (inputActual) inputActual.value = texto;
+    renderComentariosPrueba(tipo, index);
     return;
   }
 
@@ -757,13 +763,13 @@ function renderComentariosPrueba(tipo, index) {
         : "comentario-card";
 
     div.innerHTML = `
-      <strong>👨‍🔧 ${comentario.nombre}</strong>
+      <strong>👨‍🔧 ${escaparHTML(comentario.nombre)}</strong>
 
       <p class="comentario-fecha">
-        ${comentario.fecha}
+        ${escaparHTML(comentario.fecha)}
       </p>
 
-      <p>${comentario.texto}</p>
+      <p>${escaparHTML(comentario.texto)}</p>
 
       ${
         ["jefe_taller", "admin_sucursal"].includes(comentario.rol) &&
@@ -794,17 +800,16 @@ function renderComentariosPrueba(tipo, index) {
 
               <strong>
                 ✅ Respondido por ${
-                  comentario.atendidoPor ||
-                  "Técnico"
+                  escaparHTML(comentario.atendidoPor || "Técnico")
                 }
               </strong>
 
               <p>
-                ${comentario.respuestaUsuario || ""}
+                ${escaparHTML(comentario.respuestaUsuario || "")}
               </p>
 
               <small>
-                ${comentario.fechaAtendido || ""}
+                ${escaparHTML(comentario.fechaAtendido || "")}
               </small>
 
             </div>
@@ -908,7 +913,7 @@ async function aprobarPruebas() {
 
   if (!ot || OTBloqueada()) return;
 
-  if (!aprobacionesHabilitadas()) {
+  if (!aprobacionesHabilitadas("pruebas")) {
     alert("El módulo Aprobaciones está deshabilitado para esta empresa");
     return;
   }
@@ -1055,7 +1060,7 @@ async function finalizarPruebasSinAprobacion() {
 
   if (!ot || OTBloqueada()) return;
 
-  if (aprobacionesHabilitadas()) {
+  if (aprobacionesHabilitadas("pruebas")) {
     alert("Esta empresa requiere aprobación del Jefe de Taller");
     return;
   }

@@ -427,7 +427,7 @@ export function inicializarModuloEvaluacion(servicios) {
 
             <input
               type="file"
-              accept="image/*,.pdf,application/pdf"
+              accept=".jpg,.jpeg,.png,.webp,.heic,.heif,.avif,.pdf,image/jpeg,image/png,image/webp,image/heic,image/heif,image/avif,application/pdf"
               multiple
               onchange="subirFotoEvaluacion(event, ${i})"
             >
@@ -659,22 +659,17 @@ export function inicializarModuloEvaluacion(servicios) {
       }
 
 
-      for (const file of files) {
+      const cargas = await Promise.allSettled(files.map(async file => {
         const archivoEvidencia = await prepararEvidencia(file, "evaluacion");
-
-
-        const urlFoto =
-          await subirArchivoStorage(
-            archivoEvidencia,
-            "evaluacion",
-            i
-          );
-
+        const urlFoto = await subirArchivoStorage(archivoEvidencia, "evaluacion", i);
         if (!urlFoto) throw new Error("La fotografía no obtuvo una URL válida");
-
-        urlsSubidasEnEsteIntento.push(urlFoto);
-        ot.evaluacion[i].fotos.push(urlFoto);
-      }
+        return urlFoto;
+      }));
+      const urls = cargas.filter(item => item.status === "fulfilled").map(item => item.value);
+      urlsSubidasEnEsteIntento.push(...urls);
+      const cargaFallida = cargas.find(item => item.status === "rejected");
+      if (cargaFallida) throw cargaFallida.reason;
+      ot.evaluacion[i].fotos.push(...urls);
 
 
       const guardado = await guardarCambiosOT();
@@ -868,7 +863,7 @@ async function aprobarOverhaulDesdeEvaluacion() {
 
     if (OTBloqueada()) return;
 
-    if (!aprobacionesHabilitadas()) {
+    if (!aprobacionesHabilitadas("evaluacion")) {
         alert("El módulo Aprobaciones está deshabilitado para esta empresa");
         return;
     }
@@ -1001,7 +996,7 @@ async function rechazarOverhaulDesdeEvaluacion() {
 
     if (OTBloqueada()) return;
 
-    if (!aprobacionesHabilitadas()) {
+    if (!aprobacionesHabilitadas("evaluacion")) {
         alert("El módulo Aprobaciones está deshabilitado para esta empresa");
         return;
     }
@@ -1187,7 +1182,7 @@ function renderDocsDecisionEvaluacionPreview() {
             <div class="doc-left">
                 <span class="doc-icon">📄</span>
                 <span class="doc-name">
-                    ${doc.nombre}
+                    ${escaparHTML(doc.nombre)}
                 </span>
             </div>
 
@@ -1222,7 +1217,7 @@ function renderDocsDecisionEvaluacionPreview() {
             <div class="doc-left">
                 <span class="doc-icon">📄</span>
                 <span class="doc-name">
-                    ${file.name}
+                    ${escaparHTML(file.name)}
                 </span>
             </div>
 
@@ -1269,17 +1264,7 @@ function abrirDocumentoDecisionEvaluacion(index) {
 // ABRIR ARCHIVO TEMPORAL
 // ==========================================
 function abrirArchivoTemporal(url) {
-
-    const modal =
-        document.getElementById("modalDoc");
-
-    const visor =
-        document.getElementById("visorDoc");
-
-    if (!modal || !visor) return;
-
-    visor.src = url;
-    modal.style.display = "block";
+    abrirDocumento({ url });
 }
 
 
@@ -1316,22 +1301,22 @@ function renderComentarioDecisionEvaluacion() {
 
             <div>
                 <strong>Resultado:</strong>
-                ${decision.resultado || "-"}
+                ${escaparHTML(decision.resultado || "-")}
             </div>
 
             <div>
                 <strong>Usuario:</strong>
-                ${decision.usuario || "-"}
+                ${escaparHTML(decision.usuario || "-")}
             </div>
 
             <div>
                 <strong>Fecha:</strong>
-                ${decision.fecha || "-"}
+                ${escaparHTML(decision.fecha || "-")}
             </div>
 
             <div>
                 <strong>Comentario:</strong>
-                ${decision.comentario || "-"}
+                ${escaparHTML(decision.comentario || "-")}
             </div>
 
             ${
@@ -1398,7 +1383,7 @@ async function continuarEvaluacionSinAprobacion() {
 
     if (OTBloqueada()) return;
 
-    if (aprobacionesHabilitadas()) {
+    if (aprobacionesHabilitadas("evaluacion")) {
         alert("Esta empresa requiere aprobación del Jefe de Taller");
         return;
     }

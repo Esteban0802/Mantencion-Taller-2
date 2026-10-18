@@ -1,4 +1,4 @@
-import { protegerPagina, cerrarSesion } from "./session.js?v=20261004-2";
+import { protegerPagina, cerrarSesion, reautenticarAccionCritica } from "./session.js?v=20261017-1";
 import { db } from "./firebase-config.js";
 import { obtenerModulosEmpresa, moduloActivo } from "./modulos.js";
 import { asegurarResumenesOT } from "./modulos/core/resumenOT.js";
@@ -212,6 +212,7 @@ async function eliminarOT(id) {
       })
     : window.confirm("¿Eliminar definitivamente esta OS?");
   if (!confirmar) return;
+  if (!(await reautenticarAccionCritica("eliminar definitivamente esta orden de servicio"))) return;
   const eliminar = async () => {
     const lote = writeBatch(db);
     lote.delete(doc(db, "ots", id));
@@ -240,6 +241,7 @@ function configurarInterfaz() {
   const rolesModulosOperativos = ["super_admin", "admin_empresa", "admin_sucursal", "jefe_taller", "planificador"];
   document.getElementById("menuInventarioOrdenes").style.display = moduloActivo(empresaActual, "inventario") && rolesModulosOperativos.includes(usuario.rol) ? "" : "none";
   document.getElementById("menuSheqOrdenes").style.display = moduloActivo(empresaActual, "sheq") && rolesModulosOperativos.includes(usuario.rol) ? "" : "none";
+  document.getElementById("menuProgramacionOrdenes").style.display = moduloActivo(empresaActual, "programacion") && ["super_admin", "admin_empresa", "admin_sucursal", "planificador", "supervisor", "tecnico"].includes(usuario.rol) ? "" : "none";
 
   document.getElementById("buscarOrdenes").addEventListener("input", () => { pagina = 1; aplicarFiltros(); });
   document.getElementById("estadoOrdenes").addEventListener("change", () => { pagina = 1; aplicarFiltros(); });

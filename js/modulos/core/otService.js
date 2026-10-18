@@ -178,7 +178,7 @@ export async function guardarCambiosOT(
         return false;
     }
 
-    const cargaUI = window.OverTrackUI?.iniciarCarga?.("Guardando cambios de la OT…");
+    const cargaUI = silencioso ? null : window.OverTrackUI?.iniciarCarga?.("Guardando cambios de la OT…");
     const finalizarMedicion = iniciarMedicion("Guardado parcial de OT");
 
     try {
@@ -210,6 +210,20 @@ export async function guardarCambiosOT(
                 if (!valoresIguales(valor, datosRemotos[campo])) cambiosParciales[campo] = valor;
             });
 
+            const marcasAnteriores = datosRemotos.etapasConActividad || {};
+            const marcasActividad = {
+                evaluacion: marcasAnteriores.evaluacion === true || Object.hasOwn(cambiosParciales, "evaluacion"),
+                mantencion: marcasAnteriores.mantencion === true ||
+                    Object.hasOwn(cambiosParciales, "overhaul") ||
+                    Object.hasOwn(cambiosParciales, "repuestos"),
+                pruebas: marcasAnteriores.pruebas === true || Object.hasOwn(cambiosParciales, "pruebas"),
+                despacho: marcasAnteriores.despacho === true || Object.hasOwn(cambiosParciales, "despacho")
+            };
+            if (!valoresIguales(marcasActividad, marcasAnteriores)) {
+                cambiosParciales.etapasConActividad = marcasActividad;
+                ot.etapasConActividad = marcasActividad;
+            }
+
             transaction.update(referencia, {
                 ...cambiosParciales,
                 fechaActualizacion: serverTimestamp(),
@@ -218,7 +232,7 @@ export async function guardarCambiosOT(
         });
 
         ot.revision = nuevaRevision;
-        await guardarResumenOT(id, ot).catch(error => {
+        guardarResumenOT(id, ot).catch(error => {
             console.warn("La OT fue guardada, pero su resumen se sincronizará más adelante.", error);
         });
 
@@ -275,7 +289,7 @@ export async function guardarCambiosOT(
 }
 
 export function autoguardarCambiosOT(
-    delay = 700
+    delay = 250
 ) {
 
     const ot = getOT?.();

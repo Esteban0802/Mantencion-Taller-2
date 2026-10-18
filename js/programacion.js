@@ -1,5 +1,5 @@
 import { app, auth, db } from "./firebase-config.js";
-import { protegerPagina, cerrarSesion } from "./session.js?v=20261004-2";
+import { protegerPagina, cerrarSesion } from "./session.js?v=20261017-1";
 import { moduloActivo } from "./modulos.js";
 import {
   etiquetaRolProgramacion,
@@ -17,6 +17,7 @@ import {
   getDocs,
   query,
   serverTimestamp,
+  setDoc,
   updateDoc,
   where,
   writeBatch
@@ -42,6 +43,7 @@ if (!usuario) throw new Error("Acceso no autorizado");
 
 const PUEDE_EDITAR = ["super_admin", "planificador"].includes(usuario.rol);
 const PUEDE_VER_PROGRAMACION_COMPLETA = ["super_admin", "admin_empresa", "admin_sucursal", "jefe_taller", "planificador", "bodeguero", "sheq"].includes(usuario.rol);
+const ES_TRABAJADOR_CON_SEMANA_PERSONAL = ["tecnico", "supervisor"].includes(usuario.rol);
 const PUEDE_VER_BORRADORES = PUEDE_EDITAR || usuario.rol === "bodeguero";
 const DIAS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
 const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
@@ -49,14 +51,20 @@ const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "o
 let empresa = null;
 let empresaId = "";
 let semanaInicio = obtenerLunes(new Date());
-let grupoActivo = "tecnico";
+let grupoActivo = ES_TRABAJADOR_CON_SEMANA_PERSONAL ? "mi-semana" : "tecnico";
 let usuariosEmpresa = [];
 let sucursalesEmpresa = [];
 let asignacionesEmpresa = [];
 let asignacionesSemana = [];
 let documentosSheq = [];
 let vehiculosSheq = [];
+let ausenciasEmpresa = [];
+let inventarioProgramacion = [];
+let historialProgramacion = [];
+let confirmacionSemanaActual = null;
+let confirmacionesSemana = [];
 let estadoSemanaActual = "borrador";
+let turnosEmergenciaSemana = new Set();
 
 const $ = id => document.getElementById(id);
 
@@ -92,6 +100,20 @@ function fechaISO(fecha) {
 
 function fechaCorta(fecha) {
   return `${fecha.getDate()} ${MESES[fecha.getMonth()]}`;
+}
+
+function usuarioAusenteEnFecha(usuarioId, fecha) {
+  return ausenciasEmpresa.find(item =>
+    item.usuarioId === usuarioId &&
+    item.fechaInicio <= fecha &&
+    item.fechaTermino >= fecha
+  ) || null;
+}
+
+function idsAusentesEnFecha(fecha) {
+  return new Set(ausenciasEmpresa
+    .filter(item => item.fechaInicio <= fecha && item.fechaTermino >= fecha)
+    .map(item => item.usuarioId));
 }
 
 function numeroSemana(fecha) {
@@ -189,7 +211,7 @@ async function cargarUsuariosYSucursales() {
 }
 
 function opcionUsuario(item, seleccionado = false, noDisponible = false, deshabilitado = false) {
-  const estado = noDisponible ? " · ya asignado en esta fecha" : "";
+  const estado = noDisponible ? " · no disponible en esta fecha" : "";
   return `<option value="${escapar(item.id)}"${seleccionado ? " selected" : ""}${deshabilitado ? " disabled" : ""}>${escapar(nombreUsuario(item))} · ${escapar(etiquetaRol(item))}${estado}</option>`;
 }
 
@@ -282,6 +304,7 @@ function renderOrdenesServicio(items = []) {
     }
     lista.appendChild(fila);
   });
+  actualizarAlertaInventarioFormulario();
 }
 
 function ordenesServicioFormulario() {
@@ -294,6 +317,30 @@ function ordenesServicioFormulario() {
       cerrada: fila.querySelector(".asignacion-os-cerrada")?.checked === true
     }))
     .filter(item => item.numero || item.equipo || item.actividad || item.observacion);
+}
+
+function repuestoInventarioRecibido(item) {
+  return item.recibido === true || (item.recibido == null && ["Completa", "Despachada", "Recepción Cliente"].includes(item.estado));
+}
+
+function actualizarAlertaInventarioFormulario() {
+  const contenedor = $("alertaInventarioProgramacion");
+  if (!contenedor || !PUEDE_EDITAR) return;
+  const ordenes = ordenesServicioFormulario().map(item => String(item.numero || "").trim()).filter(Boolean);
+  const resultados = ordenes.map(numero => {
+    const repuestos = inventarioProgramacion.filter(item => String(item.datos?.OS || "").trim() === numero);
+    const pendientes = repuestos.filter(item => !repuestoInventarioRecibido(item));
+    return { numero, total: repuestos.length, pendientes: pendientes.length };
+  }).filter(item => item.total > 0);
+  if (!resultados.length) {
+    contenedor.hidden = true;
+    contenedor.innerHTML = "";
+    return;
+  }
+  const incompletas = resultados.filter(item => item.pendientes > 0);
+  contenedor.className = `alerta-inventario-programacion campo-ancho ${incompletas.length ? "pendiente" : "completo"}`;
+  contenedor.innerHTML = `<strong>${incompletas.length ? "Alerta de Inventario" : "Inventario disponible"}</strong><span>${resultados.map(item => `OS ${escapar(item.numero)}: ${item.total - item.pendientes} de ${item.total} repuesto(s) recibido(s)`).join(" · ")}</span>`;
+  contenedor.hidden = false;
 }
 
 function nombreVehiculo(item) {
@@ -328,6 +375,8 @@ function actualizarSelectoresAsignacion({ usuariosSeleccionados = [], usuarioSel
   const fecha = $("asignacionFecha").value;
   const permiteRepetidos = $("asignacionTipo").value === "capacitacion";
   const idsOcupados = permiteRepetidos ? new Set() : idsOcupadosEnFecha(fecha, $("asignacionId").value);
+  const idsAusentes = idsAusentesEnFecha(fecha);
+  const idsBloqueados = new Set([...idsOcupados, ...idsAusentes]);
   const idsSeleccionados = new Set([
     ...usuariosSeleccionados,
     ...(usuarioSeleccionado ? [usuarioSeleccionado] : [])
@@ -339,17 +388,17 @@ function actualizarSelectoresAsignacion({ usuariosSeleccionados = [], usuarioSel
   const supervisorGuardado = usuariosEmpresa.find(item => item.id === supervisorSeleccionado);
   const sheqGuardado = usuariosEmpresa.find(item => item.id === sheqSeleccionado);
 
-  renderSelectoresTrabajadores(trabajadores, [...idsSeleccionados], trabajadoresGuardados, idsOcupados);
-  const cantidadOcupados = trabajadores.filter(item => idsOcupados.has(item.id)).length;
+  renderSelectoresTrabajadores(trabajadores, [...idsSeleccionados], trabajadoresGuardados, idsBloqueados);
+  const cantidadOcupados = trabajadores.filter(item => idsBloqueados.has(item.id)).length;
   const ayuda = $("ayudaAsignacionUsuarios");
   if (ayuda) {
     ayuda.textContent = cantidadOcupados
-      ? `${cantidadOcupados} trabajador(es) ya tiene(n) una asignación en esta fecha y aparecen deshabilitados.`
+      ? `${cantidadOcupados} trabajador(es) ya tiene(n) una asignación o ausencia en esta fecha y aparece(n) deshabilitado(s).`
       : permiteRepetidos ? "En capacitaciones puedes seleccionar trabajadores aunque tengan otra actividad el mismo día." : "Todos los trabajadores mostrados están disponibles en esta fecha.";
   }
 
   $("asignacionSupervisor").innerHTML = `<option value="">Sin supervisor asignado</option>${supervisores
-    .map(item => opcionUsuario(item, item.id === supervisorSeleccionado))
+    .map(item => opcionUsuario(item, item.id === supervisorSeleccionado, idsAusentes.has(item.id), idsAusentes.has(item.id) && item.id !== supervisorSeleccionado))
     .join("")}${supervisorGuardado && !supervisores.some(item => item.id === supervisorGuardado.id)
       ? opcionUsuario(supervisorGuardado, true, true)
       : ""}`;
@@ -380,6 +429,30 @@ async function cargarDocumentosSheq() {
   } catch (error) {
     console.warn("No se pudieron consultar los datos SHEQ para Programación:", error);
   }
+}
+
+async function cargarDatosOperativosProgramacion() {
+  ausenciasEmpresa = [];
+  inventarioProgramacion = [];
+  historialProgramacion = [];
+  const consultas = [];
+  if (PUEDE_EDITAR) {
+    consultas.push(
+      getDocs(query(collection(db, "programacionAusencias"), where("empresaId", "==", empresaId)))
+        .then(snap => { ausenciasEmpresa = snap.docs.map(item => ({ id: item.id, ...item.data() })); })
+    );
+    const filtrosInventario = [where("empresaId", "==", empresaId)];
+    if (usuario.rol !== "super_admin" && usuario.sucursalId) filtrosInventario.push(where("sucursalId", "==", usuario.sucursalId));
+    consultas.push(
+      getDocs(query(collection(db, "programacionHistorial"), where("empresaId", "==", empresaId)))
+        .then(snap => { historialProgramacion = snap.docs.map(item => ({ id: item.id, ...item.data() })); }),
+      getDocs(query(collection(db, "inventarioItems"), ...filtrosInventario))
+        .then(snap => { inventarioProgramacion = snap.docs.map(item => ({ id: item.id, ...item.data() })); })
+    );
+  }
+  await Promise.all(consultas.map(consulta => consulta.catch(error => {
+    console.warn("No se pudo cargar un dato complementario de Programación:", error);
+  })));
 }
 
 function actualizarAlertaSheqTrabajador() {
@@ -432,26 +505,84 @@ async function cargarSemana() {
   const inicio = fechaISO(semanaInicio);
   const fin = fechaISO(sumarDias(semanaInicio, 6));
 
-  const semanasSnap = await getDocs(query(collection(db, "programacionSemanas"), where("empresaId", "==", empresaId)));
-  const semanaGuardada = semanasSnap.docs
-    .map(item => item.data())
-    .find(item => item.semanaInicio === inicio);
+  let semanaGuardada = null;
+  if (ES_TRABAJADOR_CON_SEMANA_PERSONAL) {
+    try {
+      const publicacionPersonal = await getDoc(doc(db, "programacionPublicadaUsuarios", `${empresaId}_${inicio}_${usuario.uid}`));
+      semanaGuardada = publicacionPersonal.exists() ? publicacionPersonal.data() : null;
+    } catch (error) {
+      // Compatibilidad durante el despliegue escalonado: las reglas antiguas
+      // todavía no conocen la colección personal y rechazan su lectura.
+      if (error?.code !== "permission-denied") throw error;
+      const semanaAnterior = await getDoc(doc(db, "programacionSemanas", `${empresaId}_${inicio}`));
+      semanaGuardada = semanaAnterior.exists() ? semanaAnterior.data() : null;
+    }
+  } else {
+    const semanaSnap = await getDoc(doc(db, "programacionSemanas", `${empresaId}_${inicio}`));
+    semanaGuardada = semanaSnap.exists() ? semanaSnap.data() : null;
+  }
   estadoSemanaActual = semanaGuardada?.estado || "borrador";
+  turnosEmergenciaSemana = new Set(
+    Array.isArray(semanaGuardada?.turnosEmergenciaIds)
+      ? semanaGuardada.turnosEmergenciaIds
+      : []
+  );
   actualizarEncabezadoSemana();
 
   if (!PUEDE_VER_BORRADORES && estadoSemanaActual !== "publicada") {
     asignacionesSemana = [];
     mostrarMensaje("La programación de esta semana todavía no ha sido publicada.");
     $("resumenProgramacion").textContent = "Programación pendiente de publicación";
+    const confirmacion = $("confirmacionProgramacion");
+    if (confirmacion) {
+      confirmacion.hidden = true;
+      confirmacion.innerHTML = "";
+    }
+    const cobertura = $("resumenCoberturaProgramacion");
+    if (cobertura) {
+      cobertura.hidden = true;
+      cobertura.innerHTML = "";
+    }
     return;
   }
 
-  const asignacionesSnap = await getDocs(query(collection(db, "programaciones"), where("empresaId", "==", empresaId)));
-  asignacionesEmpresa = asignacionesSnap.docs
-    .map(item => ({ id: item.id, ...item.data() }))
-    .sort((a, b) => `${a.fecha}_${a.cliente || ""}`.localeCompare(`${b.fecha}_${b.cliente || ""}`));
+  if (PUEDE_VER_BORRADORES) {
+    const asignacionesSnap = await getDocs(query(collection(db, "programaciones"), where("empresaId", "==", empresaId)));
+    asignacionesEmpresa = asignacionesSnap.docs.map(item => ({ id: item.id, ...item.data() }));
+  } else {
+    asignacionesEmpresa = Array.isArray(semanaGuardada?.asignaciones)
+      ? semanaGuardada.asignaciones
+      : Array.isArray(semanaGuardada?.snapshotPublicado) ? semanaGuardada.snapshotPublicado : [];
+  }
+  asignacionesEmpresa.sort((a, b) => `${a.fecha}_${a.cliente || ""}`.localeCompare(`${b.fecha}_${b.cliente || ""}`));
   asignacionesSemana = asignacionesEmpresa.filter(item => item.fecha >= inicio && item.fecha <= fin);
+  await cargarConfirmacionesSemana(inicio);
   renderCuadro();
+}
+
+async function cargarConfirmacionesSemana(inicio) {
+  confirmacionSemanaActual = null;
+  confirmacionesSemana = [];
+  try {
+    if (ES_TRABAJADOR_CON_SEMANA_PERSONAL) {
+      const snap = await getDocs(query(
+        collection(db, "programacionConfirmaciones"),
+        where("empresaId", "==", empresaId),
+        where("usuarioId", "==", usuario.uid),
+        where("semanaInicio", "==", inicio)
+      ));
+      const registro = snap.docs[0];
+      if (registro) {
+        confirmacionSemanaActual = { id: registro.id, ...registro.data() };
+        confirmacionesSemana = [confirmacionSemanaActual];
+      }
+    } else if (PUEDE_EDITAR) {
+      const snap = await getDocs(query(collection(db, "programacionConfirmaciones"), where("empresaId", "==", empresaId)));
+      confirmacionesSemana = snap.docs.map(item => ({ id: item.id, ...item.data() })).filter(item => item.semanaInicio === inicio);
+    }
+  } catch (error) {
+    console.warn("No fue posible cargar las confirmaciones de Programación:", error);
+  }
 }
 
 function marcarSemanaBorrador(batch, inicio) {
@@ -462,6 +593,28 @@ function marcarSemanaBorrador(batch, inicio) {
     actualizadoPor: usuario.uid,
     fechaActualizacion: serverTimestamp()
   }, { merge: true });
+}
+
+function registrarHistorialAsignacion(batch, accion, asignacionId, datos = {}) {
+  const referencia = doc(collection(db, "programacionHistorial"));
+  const participantes = [...new Set([...(datos.usuarioIds || []), ...(datos.supervisorIds || []), ...(datos.sheqIds || [])])]
+    .map(id => usuariosEmpresa.find(item => item.id === id))
+    .filter(Boolean)
+    .map(nombreUsuario);
+  batch.set(referencia, {
+    empresaId,
+    sucursalId: usuario.sucursalId || "",
+    semanaInicio: datos.semanaInicio || fechaISO(semanaInicio),
+    asignacionId,
+    accion,
+    fechaActividad: datos.fecha || "",
+    cliente: datos.cliente || "",
+    participantes,
+    ordenesServicio: (datos.ordenesServicio || []).map(item => item.numero).filter(Boolean),
+    realizadoPor: usuario.uid,
+    realizadoPorNombre: usuario.nombreCompleto || usuario.nombre || usuario.email || "Usuario",
+    fechaCreacion: serverTimestamp()
+  });
 }
 
 function actualizarEncabezadoSemana() {
@@ -525,7 +678,10 @@ function renderCuadro() {
   let html = `<div class="programacion-celda encabezado"><strong>Equipo</strong><small>Semana ${numeroSemana(semanaInicio)}</small></div>`;
 
   personas.forEach(persona => {
-    html += `<div class="programacion-celda encabezado"><strong>${escapar(nombreUsuario(persona))}</strong><small>${escapar(etiquetaRol(persona))}</small></div>`;
+    const permiteTurnoEmergencia = ["tecnico", "supervisor"].includes(grupoUsuario(persona));
+    const estaDeEmergencia = permiteTurnoEmergencia && turnosEmergenciaSemana.has(persona.id);
+    const claseEmergencia = estaDeEmergencia ? " turno-emergencia-activo" : "";
+    html += `<div class="programacion-celda encabezado encabezado-persona${claseEmergencia}"><div class="encabezado-persona-nombre"><strong>${escapar(nombreUsuario(persona))}</strong>${permiteTurnoEmergencia && PUEDE_EDITAR ? `<button type="button" class="turno-emergencia-switch${estaDeEmergencia ? " activo" : ""}" data-turno-emergencia-id="${escapar(persona.id)}" role="switch" aria-checked="${estaDeEmergencia}" aria-label="${estaDeEmergencia ? "Desactivar" : "Activar"} turno de emergencia de ${escapar(nombreUsuario(persona))}" title="Cambiar turno de emergencia"><span aria-hidden="true"></span><b>${estaDeEmergencia ? "ON" : "OFF"}</b></button>` : ""}</div><small>${escapar(etiquetaRol(persona))}${estaDeEmergencia ? " · Turno de emergencia" : ""}</small></div>`;
   });
 
   DIAS.forEach((nombreDia, indice) => {
@@ -535,7 +691,11 @@ function renderCuadro() {
 
     personas.forEach(persona => {
       const bloques = asignacionesCelda(iso, persona.id);
-      html += `<div class="programacion-celda">${bloques.length ? bloques.map(renderBloque).join("") : '<div class="celda-vacia">Sin asignación</div>'}</div>`;
+      const ausencia = usuarioAusenteEnFecha(persona.id, iso);
+      const claseEmergencia = turnosEmergenciaSemana.has(persona.id) && ["tecnico", "supervisor"].includes(grupoUsuario(persona))
+        ? " turno-emergencia-activo"
+        : "";
+      html += `<div class="programacion-celda${claseEmergencia}${ausencia ? " persona-ausente" : ""}">${ausencia ? `<div class="ausencia-programacion-badge"><strong>${escapar(ausencia.tipo || "Ausencia")}</strong>${ausencia.observacion ? `<span>${escapar(ausencia.observacion)}</span>` : ""}</div>` : ""}${bloques.length ? bloques.map(renderBloque).join("") : ausencia ? "" : '<div class="celda-vacia">Sin asignación</div>'}</div>`;
     });
   });
 
@@ -547,9 +707,140 @@ function renderCuadro() {
       if (evento.key === "Enter" || evento.key === " ") abrir();
     });
   });
+  if (PUEDE_EDITAR) cuadro.querySelectorAll("[data-turno-emergencia-id]").forEach(boton => {
+    boton.addEventListener("click", () => cambiarTurnoEmergencia(boton.dataset.turnoEmergenciaId));
+  });
 
   const asignacionesVisibles = asignacionesSemana.filter(puedeVerAsignacion);
   $("resumenProgramacion").textContent = `${personas.length} persona(s) · ${asignacionesVisibles.length} asignación(es)`;
+  renderResumenCobertura();
+  renderConfirmacionProgramacion();
+}
+
+function renderResumenCobertura() {
+  const contenedor = $("resumenCoberturaProgramacion");
+  if (!contenedor) return;
+  if (!PUEDE_VER_PROGRAMACION_COMPLETA) {
+    contenedor.innerHTML = "";
+    contenedor.hidden = true;
+    return;
+  }
+  const personas = usuariosEmpresa.filter(item => item.activo !== false && ["tecnico", "supervisor"].includes(grupoUsuario(item)));
+  const idsPorAsignacion = item => new Set([...(item.usuarioIds || []), ...(item.supervisorIds || [])]);
+  const sinProgramacion = personas.filter(persona => !asignacionesSemana.some(item => idsPorAsignacion(item).has(persona.id))).length;
+  const sobrecargados = personas.filter(persona => DIAS.some((_, indice) => {
+    const fecha = fechaISO(sumarDias(semanaInicio, indice));
+    return asignacionesSemana.filter(item => item.fecha === fecha && idsPorAsignacion(item).has(persona.id) && item.tipo !== "capacitacion").length > 1;
+  })).length;
+  const ausentes = personas.filter(persona => ausenciasEmpresa.some(item => item.usuarioId === persona.id && item.fechaInicio <= fechaISO(sumarDias(semanaInicio, 6)) && item.fechaTermino >= fechaISO(semanaInicio))).length;
+  const diasLibres = personas.reduce((total, persona) => total + [0, 1, 2, 3, 4].filter(indice => {
+    const fecha = fechaISO(sumarDias(semanaInicio, indice));
+    return !usuarioAusenteEnFecha(persona.id, fecha) && !asignacionesSemana.some(item => item.fecha === fecha && idsPorAsignacion(item).has(persona.id));
+  }).length, 0);
+  const participantes = new Set(asignacionesSemana.flatMap(item => [...(item.usuarioIds || []), ...(item.supervisorIds || [])]));
+  const confirmados = new Set(confirmacionesSemana.map(item => item.usuarioId)).size;
+  contenedor.hidden = false;
+  contenedor.innerHTML = `
+    <article><span>Sin programación</span><strong>${sinProgramacion}</strong></article>
+    <article class="${sobrecargados ? "advertencia" : ""}"><span>Sobrecargados</span><strong>${sobrecargados}</strong></article>
+    <article><span>Ausentes esta semana</span><strong>${ausentes}</strong></article>
+    <article><span>Días libres disponibles</span><strong>${diasLibres}</strong></article>
+    <article><span>Lecturas confirmadas</span><strong>${confirmados}/${participantes.size}</strong></article>`;
+}
+
+function renderConfirmacionProgramacion() {
+  const contenedor = $("confirmacionProgramacion");
+  if (!contenedor) return;
+  if (!ES_TRABAJADOR_CON_SEMANA_PERSONAL) {
+    contenedor.hidden = true;
+    return;
+  }
+  const publicada = estadoSemanaActual === "publicada";
+  contenedor.hidden = false;
+  contenedor.className = `confirmacion-programacion${confirmacionSemanaActual ? " confirmada" : ""}`;
+  contenedor.innerHTML = confirmacionSemanaActual
+    ? `<div><strong>Programación revisada</strong><span>Confirmaste que revisaste esta semana.</span></div><span class="confirmacion-ok">✓ Confirmada</span>`
+    : `<div><strong>${publicada ? "Confirma tu programación" : "Programación en borrador"}</strong><span>${publicada ? "Indica que revisaste las actividades publicadas para esta semana." : "Podrás confirmar la revisión cuando la semana sea publicada."}</span></div><button type="button" id="btnConfirmarProgramacion" class="btn-primary">Confirmar revisión</button>`;
+  $("btnConfirmarProgramacion")?.addEventListener("click", confirmarRevisionProgramacion);
+}
+
+async function confirmarRevisionProgramacion() {
+  if (!ES_TRABAJADOR_CON_SEMANA_PERSONAL) return;
+  if (estadoSemanaActual !== "publicada") {
+    if (window.OverTrackUI?.mostrarMensaje) {
+      await window.OverTrackUI.mostrarMensaje({
+        titulo: "Programación en borrador",
+        mensaje: "Todavía no puedes confirmar la revisión. Espera a que el Planificador publique esta semana.",
+        tipo: "advertencia"
+      });
+    } else {
+      alert("Todavía no puedes confirmar la revisión. Espera a que el Planificador publique esta semana.");
+    }
+    return;
+  }
+  const inicio = fechaISO(semanaInicio);
+  const referencia = doc(db, "programacionConfirmaciones", `${empresaId}_${inicio}_${usuario.uid}`);
+  const boton = $("btnConfirmarProgramacion");
+  if (boton) {
+    boton.disabled = true;
+    boton.textContent = "Confirmando...";
+  }
+  try {
+    await setDoc(referencia, {
+      empresaId,
+      sucursalId: usuario.sucursalId || "",
+      semanaInicio: inicio,
+      usuarioId: usuario.uid,
+      usuarioNombre: usuario.nombreCompleto || usuario.nombre || usuario.email || "Usuario",
+      fechaConfirmacion: serverTimestamp()
+    });
+    confirmacionSemanaActual = { usuarioId: usuario.uid, semanaInicio: inicio };
+    confirmacionesSemana = [confirmacionSemanaActual];
+    renderConfirmacionProgramacion();
+    if (window.OverTrackUI?.mostrarMensaje) {
+      await window.OverTrackUI.mostrarMensaje({
+        titulo: "Revisión confirmada",
+        mensaje: `Confirmaste correctamente la programación de la semana ${numeroSemana(semanaInicio)}.`,
+        tipo: "exito"
+      });
+    } else {
+      alert("La revisión de tu programación fue confirmada correctamente.");
+    }
+  } catch (error) {
+    console.error("No fue posible confirmar la programación:", error);
+    alert("No fue posible confirmar la revisión. Intenta nuevamente.");
+    if (boton?.isConnected) {
+      boton.disabled = false;
+      boton.textContent = "Confirmar revisión";
+    }
+  }
+}
+
+async function cambiarTurnoEmergencia(usuarioId) {
+  if (!PUEDE_EDITAR || !usuarioId) return;
+  const perfil = usuariosEmpresa.find(item => item.id === usuarioId);
+  if (!perfil || !["tecnico", "supervisor"].includes(grupoUsuario(perfil))) return;
+
+  const nuevosTurnos = new Set(turnosEmergenciaSemana);
+  if (nuevosTurnos.has(usuarioId)) nuevosTurnos.delete(usuarioId);
+  else nuevosTurnos.add(usuarioId);
+
+  const inicio = fechaISO(semanaInicio);
+  try {
+    await setDoc(doc(db, "programacionSemanas", `${empresaId}_${inicio}`), {
+      empresaId,
+      semanaInicio: inicio,
+      estado: estadoSemanaActual,
+      turnosEmergenciaIds: [...nuevosTurnos],
+      actualizadoPor: usuario.uid,
+      fechaActualizacion: serverTimestamp()
+    }, { merge: true });
+    turnosEmergenciaSemana = nuevosTurnos;
+    renderCuadro();
+  } catch (error) {
+    console.error("No fue posible actualizar el turno de emergencia:", error);
+    alert(error?.message || "No fue posible actualizar el turno de emergencia.");
+  }
 }
 
 function abrirModal(id) {
@@ -636,6 +927,16 @@ async function guardarAsignacion(evento) {
     ...(sheqId ? [{ id: sheqId, rol: "SHEQ" }] : [])
   ];
   const idsParticipantesSeleccionados = new Set(participantesSeleccionados.map(item => item.id));
+  const participantesAusentes = participantesSeleccionados.filter(item => usuarioAusenteEnFecha(item.id, fecha));
+  if (participantesAusentes.length) {
+    const nombres = participantesAusentes.map(item => {
+      const perfil = usuariosEmpresa.find(usuarioEmpresa => usuarioEmpresa.id === item.id);
+      const ausencia = usuarioAusenteEnFecha(item.id, fecha);
+      return `${nombreUsuario(perfil || {})} (${ausencia?.tipo || "Ausencia"})`;
+    }).join(", ");
+    alert(`No se puede guardar la asignación porque hay personal no disponible: ${nombres}.`);
+    return;
+  }
   const idsConConflicto = new Set();
   asignacionesEmpresa.forEach(item => {
     if (item.id === $("asignacionId").value || item.fecha !== fecha) return;
@@ -707,20 +1008,23 @@ async function guardarAsignacion(evento) {
     const id = $("asignacionId").value;
     const batch = writeBatch(db);
     const asignacionAnterior = id ? asignacionesSemana.find(item => item.id === id) : null;
+    const referenciaAsignacion = id ? doc(db, "programaciones", id) : doc(collection(db, "programaciones"));
     if (id) {
-      batch.update(doc(db, "programaciones", id), datos);
+      batch.update(referenciaAsignacion, datos);
     } else {
-      batch.set(doc(collection(db, "programaciones")), {
+      batch.set(referenciaAsignacion, {
         ...datos,
         creadoPor: usuario.uid,
         fechaCreacion: serverTimestamp()
       });
     }
+    registrarHistorialAsignacion(batch, id ? "Asignación modificada" : "Asignación creada", referenciaAsignacion.id, datos);
     marcarSemanaBorrador(batch, datos.semanaInicio);
     if (asignacionAnterior?.semanaInicio && asignacionAnterior.semanaInicio !== datos.semanaInicio) {
       marcarSemanaBorrador(batch, asignacionAnterior.semanaInicio);
     }
     await batch.commit();
+    await cargarDatosOperativosProgramacion();
     cerrarModal("modalAsignacion");
     await cargarSemana();
   } catch (error) {
@@ -740,8 +1044,10 @@ async function eliminarAsignacion() {
     const asignacion = asignacionesSemana.find(item => item.id === id);
     const batch = writeBatch(db);
     batch.delete(doc(db, "programaciones", id));
+    registrarHistorialAsignacion(batch, "Asignación eliminada", id, asignacion || {});
     marcarSemanaBorrador(batch, asignacion?.semanaInicio || fechaISO(semanaInicio));
     await batch.commit();
+    await cargarDatosOperativosProgramacion();
     cerrarModal("modalAsignacion");
     await cargarSemana();
   } catch (error) {
@@ -840,6 +1146,11 @@ function renderVistaCorreo(grupo = "tecnico", personaId = "") {
   ];
   const personas = personasVistaCorreo(grupo);
   const persona = personas.find(item => item.id === personaId) || personas[0] || null;
+  const personaDeEmergencia = Boolean(
+    persona &&
+    ["tecnico", "supervisor"].includes(grupoUsuario(persona)) &&
+    turnosEmergenciaSemana.has(persona.id)
+  );
   const asignaciones = persona
     ? asignacionesSemana.filter(item => idsPersonaPorGrupo(item, grupo).includes(persona.id))
     : [];
@@ -850,10 +1161,10 @@ function renderVistaCorreo(grupo = "tecnico", personaId = "") {
     </div>
     ${personas.length ? `
       <div class="correo-personas" role="tablist" aria-label="Personas del grupo">
-        ${personas.map(item => `<button type="button" class="${item.id === persona?.id ? "active" : ""}" data-correo-persona="${escapar(item.id)}">${escapar(nombreUsuario(item))}</button>`).join("")}
+        ${personas.map(item => `<button type="button" class="${item.id === persona?.id ? "active" : ""}${turnosEmergenciaSemana.has(item.id) && ["tecnico", "supervisor"].includes(grupoUsuario(item)) ? " en-emergencia" : ""}" data-correo-persona="${escapar(item.id)}">${escapar(nombreUsuario(item))}${turnosEmergenciaSemana.has(item.id) && ["tecnico", "supervisor"].includes(grupoUsuario(item)) ? " · Emergencia" : ""}</button>`).join("")}
       </div>
-      <div class="correo-programacion-individual">
-        <div class="correo-encabezado"><h3>Programación individual · Semana ${numeroSemana(semanaInicio)}</h3><p>${escapar(nombreUsuario(persona))} · ${escapar(etiquetaRol(persona))} · ${escapar(empresa?.nombre || "Empresa")}</p></div>
+      <div class="correo-programacion-individual${personaDeEmergencia ? " correo-turno-emergencia" : ""}">
+        <div class="correo-encabezado${personaDeEmergencia ? " emergencia" : ""}"><div class="correo-titulo-linea"><h3>Programación individual · Semana ${numeroSemana(semanaInicio)}</h3>${personaDeEmergencia ? '<span class="correo-emergencia-badge">Turno de emergencia</span>' : ""}</div><p>${escapar(nombreUsuario(persona))} · ${escapar(etiquetaRol(persona))} · ${escapar(empresa?.nombre || "Empresa")}</p>${personaDeEmergencia ? '<div class="correo-emergencia-aviso">Esta persona se encuentra asignada al turno de emergencia durante toda la semana.</div>' : ""}</div>
         <div class="correo-cuerpo">
           ${asignaciones.length ? asignaciones.map(item => `
             <div class="correo-dia"><strong>${escapar(DIAS[Math.max(0, Math.round((new Date(`${item.fecha}T12:00:00`) - new Date(`${fechaISO(semanaInicio)}T12:00:00`)) / 86400000))])} ${escapar(fechaCorta(new Date(`${item.fecha}T12:00:00`)))}</strong><p>${escapar(item.cliente || "Sin cliente")}${detalleOperacionalCorreo(item)}${companerosAsignacionCorreo(item, persona.id)}${item.observaciones ? `<br>${escapar(item.observaciones)}` : ""}</p></div>
@@ -876,6 +1187,94 @@ function abrirVistaCorreo() {
   abrirModal("modalCorreoProgramacion");
 }
 
+function fechaHoraHistorial(valor) {
+  const fecha = valor?.toDate ? valor.toDate() : valor instanceof Date ? valor : null;
+  return fecha ? fecha.toLocaleString("es-CL", { dateStyle: "short", timeStyle: "short" }) : "Recién registrado";
+}
+
+function abrirHistorialProgramacion() {
+  const inicio = fechaISO(semanaInicio);
+  const registros = historialProgramacion
+    .filter(item => item.semanaInicio === inicio)
+    .sort((a, b) => (b.fechaCreacion?.seconds || 0) - (a.fechaCreacion?.seconds || 0));
+  $("listaHistorialProgramacion").innerHTML = registros.length
+    ? registros.map(item => `<article><div><strong>${escapar(item.accion || "Modificación")}</strong><span>${escapar(item.cliente || "Sin cliente")}${item.fechaActividad ? ` · ${escapar(item.fechaActividad)}` : ""}</span>${item.participantes?.length ? `<small>${escapar(item.participantes.join(", "))}</small>` : ""}</div><div><strong>${escapar(item.realizadoPorNombre || "Usuario")}</strong><time>${escapar(fechaHoraHistorial(item.fechaCreacion))}</time></div></article>`).join("")
+    : '<div class="correo-vacio">Esta semana todavía no tiene modificaciones registradas.</div>';
+  abrirModal("modalHistorialProgramacion");
+}
+
+function renderAusenciasProgramacion() {
+  const inicio = fechaISO(semanaInicio);
+  const termino = fechaISO(sumarDias(semanaInicio, 6));
+  const registros = ausenciasEmpresa
+    .filter(item => item.fechaInicio <= termino && item.fechaTermino >= inicio)
+    .sort((a, b) => `${a.fechaInicio}_${a.usuarioNombre || ""}`.localeCompare(`${b.fechaInicio}_${b.usuarioNombre || ""}`, "es"));
+  $("listaAusenciasProgramacion").innerHTML = registros.length
+    ? registros.map(item => `<article data-ausencia-id="${escapar(item.id)}"><div><strong>${escapar(item.usuarioNombre || "Trabajador")}</strong><span>${escapar(item.tipo || "Ausencia")} · ${escapar(item.fechaInicio)} al ${escapar(item.fechaTermino)}</span>${item.observacion ? `<small>${escapar(item.observacion)}</small>` : ""}</div><button type="button" class="btn-eliminar-ausencia">Eliminar</button></article>`).join("")
+    : '<div class="correo-vacio">No hay ausencias registradas durante esta semana.</div>';
+}
+
+function abrirAusenciasProgramacion() {
+  const trabajadores = usuariosEmpresa.filter(item => item.activo !== false && ["tecnico", "supervisor"].includes(grupoUsuario(item)));
+  $("ausenciaUsuarioProgramacion").innerHTML = '<option value="">Selecciona un trabajador</option>' + trabajadores
+    .map(item => `<option value="${escapar(item.id)}">${escapar(nombreUsuario(item))} · ${escapar(etiquetaRol(item))}</option>`).join("");
+  $("formAusenciaProgramacion").reset();
+  $("ausenciaIdProgramacion").value = "";
+  $("ausenciaInicioProgramacion").value = fechaISO(semanaInicio);
+  $("ausenciaTerminoProgramacion").value = fechaISO(semanaInicio);
+  renderAusenciasProgramacion();
+  abrirModal("modalAusenciasProgramacion");
+}
+
+async function guardarAusenciaProgramacion(evento) {
+  evento.preventDefault();
+  if (!PUEDE_EDITAR) return;
+  const usuarioId = $("ausenciaUsuarioProgramacion").value;
+  const perfil = usuariosEmpresa.find(item => item.id === usuarioId);
+  const fechaInicio = $("ausenciaInicioProgramacion").value;
+  const fechaTermino = $("ausenciaTerminoProgramacion").value;
+  if (!perfil || !fechaInicio || !fechaTermino || fechaTermino < fechaInicio) {
+    alert("Selecciona un trabajador y un rango de fechas válido.");
+    return;
+  }
+  try {
+    await addDoc(collection(db, "programacionAusencias"), {
+      empresaId,
+      sucursalId: perfil.sucursalId || usuario.sucursalId || "",
+      usuarioId,
+      usuarioNombre: nombreUsuario(perfil),
+      tipo: $("ausenciaTipoProgramacion").value,
+      observacion: $("ausenciaObservacionProgramacion").value.trim(),
+      fechaInicio,
+      fechaTermino,
+      creadoPor: usuario.uid,
+      fechaCreacion: serverTimestamp()
+    });
+    await cargarDatosOperativosProgramacion();
+    renderAusenciasProgramacion();
+    renderCuadro();
+    $("formAusenciaProgramacion").reset();
+    $("ausenciaInicioProgramacion").value = fechaISO(semanaInicio);
+    $("ausenciaTerminoProgramacion").value = fechaISO(semanaInicio);
+  } catch (error) {
+    console.error("No fue posible guardar la ausencia:", error);
+    alert("No fue posible guardar la ausencia.");
+  }
+}
+
+async function eliminarAusenciaProgramacion(id) {
+  if (!PUEDE_EDITAR || !id || !confirm("¿Eliminar esta ausencia?")) return;
+  try {
+    await deleteDoc(doc(db, "programacionAusencias", id));
+    await cargarDatosOperativosProgramacion();
+    renderAusenciasProgramacion();
+    renderCuadro();
+  } catch (error) {
+    console.error("No fue posible eliminar la ausencia:", error);
+    alert("No fue posible eliminar la ausencia.");
+  }
+}
+
 function configurarInterfaz() {
   $("usuarioNombreProgramacion").textContent = usuario.nombre || usuario.email || "Usuario";
   $("usuarioRolProgramacion").textContent = usuario.rol || "Rol";
@@ -887,7 +1286,7 @@ function configurarInterfaz() {
   $("menuOrdenesProgramacion").style.display = esUsuarioSheq || esBodeguero ? "none" : "";
   $("menuSheqProgramacion").style.display = ["sheq", "planificador", "admin_empresa", "admin_sucursal"].includes(usuario.rol) ? "" : "none";
   $("menuInventarioProgramacion").style.display = ["planificador", "admin_empresa", "admin_sucursal", "bodeguero"].includes(usuario.rol) ? "" : "none";
-  if (!PUEDE_VER_PROGRAMACION_COMPLETA) {
+  if (ES_TRABAJADOR_CON_SEMANA_PERSONAL) {
     grupoActivo = "mi-semana";
     document.querySelectorAll("[data-grupo]").forEach(boton => {
       const esMiSemana = boton.dataset.grupo === "mi-semana";
@@ -905,6 +1304,8 @@ function configurarInterfaz() {
     await cargarSemana();
   });
   $("btnNuevaAsignacion").addEventListener("click", abrirNuevaAsignacion);
+  $("btnHistorialProgramacion").addEventListener("click", abrirHistorialProgramacion);
+  $("btnAusenciasProgramacion").addEventListener("click", abrirAusenciasProgramacion);
   $("btnVistaCorreo").addEventListener("click", abrirVistaCorreo);
   $("btnPublicarSemana").addEventListener("click", publicarSemana);
   $("formAsignacion").addEventListener("submit", guardarAsignacion);
@@ -947,7 +1348,8 @@ function configurarInterfaz() {
   $("btnAgregarTrabajador").addEventListener("click", () => {
     const grupo = $("asignacionGrupo").value || "tecnico";
     const trabajadores = usuariosDisponiblesPorGrupo(usuariosEmpresa, grupo);
-    const ocupados = $("asignacionTipo").value === "capacitacion" ? new Set() : idsOcupadosEnFecha($("asignacionFecha").value, $("asignacionId").value);
+    const ocupadosAsignacion = $("asignacionTipo").value === "capacitacion" ? new Set() : idsOcupadosEnFecha($("asignacionFecha").value, $("asignacionId").value);
+    const ocupados = new Set([...ocupadosAsignacion, ...idsAusentesEnFecha($("asignacionFecha").value)]);
     $("listaAsignacionUsuarios").appendChild(crearFilaTrabajador(trabajadores, "", [], true, ocupados));
     $("listaAsignacionUsuarios").lastElementChild?.querySelector("select")?.focus();
   });
@@ -959,6 +1361,9 @@ function configurarInterfaz() {
     if (!evento.target.matches(".asignacion-os-cerrada")) return;
     evento.target.closest(".fila-asignacion-os")?.classList.toggle("os-cerrada", evento.target.checked);
   });
+  $("listaAsignacionOs").addEventListener("input", evento => {
+    if (evento.target.matches(".asignacion-os-numero")) actualizarAlertaInventarioFormulario();
+  });
   $("listaAsignacionOs").addEventListener("click", evento => {
     const boton = evento.target.closest(".btn-quitar-os");
     if (boton) boton.closest(".fila-asignacion-os")?.remove();
@@ -967,6 +1372,11 @@ function configurarInterfaz() {
   $("asignacionSupervisor").addEventListener("change", actualizarAlertaSheqTrabajador);
   $("asignacionSheq").addEventListener("change", actualizarAlertaSheqTrabajador);
   $("btnEliminarAsignacion").addEventListener("click", eliminarAsignacion);
+  $("formAusenciaProgramacion").addEventListener("submit", guardarAusenciaProgramacion);
+  $("listaAusenciasProgramacion").addEventListener("click", evento => {
+    const boton = evento.target.closest(".btn-eliminar-ausencia");
+    if (boton) eliminarAusenciaProgramacion(boton.closest("[data-ausencia-id]")?.dataset.ausenciaId);
+  });
 
   document.querySelectorAll("[data-cerrar-modal]").forEach(boton => {
     boton.addEventListener("click", () => cerrarModal(boton.dataset.cerrarModal));
@@ -1007,6 +1417,7 @@ async function iniciar() {
     if (!await cargarEmpresa()) return;
     await cargarUsuariosYSucursales();
     await cargarDocumentosSheq();
+    await cargarDatosOperativosProgramacion();
     await cargarSemana();
   } catch (error) {
     console.error("Error iniciando Programación semanal:", error);

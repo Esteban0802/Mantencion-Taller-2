@@ -1,6 +1,7 @@
 // ==========================================
 // MÓDULO DESPACHO — OVERTRACK
 // ==========================================
+import { reautenticarAccionCritica } from "../session.js?v=20261017-1";
 
 export function inicializarModuloDespacho(servicios) {
   let cierreEnCurso = false;
@@ -351,6 +352,8 @@ export function inicializarModuloDespacho(servicios) {
         textoConfirmar: "Cerrar OT",
         peligrosa: true
       }))) return;
+
+      if (!(await reautenticarAccionCritica("cerrar definitivamente esta orden de trabajo"))) return;
 
       if (!validarOTCompleta()) return;
 

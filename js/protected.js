@@ -39,7 +39,7 @@ function createLogoutButton(userData) {
     
     const logoutBtn = document.createElement('button');
     logoutBtn.id = 'overtrack-logout';
-    logoutBtn.innerHTML = `👋 Cerrar Sesión (${userData.email})`;
+    logoutBtn.textContent = `👋 Cerrar Sesión (${userData.email || "Usuario"})`;
     logoutBtn.className = 'btn-logout';
     logoutBtn.style.cssText = `
         position: fixed;

@@ -9,11 +9,13 @@ Vectaria es una plataforma web multiempresa para gestionar órdenes de trabajo, 
 - Administración global de empresas, planes y módulos.
 - Separación de datos por empresa y sucursal.
 - Administración de usuarios y estados de acceso.
-- Roles de superadministrador, administrador de empresa, jefe de taller y técnico.
+- Roles de superadministrador, administrador de empresa, administrador de sucursal, jefe de taller, supervisor, técnico y perfiles especializados.
 - Creación y seguimiento de órdenes de trabajo.
 - Flujo configurable con ingreso, evaluación, mantención, pruebas y despacho.
-- Checklists, evidencias fotográficas y comentarios.
-- Aprobaciones del jefe de taller.
+- Plantillas de checklist administradas por sucursal y asociadas a la gama de equipo.
+- Etapas de trabajo obtenidas desde la plantilla aplicable, sin cargas manuales dentro de cada etapa.
+- Evidencias fotográficas, documentos y comentarios con control de autoría.
+- Aprobaciones por etapa configuradas y resueltas exclusivamente por el jefe de taller.
 - Gestión de repuestos.
 - Carta Gantt.
 - Informes PDF personalizables por empresa.
@@ -78,11 +80,15 @@ La validación comprueba:
 - Acceso a órdenes de trabajo.
 - Lectura, carga y eliminación de archivos en Storage.
 
-El resultado esperado actualmente es:
+La validación automatizada incluye actualmente 29 pruebas unitarias y 125 casos de reglas de seguridad. Cada conjunto debe finalizar sin fallos:
 
 ```text
-tests 80
-pass 80
+tests 29
+pass 29
+fail 0
+
+tests 125
+pass 125
 fail 0
 ```
 

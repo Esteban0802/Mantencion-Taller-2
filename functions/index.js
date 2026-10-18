@@ -180,6 +180,13 @@ async function obtenerSolicitante(request) {
   return { uid: request.auth.uid, ...snap.data() };
 }
 
+function exigirAutenticacionReciente(request, minutos = 15) {
+  const authTime = Number(request.auth?.token?.auth_time || 0);
+  if (!authTime || Date.now() / 1000 - authTime > minutos * 60) {
+    throw new HttpsError("unauthenticated", "Debes confirmar nuevamente tu identidad para realizar esta operación.");
+  }
+}
+
 function puedeAdministrarEmpresa(solicitante, empresaId) {
   return solicitante.rol === "super_admin" ||
     (solicitante.rol === "admin_empresa" && solicitante.empresaId === empresaId) ||
@@ -218,6 +225,8 @@ function validarRolCreable(solicitante, rol) {
 
 async function registrarAuditoria({ solicitante, empresaId, accion, objetivoId, detalle }) {
   await db.collection("logsSistema").add({
+    version: 1,
+    origen: "cloud_function",
     empresaId: empresaId || "",
     usuarioId: solicitante.uid,
     usuarioNombre: solicitante.nombreCompleto || solicitante.nombre || solicitante.correo || "Usuario",
@@ -228,6 +237,23 @@ async function registrarAuditoria({ solicitante, empresaId, accion, objetivoId, 
     fecha: FieldValue.serverTimestamp()
   });
 }
+
+exports.registrarCierreSesion = onCall(CALLABLE_OPTIONS, async request => {
+  const solicitante = await obtenerSolicitante(request);
+  const motivosPermitidos = new Set(["manual", "inactividad", "cierre_desde_aviso_inactividad"]);
+  const motivo = texto(request.data?.motivo, 60);
+  if (!motivosPermitidos.has(motivo)) {
+    throw new HttpsError("invalid-argument", "El motivo de cierre no es válido.");
+  }
+  await registrarAuditoria({
+    solicitante,
+    empresaId: solicitante.empresaId || "",
+    accion: "cierre_sesion",
+    objetivoId: solicitante.uid,
+    detalle: `Motivo: ${motivo}`
+  });
+  return { ok: true };
+});
 
 async function validarCupoUsuariosEmpresa(empresaId, solicitante) {
   const [empresaSnap, usuariosSnap] = await Promise.all([
@@ -835,6 +861,9 @@ exports.cambiarEstadoUsuario = onCall(CALLABLE_OPTIONS, async request => {
   if (objetivo.rol === "super_admin") {
     throw new HttpsError("permission-denied", "Esta operación no administra superadministradores.");
   }
+  if (!activo && ["admin_empresa", "admin_sucursal", "jefe_taller"].includes(objetivo.rol)) {
+    exigirAutenticacionReciente(request);
+  }
   if (!puedeAdministrarEmpresa(solicitante, objetivo.empresaId)) {
     throw new HttpsError("permission-denied", "No puedes administrar este usuario.");
   }
@@ -908,6 +937,7 @@ exports.actualizarSucursalUsuario = onCall(CALLABLE_OPTIONS, async request => {
       "Este perfil administra toda la empresa y no requiere sucursal."
     );
   }
+  exigirAutenticacionReciente(request);
   if (solicitante.rol === "admin_empresa" &&
       solicitante.empresaId !== objetivo.empresaId) {
     throw new HttpsError(
@@ -968,6 +998,7 @@ exports.actualizarSucursalUsuario = onCall(CALLABLE_OPTIONS, async request => {
 
 exports.eliminarUsuarioEmpresa = onCall(CALLABLE_OPTIONS, async request => {
   const solicitante = await obtenerSolicitante(request);
+  exigirAutenticacionReciente(request);
   const usuarioId = texto(request.data?.usuarioId, 128);
   if (!usuarioId || usuarioId === solicitante.uid) {
     throw new HttpsError("failed-precondition", "No puedes eliminar tu propia cuenta.");
@@ -1100,6 +1131,7 @@ exports.crearEmpresaConAdministrador = onCall(CALLABLE_OPTIONS, async request =>
 
 exports.solicitarCancelacionEmpresa = onCall(CALLABLE_OPTIONS, async request => {
   const solicitante = await obtenerSolicitante(request);
+  exigirAutenticacionReciente(request);
   const empresaId = texto(request.data?.empresaId, 128);
   if (!empresaId) {
     throw new HttpsError("invalid-argument", "Falta la empresa que deseas cancelar.");
@@ -1164,6 +1196,7 @@ exports.eliminarEmpresaCompleta = onCall({
   maxInstances: 2
 }, async request => {
   const solicitante = await obtenerSolicitante(request);
+  exigirAutenticacionReciente(request);
   if (solicitante.rol !== "super_admin") {
     throw new HttpsError(
       "permission-denied",
@@ -1218,6 +1251,10 @@ exports.eliminarEmpresaCompleta = onCall({
     "inventarioConfiguraciones",
     "programaciones",
     "programacionSemanas",
+    "programacionPublicadaUsuarios",
+    "programacionHistorial",
+    "programacionAusencias",
+    "programacionConfirmaciones",
     "sheqContratos",
     "sheqVehiculos",
     "sheqDocumentos",
@@ -1288,7 +1325,9 @@ exports.generarExportacionEmpresa = onCall({
   const colecciones = [
     "usuarios", "sucursales", "clientes", "equipos", "ots", "otsResumen",
     "plantillasMantenimiento", "inventarioItems", "inventarioConfiguraciones",
-    "programaciones", "programacionSemanas", "sheqContratos", "sheqVehiculos",
+    "programaciones", "programacionSemanas", "programacionPublicadaUsuarios",
+    "programacionHistorial", "programacionAusencias", "programacionConfirmaciones",
+    "sheqContratos", "sheqVehiculos",
     "sheqDocumentos", "logsSistema"
   ];
 
@@ -1413,16 +1452,27 @@ exports.publicarProgramacion = onCall(CALLABLE_OPTIONS, async request => {
   const termino = new Date(inicio);
   termino.setUTCDate(termino.getUTCDate() + 6);
   const semanaTermino = termino.toISOString().slice(0, 10);
-  const [asignacionesSnap, semanaSnap, usuariosSnap] = await Promise.all([
+  const [asignacionesSnap, semanaSnap, usuariosSnap, confirmacionesSnap] = await Promise.all([
     db.collection("programaciones").where("empresaId", "==", empresaId).get(),
     db.collection("programacionSemanas").doc(`${empresaId}_${semanaInicio}`).get(),
-    db.collection("usuarios").where("empresaId", "==", empresaId).get()
+    db.collection("usuarios").where("empresaId", "==", empresaId).get(),
+    db.collection("programacionConfirmaciones").where("empresaId", "==", empresaId).get()
   ]);
   const actuales = asignacionesSnap.docs
     .map(programacionPublicable)
     .filter(item => item.fecha >= semanaInicio && item.fecha <= semanaTermino);
   if (!actuales.length) throw new HttpsError("failed-precondition", "La semana no tiene asignaciones.");
   const anteriores = Array.isArray(semanaSnap.data()?.snapshotPublicado) ? semanaSnap.data().snapshotPublicado : [];
+  const turnosEmergenciaActuales = new Set(
+    Array.isArray(semanaSnap.data()?.turnosEmergenciaIds)
+      ? semanaSnap.data().turnosEmergenciaIds
+      : []
+  );
+  const turnosEmergenciaAnteriores = new Set(
+    Array.isArray(semanaSnap.data()?.snapshotTurnosEmergenciaIds)
+      ? semanaSnap.data().snapshotTurnosEmergenciaIds
+      : []
+  );
   const primeraPublicacion = !anteriores.length;
   const anteriorPorId = new Map(anteriores.map(item => [item.id, item]));
   const actualPorId = new Map(actuales.map(item => [item.id, item]));
@@ -1453,31 +1503,52 @@ exports.publicarProgramacion = onCall(CALLABLE_OPTIONS, async request => {
       cambiosPorUsuario.get(id).push({ ...cambio, accion: accionUsuario });
     });
   });
+  const usuariosConCambioTurno = new Set([
+    ...turnosEmergenciaActuales,
+    ...turnosEmergenciaAnteriores
+  ].filter(id => turnosEmergenciaActuales.has(id) !== turnosEmergenciaAnteriores.has(id)));
+  usuariosConCambioTurno.forEach(id => {
+    if (!cambiosPorUsuario.has(id)) cambiosPorUsuario.set(id, []);
+  });
+  const cantidadCambios = cambios.length + usuariosConCambioTurno.size;
   const lote = db.batch();
+  if (cantidadCambios > 0) {
+    confirmacionesSnap.docs
+      .filter(item => item.data().semanaInicio === semanaInicio)
+      .forEach(item => lote.delete(item.ref));
+  }
   const correosActivos = empresaSnap.data().envioCorreosProgramacion === true;
   let enCola = 0;
   let destinatariosPotenciales = 0;
   let sinCorreo = 0;
   for (const [usuarioId, cambiosUsuario] of cambiosPorUsuario) {
     const perfil = usuarios.get(usuarioId);
+    const estaDeEmergencia = turnosEmergenciaActuales.has(usuarioId);
+    const cambioTurnoEmergencia = usuariosConCambioTurno.has(usuarioId);
     const correo = texto(perfil?.email || perfil?.correo, 160).toLowerCase();
     if (!correoValido(correo)) { sinCorreo += 1; continue; }
     destinatariosPotenciales += 1;
     if (!correosActivos) continue;
-    const asunto = primeraPublicacion
+    const asuntoBase = primeraPublicacion
       ? `Programación semanal · ${semanaInicio}`
       : `Cambio en tu programación · ${semanaInicio}`;
+    const asunto = estaDeEmergencia ? `Turno de emergencia · ${asuntoBase}` : asuntoBase;
     const contenido = cambiosUsuario.map(cambio => {
       const asignacion = cambio.actual || cambio.anterior;
       return detalleProgramacionHtml(asignacion, cambio.accion, companerosProgramacion(asignacion, usuarioId, usuarios));
     }).join("");
+    const avisoEmergencia = estaDeEmergencia
+      ? `<div style="margin:14px 0;padding:12px 14px;border:1px solid #e6a22b;border-radius:10px;background:#fff4d6;color:#6f4500"><strong>Turno de emergencia</strong><br>Te encuentras asignado al turno de emergencia durante toda esta semana.</div>`
+      : cambioTurnoEmergencia
+        ? `<div style="margin:14px 0;padding:12px 14px;border:1px solid #cad6e0;border-radius:10px;background:#f5f8fb;color:#42566a"><strong>Turno de emergencia actualizado</strong><br>Ya no figuras asignado al turno de emergencia de esta semana.</div>`
+        : "";
     const referencia = db.collection("mail").doc();
     lote.set(referencia, {
       to: correo,
       message: {
         subject: asunto,
-        html: `<div style="font-family:Arial,sans-serif;color:#17324a"><h2>${escaparHtml(empresaSnap.data().nombre || "Vectaria")}</h2><p>Hola ${escaparHtml(perfil?.nombreCompleto || perfil?.nombre || "")},</p><p>${primeraPublicacion ? "Esta es tu programación completa para la semana." : "Se realizaron cambios que afectan tu programación."}</p>${contenido}<p>Revisa el sistema para consultar la programación vigente.</p></div>`,
-        text: `${primeraPublicacion ? "Programación semanal" : "Cambios de programación"} desde ${semanaInicio}. Ingresa al sistema para ver el detalle.`
+        html: `<div style="font-family:Arial,sans-serif;color:#17324a"><div style="padding:18px 20px;border-radius:12px 12px 0 0;background:${estaDeEmergencia ? "#51380d" : "#0b1d33"};color:#fff"><h2 style="margin:0">${escaparHtml(empresaSnap.data().nombre || "Vectaria")}</h2>${estaDeEmergencia ? '<p style="margin:8px 0 0;color:#ffd987;font-weight:bold">TURNO DE EMERGENCIA</p>' : ""}</div><p>Hola ${escaparHtml(perfil?.nombreCompleto || perfil?.nombre || "")},</p><p>${primeraPublicacion ? "Esta es tu programación completa para la semana." : "Se realizaron cambios que afectan tu programación."}</p>${avisoEmergencia}${contenido}<p>Revisa el sistema para consultar la programación vigente.</p></div>`,
+        text: `${estaDeEmergencia ? "TURNO DE EMERGENCIA. " : cambioTurnoEmergencia ? "Tu turno de emergencia fue actualizado. " : ""}${primeraPublicacion ? "Programación semanal" : "Cambios de programación"} desde ${semanaInicio}. Ingresa al sistema para ver el detalle.`
       },
       empresaId, semanaInicio, usuarioId,
       tipo: primeraPublicacion ? "programacion_completa" : "cambio_programacion",
@@ -1487,24 +1558,38 @@ exports.publicarProgramacion = onCall(CALLABLE_OPTIONS, async request => {
     });
     enCola += 1;
   }
+  for (const [usuarioId, perfil] of usuarios) {
+    if (!['tecnico', 'supervisor'].includes(perfil?.rol) || perfil?.activo === false) continue;
+    lote.set(db.collection("programacionPublicadaUsuarios").doc(`${empresaId}_${semanaInicio}_${usuarioId}`), {
+      empresaId,
+      semanaInicio,
+      estado: "publicada",
+      usuarioId,
+      asignaciones: actuales.filter(item => idsProgramacion(item).includes(usuarioId)),
+      turnoEmergencia: turnosEmergenciaActuales.has(usuarioId),
+      turnosEmergenciaIds: turnosEmergenciaActuales.has(usuarioId) ? [usuarioId] : [],
+      fechaPublicacion: FieldValue.serverTimestamp()
+    }, { merge: false });
+  }
   lote.set(db.collection("programacionSemanas").doc(`${empresaId}_${semanaInicio}`), {
     empresaId, semanaInicio, estado: "publicada",
     publicadoPor: solicitante.uid,
     fechaPublicacion: FieldValue.serverTimestamp(),
     cantidadAsignaciones: actuales.length,
     snapshotPublicado: actuales,
+    snapshotTurnosEmergenciaIds: [...turnosEmergenciaActuales],
     ultimoEnvio: {
       tipo: primeraPublicacion ? "completo" : "cambios",
       modoPrueba: !correosActivos,
       destinatarios: enCola,
       destinatariosPotenciales,
-      cambios: cambios.length,
+      cambios: cantidadCambios,
       sinCorreo
     }
   }, { merge: true });
   await lote.commit();
-  await registrarAuditoria({ solicitante, empresaId, accion: "programacion_publicada", objetivoId: semanaInicio, detalle: `${primeraPublicacion ? "Completa" : "Cambios"}: ${cambios.length}; modo prueba: ${!correosActivos}; correos en cola: ${enCola}` });
-  return { ok: true, primeraPublicacion, cambios: cambios.length, modoPrueba: !correosActivos, destinatarios: enCola, destinatariosPotenciales, sinCorreo };
+  await registrarAuditoria({ solicitante, empresaId, accion: "programacion_publicada", objetivoId: semanaInicio, detalle: `${primeraPublicacion ? "Completa" : "Cambios"}: ${cantidadCambios}; modo prueba: ${!correosActivos}; correos en cola: ${enCola}` });
+  return { ok: true, primeraPublicacion, cambios: cantidadCambios, modoPrueba: !correosActivos, destinatarios: enCola, destinatariosPotenciales, sinCorreo };
 });
 
 exports.limpiarExportacionesExpiradas = onSchedule({

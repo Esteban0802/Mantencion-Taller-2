@@ -3,13 +3,15 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="js/sidebar-preload.js?v=20261016-2"></script>
   <title>Taller | Vectaria</title>
   <link rel="icon" type="image/png" href="img/vectaria-favicon-official.png?v=3">
-  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/styles.css?v=20261018-8">
   <link rel="stylesheet" href="css/brand-overtrack.css">
   <link rel="stylesheet" href="css/brand-overtrack-light.css">
   <link rel="stylesheet" href="css/notificaciones.css?v=20261007-1">
     <link rel="stylesheet" href="css/desktop-density.css?v=20261004-7">
+  <link rel="stylesheet" href="css/mobile-normalized.css?v=20261018-4">
 </head>
 <body class="dashboard-overtrack dashboard-page">
 
@@ -74,17 +76,16 @@
         <span>Inventario</span>
       </li>
       <li
-        id="menuProgramacion"
+        id="menuSheq"
         role="button"
         tabindex="0"
         style="display:none"
-        onclick="irProgramacion()"
+        onclick="irSheq()"
       >
-        <svg class="ot-icon nav-icon" aria-hidden="true"><use href="img/icons-overtrack.svg#calendar"></use></svg>
-        <span>Programación</span>
-      </li>
-      <li id="menuSheq" role="button" tabindex="0" style="display:none" onclick="irSheq()">
         <span class="nav-icon" aria-hidden="true">🛡️</span><span>SHEQ</span>
+      </li>
+      <li id="menuProgramacion" role="button" tabindex="0" style="display:none" onclick="irProgramacion()">
+        <svg class="ot-icon nav-icon" aria-hidden="true"><use href="img/icons-overtrack.svg#calendar"></use></svg><span>Programación</span>
       </li>
       <li
           id="btnPanelEmpresa"
@@ -318,9 +319,9 @@
 
     <div class="popover-gantt-header">
 
-      <h3>📊 Información OT</h3>
+      <h3><span aria-hidden="true">▥</span> Resumen de planificación</h3>
 
-      <button onclick="cerrarPopoverGantt()">
+      <button onclick="cerrarPopoverGantt()" aria-label="Cerrar resumen de planificación">
         ×
       </button>
 
@@ -334,6 +335,6 @@
 
 <script src="js/components/notificaciones.js?v=20261007-1"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.min.js"></script>
-<script type="module" src="js/dashboard.js?v=20261014-5"></script>
+<script type="module" src="js/dashboard.js?v=20261018-8"></script>
 </body>
 </html>

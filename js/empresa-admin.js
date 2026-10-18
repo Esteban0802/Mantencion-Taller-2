@@ -1,9 +1,10 @@
 import { renderVistaUsuariosEmpresa } from "./empresa/usuarios.js";
 import { renderVistaSucursalesEmpresa } from "./empresa/sucursales.js";
 import { app, db } from "./firebase-config.js";
-import { protegerPagina, cerrarSesion } from "./session.js?v=20261004-1";
+import { protegerPagina, cerrarSesion, reautenticarAccionCritica } from "./session.js?v=20261017-1";
 import { aplicarModulosEnInterfaz, moduloActivo, obtenerModulosEmpresa} from "./modulos.js";
 import { evaluarCuotaStorage, mensajeCuotaStorage } from "./storage-quota.js";
+import { validarFirmaArchivo } from "./file-validation.js";
 
 import {
   doc,
@@ -983,6 +984,7 @@ async function solicitarCancelacionEmpresa() {
     peligrosa: true
   });
   if (!confirmado) return;
+  if (!(await reautenticarAccionCritica("solicitar la cancelación de esta empresa"))) return;
   try {
     const resultado = await solicitarCancelacionEmpresaSegura({ empresaId: empresaActual.id });
     empresaActual.activa = false;
@@ -1396,6 +1398,8 @@ async function guardarPlantillaMantenimiento(evento) {
   const archivo = document.getElementById("plantillaArchivo").files?.[0];
   if (!gama || !nombre || !archivo) return alert("Completa la gama, el nombre y selecciona el archivo Excel.");
   if (archivo.size > 5 * 1024 * 1024) return alert("El archivo Excel no puede superar 5 MB.");
+  const tipoPlantilla = /\.xls$/i.test(archivo.name) ? "application/vnd.ms-excel" : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+  await validarFirmaArchivo(archivo, tipoPlantilla);
   const gamaNormalizada = normalizarTextoPlantilla(gama);
   if (plantillasMantenimientoActuales.some(item => item.activa !== false && item.gamaNormalizada === gamaNormalizada)) return alert("Ya existe una plantilla activa para esta gama.");
   const boton = evento.submitter;
@@ -1472,6 +1476,7 @@ function validarImagenInforme(archivo, maxMB, nombreCampo) {
 }
 
 async function subirImagenInforme(archivo, nombreBase) {
+  await validarFirmaArchivo(archivo, archivo.type);
   const resultadoCuota = evaluarCuotaStorage({
     usadoBytes: empresaActual.storageUsadoBytes,
     maxStorageGB: empresaActual.maxStorageGB,

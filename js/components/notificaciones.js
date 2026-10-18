@@ -173,7 +173,8 @@
     valorEsperado = "",
     textoConfirmar = "Continuar",
     textoCancelar = "Cancelar",
-    peligrosa = false
+    peligrosa = false,
+    tipoCampo = "text"
   } = {}) {
     tipo = normalizarTipo(tipo);
 
@@ -203,6 +204,8 @@
       fondo.querySelector("#otPromptTitle").textContent = titulo;
       fondo.querySelector("#otPromptMessage").textContent = mensaje;
       const campo = fondo.querySelector(".ot-feedback-field input");
+      campo.type = tipoCampo === "password" ? "password" : "text";
+      if (campo.type === "password") campo.autocomplete = "current-password";
       fondo.querySelector(".ot-feedback-field span").textContent = etiqueta;
       const cancelar = fondo.querySelector(".ot-feedback-secondary");
       const confirmar = fondo.querySelector(".ot-feedback-primary");

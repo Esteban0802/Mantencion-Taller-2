@@ -478,7 +478,7 @@ Actualmente el servicio se encuentra en etapa de Evaluación. Se está desarroll
 `,
 
     OVERHAUL: `
-Actualmente el servicio se encuentra en etapa de Overhaul. Las etapas previas han permitido levantar antecedentes técnicos y el equipo se encuentra en proceso de intervención conforme a la planificación establecida.
+Actualmente el servicio se encuentra en etapa de Mantención. Las etapas previas han permitido levantar antecedentes técnicos y el equipo se encuentra en proceso de intervención conforme a la planificación establecida.
 `,
 
     PRUEBAS: `

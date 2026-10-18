@@ -2,13 +2,13 @@
 
 ## 1. Visión general
 
-Vectaria será una plataforma web multiempresa para la gestión de órdenes de servicio, mantenimiento, evidencias técnicas, checklist, aprobaciones, reportes PDF y trazabilidad operacional.
+Vectaria es una plataforma web multiempresa para la gestión de órdenes de servicio, mantenimiento, evidencias técnicas, checklist, aprobaciones, reportes PDF y trazabilidad operacional.
 
 El sistema permitirá que múltiples empresas utilicen la misma plataforma, manteniendo sus datos separados por empresa y sucursal.
 
 ## 2. Objetivo principal
 
-Transformar Vectaria desde un sistema operativo de taller a una plataforma SaaS multiempresa, donde cada empresa pueda administrar sus usuarios, sucursales, órdenes de servicio y reportes.
+Consolidar Vectaria como una plataforma SaaS multiempresa, donde cada empresa administra sus usuarios, sucursales, plantillas, órdenes de servicio y reportes con separación segura de datos.
 
 ## 3. Estructura general
 
@@ -52,22 +52,29 @@ Rol operativo con permisos de supervisión.
 
 Puede:
 - Crear órdenes de servicio.
-- Cargar checklist.
-- Planificar Gantt.
-- Aprobar etapas.
+- Modificar la identificación de la OT.
+- Configurar aprobaciones por etapa antes de que exista actividad.
+- Crear y modificar la Carta Gantt.
+- Aprobar o rechazar las etapas configuradas.
+- Cerrar o eliminar órdenes de servicio.
 - Generar informes PDF.
-- Ver OS de su sucursal.
+- Registrar observaciones y ver las OT de su sucursal.
 
-### Técnico
+### Supervisor y Técnico
 
 Rol operativo técnico.
 
 Puede:
-- Completar checklist.
+- Completar las actividades de cada etapa.
 - Subir fotografías.
 - Agregar comentarios.
+- Modificar o eliminar únicamente sus propios comentarios y evidencias.
+- Registrar el uso de repuestos disponibles.
 - Guardar avances.
-- Ver OS asignadas o de su sucursal.
+- Visualizar la Carta Gantt sin modificarla.
+- Ver las OT dentro de su alcance.
+
+Los checklist no se cargan dentro de las etapas. El Administrador de Empresa o de Sucursal mantiene las plantillas, asociadas a una gama de equipo; al crear una OT, el sistema utiliza la plantilla aplicable para generar sus etapas y actividades.
 
 ## 5. Principio clave de seguridad
 
@@ -106,15 +113,17 @@ Vectaria ya cuenta con:
 - Informe PDF.
 - empresaId y sucursalId en las OS.
 
-## 8. Próximo objetivo
+## 8. Etapa actual y próximo objetivo
 
-Construir el Panel Super Administrador para gestionar:
+El Panel Super Administrador y los módulos operativos principales ya están implementados. El proyecto se encuentra en preproducción avanzada.
 
-- Empresas.
-- Sucursales.
-- Usuarios.
-- Estado de empresas.
-- Planes.
+Los próximos objetivos son:
+
+- Completar la validación automática de reglas de seguridad.
+- Ejecutar la matriz manual completa por rol.
+- Normalizar la construcción de producción y el control de versiones.
+- Configurar dominio, App Check, respaldos, correo y monitoreo.
+- Completar la revisión legal y preparar el lanzamiento formal.
 
 
 ---
@@ -262,7 +271,7 @@ Ejemplos:
 - OS eliminada
 - Informe generado
 - Etapa aprobada
-- Checklist cargado
+- Plantilla de checklist asignada
 
 
 

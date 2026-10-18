@@ -450,13 +450,16 @@ export async function agregarComentarioItem(i) {
         inputTexto.value = "";
     }
 
-    const guardado = await guardarCambiosOT();
+    renderComentariosItem(i);
+    const guardado = await guardarCambiosOT(true);
     if (!guardado) {
         item.comentarios.splice(cantidadComentariosAnterior);
         ot.alertaJefe = alertaJefeAnterior;
         if (bitacoraAnterior) ot.bitacora = bitacoraAnterior;
         else delete ot.bitacora;
-        if (inputTexto) inputTexto.value = texto;
+        const inputActual = document.getElementById(`comentario-${i}`);
+        if (inputActual) inputActual.value = texto;
+        renderComentariosItem(i);
         return;
     }
 
@@ -593,11 +596,14 @@ export async function agregarComentarioEvaluacion(i) {
         inputTexto.value = "";
     }
 
-    const guardado = await guardarCambiosOT();
+    renderComentariosEvaluacion(i);
+    const guardado = await guardarCambiosOT(true);
     if (!guardado) {
         item.comentarios.splice(cantidadComentariosAnterior);
         ot.alertaJefe = alertaJefeAnterior;
-        if (inputTexto) inputTexto.value = texto;
+        const inputActual = document.getElementById(`comentario-eval-${i}`);
+        if (inputActual) inputActual.value = texto;
+        renderComentariosEvaluacion(i);
         return;
     }
 
@@ -764,6 +770,8 @@ export async function agregarComentarioDespacho(
 
     if (!lista) return;
 
+    const cantidadAnterior = lista.length;
+    const alertaJefeAnterior = obtenerOT()?.alertaJefe;
     lista.push(comentario);
 
     const ot = obtenerOT();
@@ -774,9 +782,15 @@ export async function agregarComentarioDespacho(
 
     input.value = "";
 
-    await guardarCambiosOT();
-
     renderComentariosDespacho(tipo);
+    const guardado = await guardarCambiosOT(true);
+    if (!guardado) {
+        lista.splice(cantidadAnterior);
+        ot.alertaJefe = alertaJefeAnterior;
+        const inputActual = document.getElementById(inputId);
+        if (inputActual) inputActual.value = texto;
+        renderComentariosDespacho(tipo);
+    }
 }
 
 export function renderComentariosDespacho(tipo) {

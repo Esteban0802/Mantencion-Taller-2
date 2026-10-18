@@ -82,6 +82,22 @@ const adminSucursalA = {
   activo: true,
 };
 
+const planificadorA = {
+  uid: "planificador-a",
+  rol: "planificador",
+  empresaId: "empresa-a",
+  sucursalId: "sucursal-a",
+  activo: true,
+};
+
+const bodegueroA = {
+  uid: "bodeguero-a",
+  rol: "bodeguero",
+  empresaId: "empresa-a",
+  sucursalId: "sucursal-a",
+  activo: true,
+};
+
 const usuarioSheqA = {
   uid: "sheq-a",
   rol: "sheq",
@@ -123,8 +139,8 @@ const usuarioSucursalInactiva = {
   suspendidoPorSucursal: true,
 };
 
-function firestoreComo(uid) {
-  return testEnv.authenticatedContext(uid).firestore();
+function firestoreComo(uid, authTime = Math.floor(Date.now() / 1000)) {
+  return testEnv.authenticatedContext(uid, { auth_time: authTime }).firestore();
 }
 
 function storageComo(uid) {
@@ -142,6 +158,8 @@ async function sembrarDatos() {
       tecnicoA,
       adminEmpresaA,
       adminSucursalA,
+      planificadorA,
+      bodegueroA,
       usuarioSheqA,
       usuarioSucursalA2,
       usuarioTallerB,
@@ -251,6 +269,18 @@ async function sembrarDatos() {
       overhaulRequerido: true,
       overhaulAprobado: false,
       pruebasAprobado: false,
+      aprobacionesPorEtapa: {
+        evaluacion: true,
+        mantencion: false,
+        pruebas: true,
+        despacho: false,
+      },
+      etapasConActividad: {
+        evaluacion: false,
+        mantencion: false,
+        pruebas: false,
+        despacho: false,
+      },
     });
 
     await setDoc(doc(db, "ots", "ot-cerrada-a"), {
@@ -297,6 +327,27 @@ async function sembrarDatos() {
       vehiculoNombre: "ABCD12 · Camioneta",
       cliente: "Cliente A",
       actualizadoPor: "planificador-a",
+    });
+
+    await setDoc(doc(db, "programacionSemanas", "empresa-a_2026-10-12"), {
+      empresaId: "empresa-a",
+      semanaInicio: "2026-10-12",
+      estado: "publicada",
+      snapshotPublicado: [],
+    });
+
+    await setDoc(doc(db, "programacionSemanas", "empresa-a_2026-10-19"), {
+      empresaId: "empresa-a",
+      semanaInicio: "2026-10-19",
+      estado: "borrador",
+    });
+
+    await setDoc(doc(db, "programacionPublicadaUsuarios", "empresa-a_2026-10-12_tecnico-a"), {
+      empresaId: "empresa-a",
+      semanaInicio: "2026-10-12",
+      estado: "publicada",
+      usuarioId: "tecnico-a",
+      asignaciones: [],
     });
 
     const storage = context.storage();
@@ -691,8 +742,17 @@ test("un usuario no puede crear una OT que ya figure cerrada", async () => {
   );
 });
 
-test("Taller puede actualizar datos normales de una OT de su empresa", async () => {
+test("Técnico no puede modificar la identificación de una OT", async () => {
   const db = firestoreComo("taller-a");
+  await assertFails(
+    updateDoc(doc(db, "ots", "ot-abierta-a"), {
+      cliente: "Cliente actualizado",
+    }),
+  );
+});
+
+test("Jefe de Taller puede modificar la identificación de una OT", async () => {
+  const db = firestoreComo("jefe-a");
   await assertSucceeds(
     updateDoc(doc(db, "ots", "ot-abierta-a"), {
       cliente: "Cliente actualizado",
@@ -700,20 +760,22 @@ test("Taller puede actualizar datos normales de una OT de su empresa", async () 
   );
 });
 
-test("Supervisor puede registrar trabajo normal en una OT de su sucursal", async () => {
+test("Supervisor puede registrar trabajo de una etapa y la deja iniciada", async () => {
   const db = firestoreComo("supervisor-a");
   await assertSucceeds(
     updateDoc(doc(db, "ots", "ot-abierta-a"), {
-      observacionSupervisor: "Trabajo revisado en terreno",
+      ingreso: [{ item: "Recepción", ok: true }],
+      etapasConActividad: { evaluacion: false, mantencion: false, pruebas: false, despacho: false },
     }),
   );
 });
 
-test("Técnico puede registrar trabajo normal en una OT de su sucursal", async () => {
+test("Técnico puede registrar trabajo de una etapa y la deja iniciada", async () => {
   const db = firestoreComo("tecnico-a");
   await assertSucceeds(
     updateDoc(doc(db, "ots", "ot-abierta-a"), {
-      observacionTecnico: "Actividad ejecutada",
+      evaluacion: [{ item: "Diagnóstico", ok: true }],
+      etapasConActividad: { evaluacion: true, mantencion: false, pruebas: false, despacho: false },
     }),
   );
 });
@@ -884,11 +946,11 @@ test("Admin Sucursal no puede aprobar la Evaluación de su sucursal", async () =
   );
 });
 
-test("Técnico puede registrar aprobación automática si Aprobaciones está deshabilitado", async () => {
+test("Técnico puede completar automáticamente una etapa sin aprobación configurada", async () => {
   await testEnv.withSecurityRulesDisabled(async (context) => {
     const db = context.firestore();
-    await updateDoc(doc(db, "empresas", "empresa-a"), {
-      "modulos.aprobaciones": false,
+    await updateDoc(doc(db, "ots", "ot-flujo-a"), {
+      "aprobacionesPorEtapa.evaluacion": false,
     });
   });
 
@@ -898,6 +960,48 @@ test("Técnico puede registrar aprobación automática si Aprobaciones está des
       evaluacionAprobada: true,
       overhaulRequerido: true,
       decisionEvaluacion: { resultado: "NO REQUERIDA" },
+    }),
+  );
+});
+
+test("Técnico no puede desactivar las aprobaciones de una OT", async () => {
+  const db = firestoreComo("tecnico-a");
+  await assertFails(
+    updateDoc(doc(db, "ots", "ot-flujo-a"), {
+      "aprobacionesPorEtapa.evaluacion": false,
+    }),
+  );
+});
+
+test("Supervisor no puede crear ni modificar la Carta Gantt", async () => {
+  const db = firestoreComo("supervisor-a");
+  await assertFails(
+    updateDoc(doc(db, "ots", "ot-flujo-a"), {
+      gantt: { actividades: [], creadoPor: "Supervisor" },
+    }),
+  );
+});
+
+test("Jefe de Taller puede configurar una aprobación antes de iniciar la etapa", async () => {
+  const db = firestoreComo("jefe-a");
+  await assertSucceeds(
+    updateDoc(doc(db, "ots", "ot-flujo-a"), {
+      "aprobacionesPorEtapa.mantencion": true,
+    }),
+  );
+});
+
+test("Jefe de Taller no puede retirar la aprobación de una etapa ya iniciada", async () => {
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    await updateDoc(doc(context.firestore(), "ots", "ot-flujo-a"), {
+      "etapasConActividad.evaluacion": true,
+    });
+  });
+
+  const db = firestoreComo("jefe-a");
+  await assertFails(
+    updateDoc(doc(db, "ots", "ot-flujo-a"), {
+      "aprobacionesPorEtapa.evaluacion": false,
     }),
   );
 });
@@ -992,6 +1096,11 @@ test("Admin Empresa no puede eliminar una OT de su empresa", async () => {
 test("Jefe de Taller puede eliminar una OT de su sucursal", async () => {
   const db = firestoreComo("jefe-a");
   await assertSucceeds(deleteDoc(doc(db, "ots", "ot-abierta-a")));
+});
+
+test("Jefe de Taller con autenticación antigua no puede eliminar una OT", async () => {
+  const db = firestoreComo("jefe-a", Math.floor(Date.now() / 1000) - 3600);
+  await assertFails(deleteDoc(doc(db, "ots", "ot-abierta-a")));
 });
 
 test("Técnico puede crear el resumen liviano de una OT de su sucursal", async () => {
@@ -1129,6 +1238,36 @@ test("Admin Empresa no puede eludir el límite creando una sucursal desde el cli
   );
 });
 
+test("ningún usuario puede falsificar registros del historial del sistema", async () => {
+  const db = firestoreComo("admin-a");
+  await assertFails(setDoc(doc(db, "logsSistema", "log-falso"), {
+    version: 1,
+    origen: "cloud_function",
+    empresaId: "empresa-a",
+    usuarioId: "admin-a",
+    usuarioNombre: "Administrador",
+    rol: "admin_empresa",
+    accion: "usuario_eliminado",
+    objetivoId: "jefe-a",
+    detalle: "Evento fabricado desde el navegador",
+    fecha: serverTimestamp(),
+  }));
+});
+
+test("un administrador de empresa puede leer un log creado por el servidor", async () => {
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    await setDoc(doc(context.firestore(), "logsSistema", "log-servidor"), {
+      version: 1,
+      origen: "cloud_function",
+      empresaId: "empresa-a",
+      usuarioId: "jefe-a",
+      accion: "usuario_actualizado",
+      fecha: new Date("2026-10-17T12:00:00Z"),
+    });
+  });
+  await assertSucceeds(getDoc(doc(firestoreComo("admin-a"), "logsSistema", "log-servidor")));
+});
+
 test("Técnico puede consultar el inventario de su sucursal", async () => {
   const db = firestoreComo("taller-a");
   await assertSucceeds(getDoc(doc(db, "inventarioItems", "item-a")));
@@ -1166,6 +1305,76 @@ test("Jefe de Taller no puede agregar inventario en otra sucursal", async () => 
     actualizadoPor: "jefe-a",
     datos: { Código: "REP-X", Descripción: "Ajeno", Cantidad: "1" },
   }));
+});
+
+test("Bodeguero puede consultar el inventario de su sucursal", async () => {
+  const db = firestoreComo("bodeguero-a");
+  await assertSucceeds(getDoc(doc(db, "inventarioItems", "item-a")));
+});
+
+test("Bodeguero puede confirmar la recepción de un repuesto", async () => {
+  const db = firestoreComo("bodeguero-a");
+  await assertSucceeds(updateDoc(doc(db, "inventarioItems", "item-a"), {
+    recibido: true,
+    fechaRecepcion: serverTimestamp(),
+    recibidoPor: "bodeguero-a",
+    recibidoPorNombre: "Bodeguero A",
+    estado: "Completa",
+    fechaActualizacion: serverTimestamp(),
+    actualizadoPor: "bodeguero-a",
+  }));
+});
+
+test("Bodeguero puede actualizar el estado derivado sin alterar otro repuesto", async () => {
+  const db = firestoreComo("bodeguero-a");
+  await assertSucceeds(updateDoc(doc(db, "inventarioItems", "item-a"), {
+    estado: "Parcial",
+    fechaActualizacion: serverTimestamp(),
+    actualizadoPor: "bodeguero-a",
+  }));
+});
+
+test("Bodeguero no puede modificar datos ni cantidades del repuesto", async () => {
+  const db = firestoreComo("bodeguero-a");
+  await assertFails(updateDoc(doc(db, "inventarioItems", "item-a"), {
+    datos: { Código: "REP-001", Descripción: "Alterado", Cantidad: "999" },
+    fechaActualizacion: serverTimestamp(),
+    actualizadoPor: "bodeguero-a",
+  }));
+});
+
+test("Bodeguero no puede falsificar quién recibió un repuesto", async () => {
+  const db = firestoreComo("bodeguero-a");
+  await assertFails(updateDoc(doc(db, "inventarioItems", "item-a"), {
+    recibido: true,
+    fechaRecepcion: serverTimestamp(),
+    recibidoPor: "jefe-a",
+    recibidoPorNombre: "Jefe A",
+    estado: "Completa",
+    fechaActualizacion: serverTimestamp(),
+    actualizadoPor: "bodeguero-a",
+  }));
+});
+
+test("Bodeguero no puede crear ni eliminar repuestos", async () => {
+  const db = firestoreComo("bodeguero-a");
+  await assertFails(setDoc(doc(db, "inventarioItems", "item-bodeguero"), {
+    empresaId: "empresa-a",
+    sucursalId: "sucursal-a",
+    creadoPor: "bodeguero-a",
+    actualizadoPor: "bodeguero-a",
+    datos: { Código: "REP-B", Descripción: "No autorizado", Cantidad: "1" },
+  }));
+  await assertFails(deleteDoc(doc(db, "inventarioItems", "item-a")));
+});
+
+test("Bodeguero no puede subir evidencias al inventario", async () => {
+  const storage = storageComo("bodeguero-a");
+  await assertFails(uploadBytes(
+    ref(storage, "empresas/empresa-a/inventario/sucursal-a/item-a/evidencia.pdf"),
+    new TextEncoder().encode("contenido"),
+    { contentType: "application/pdf" },
+  ));
 });
 
 test("Admin Empresa puede consultar inventario de todas sus sucursales", async () => {
@@ -1244,6 +1453,125 @@ test("SHEQ puede actualizar únicamente el RUT de un trabajador de su sucursal",
   }));
   await assertFails(updateDoc(doc(db, "usuarios", "taller-a"), {
     rol: "admin_empresa",
+  }));
+});
+
+test("Técnico no puede leer la planificación editable completa", async () => {
+  await assertFails(getDoc(doc(
+    firestoreComo("tecnico-a"),
+    "programaciones",
+    "programacion-vehiculo-a",
+  )));
+});
+
+test("Bodeguero puede leer la planificación editable para preparar repuestos", async () => {
+  await assertSucceeds(getDoc(doc(
+    firestoreComo("bodeguero-a"),
+    "programaciones",
+    "programacion-vehiculo-a",
+  )));
+});
+
+test("SHEQ puede leer una semana publicada pero no un borrador", async () => {
+  const db = firestoreComo("sheq-a");
+  await assertSucceeds(getDoc(doc(db, "programacionSemanas", "empresa-a_2026-10-12")));
+  await assertFails(getDoc(doc(db, "programacionSemanas", "empresa-a_2026-10-19")));
+});
+
+test("Técnico puede leer únicamente su copia personal publicada", async () => {
+  const dbTecnico = firestoreComo("tecnico-a");
+  await assertSucceeds(getDoc(doc(
+    dbTecnico,
+    "programacionPublicadaUsuarios",
+    "empresa-a_2026-10-12_tecnico-a",
+  )));
+  await assertFails(getDoc(doc(
+    firestoreComo("supervisor-a"),
+    "programacionPublicadaUsuarios",
+    "empresa-a_2026-10-12_tecnico-a",
+  )));
+});
+
+test("Planificador puede registrar turnos de emergencia de una semana", async () => {
+  const db = firestoreComo("planificador-a");
+  await assertSucceeds(setDoc(doc(db, "programacionSemanas", "empresa-a_2026-10-12"), {
+    empresaId: "empresa-a",
+    semanaInicio: "2026-10-12",
+    estado: "borrador",
+    turnosEmergenciaIds: ["tecnico-a", "supervisor-a"],
+    actualizadoPor: "planificador-a",
+    fechaActualizacion: new Date(),
+  }));
+});
+
+test("Técnico no puede modificar los turnos de emergencia", async () => {
+  const db = firestoreComo("tecnico-a");
+  await assertFails(setDoc(doc(db, "programacionSemanas", "empresa-a_2026-10-12"), {
+    empresaId: "empresa-a",
+    semanaInicio: "2026-10-12",
+    estado: "borrador",
+    turnosEmergenciaIds: ["tecnico-a"],
+    actualizadoPor: "tecnico-a",
+    fechaActualizacion: new Date(),
+  }));
+});
+
+test("Planificador puede registrar historial y el Técnico no puede alterarlo", async () => {
+  const dbPlanificador = firestoreComo("planificador-a");
+  const referencia = doc(dbPlanificador, "programacionHistorial", "historial-a");
+  await assertSucceeds(setDoc(referencia, {
+    empresaId: "empresa-a",
+    sucursalId: "sucursal-a",
+    semanaInicio: "2026-10-12",
+    asignacionId: "programacion-vehiculo-a",
+    accion: "Asignación modificada",
+    realizadoPor: "planificador-a",
+    fechaCreacion: new Date(),
+  }));
+  await assertFails(updateDoc(doc(firestoreComo("tecnico-a"), "programacionHistorial", "historial-a"), {
+    accion: "Alterado",
+  }));
+});
+
+test("Planificador administra ausencias y el Técnico solo puede consultarlas", async () => {
+  const dbPlanificador = firestoreComo("planificador-a");
+  await assertSucceeds(setDoc(doc(dbPlanificador, "programacionAusencias", "ausencia-a"), {
+    empresaId: "empresa-a",
+    sucursalId: "sucursal-a",
+    usuarioId: "tecnico-a",
+    fechaInicio: "2026-10-14",
+    fechaTermino: "2026-10-15",
+    tipo: "Vacaciones",
+    creadoPor: "planificador-a",
+  }));
+  const dbTecnico = firestoreComo("tecnico-a");
+  await assertSucceeds(getDoc(doc(dbTecnico, "programacionAusencias", "ausencia-a")));
+  await assertFails(setDoc(doc(dbTecnico, "programacionAusencias", "ausencia-tecnico"), {
+    empresaId: "empresa-a",
+    sucursalId: "sucursal-a",
+    usuarioId: "tecnico-a",
+    fechaInicio: "2026-10-16",
+    fechaTermino: "2026-10-16",
+    tipo: "Permiso",
+    creadoPor: "tecnico-a",
+  }));
+});
+
+test("Técnico puede confirmar únicamente su propia programación", async () => {
+  const db = firestoreComo("tecnico-a");
+  await assertSucceeds(setDoc(doc(db, "programacionConfirmaciones", "empresa-a_2026-10-12_tecnico-a"), {
+    empresaId: "empresa-a",
+    sucursalId: "sucursal-a",
+    semanaInicio: "2026-10-12",
+    usuarioId: "tecnico-a",
+    fechaConfirmacion: new Date(),
+  }));
+  await assertFails(setDoc(doc(db, "programacionConfirmaciones", "empresa-a_2026-10-12_supervisor-a"), {
+    empresaId: "empresa-a",
+    sucursalId: "sucursal-a",
+    semanaInicio: "2026-10-12",
+    usuarioId: "supervisor-a",
+    fechaConfirmacion: new Date(),
   }));
 });
 
@@ -1333,9 +1661,9 @@ test("un usuario inactivo no puede leer archivos de una OT", async () => {
   );
 });
 
-test("Taller puede subir un archivo menor a 20 MB a una OT abierta", async () => {
+test("Taller no puede subir texto plano a una OT abierta", async () => {
   const storage = storageComo("taller-a");
-  await assertSucceeds(
+  await assertFails(
     uploadBytes(
       ref(storage, "ots/ot-abierta-a/documentos/nuevo.txt"),
       new TextEncoder().encode("contenido"),
@@ -1344,12 +1672,39 @@ test("Taller puede subir un archivo menor a 20 MB a una OT abierta", async () =>
   );
 });
 
-test("Supervisor puede subir evidencia en otro formato de imagen", async () => {
+test("Supervisor no puede subir GIF como evidencia", async () => {
   const storage = storageComo("supervisor-a");
-  await assertSucceeds(uploadBytes(
+  await assertFails(uploadBytes(
     ref(storage, "ots/ot-abierta-a/ingreso/item_0/evidencia-supervisor.gif"),
     new Uint8Array([71, 73, 70]),
     { contentType: "image/gif" },
+  ));
+});
+
+test("Supervisor puede subir una foto HEIC tomada desde un móvil", async () => {
+  const storage = storageComo("supervisor-a");
+  await assertSucceeds(uploadBytes(
+    ref(storage, "ots/ot-abierta-a/ingreso/item_0/evidencia-supervisor.heic"),
+    new Uint8Array([0, 0, 0, 24]),
+    { contentType: "image/heic" },
+  ));
+});
+
+test("Técnico puede subir una foto AVIF tomada desde un móvil", async () => {
+  const storage = storageComo("tecnico-a");
+  await assertSucceeds(uploadBytes(
+    ref(storage, "ots/ot-abierta-a/ingreso/item_0/evidencia-tecnico.avif"),
+    new Uint8Array([0, 0, 0, 24]),
+    { contentType: "image/avif" },
+  ));
+});
+
+test("Técnico no puede subir SVG como evidencia", async () => {
+  const storage = storageComo("tecnico-a");
+  await assertFails(uploadBytes(
+    ref(storage, "ots/ot-abierta-a/ingreso/item_0/evidencia-tecnico.svg"),
+    new TextEncoder().encode('<svg xmlns="http://www.w3.org/2000/svg"></svg>'),
+    { contentType: "image/svg+xml" },
   ));
 });
 

@@ -1,4 +1,4 @@
-import { protegerPagina, cerrarSesion } from "./session.js?v=20261004-2";
+import { protegerPagina, cerrarSesion } from "./session.js?v=20261017-1";
 
 import {
   obtenerModulosEmpresa,
@@ -48,6 +48,9 @@ let listaFiltrada = [];
 let empresaActualDashboard = null;
 let modulosDashboard = {};
 let cancelarEscuchaOTs = null;
+let cancelarEscuchaInventarioAlertas = null;
+let inventarioAlertasCargado = false;
+let inventarioPorOSDashboard = new Map();
 
 const ETAPAS_DASHBOARD = [
   { key: "INGRESO", modulo: "ingreso", label: "INGRESO", estadoId: "estadoIngreso", color: "#6c757d" },
@@ -160,6 +163,7 @@ window.onload = async () => {
 
   aplicarModulosDashboard();
   configurarNavegacionPorPermisos();
+  iniciarInventarioAlertasTiempoReal();
 
   if (
     puedeVerOrdenesServicio(
@@ -172,6 +176,54 @@ window.onload = async () => {
     mostrarDashboardSinOrdenes();
   }
 };
+
+function normalizarClaveOS(valor = "") {
+  return String(valor).trim().toLocaleLowerCase("es");
+}
+
+function repuestoInventarioRecibido(item = {}) {
+  return item.recibido === true || (
+    item.recibido == null &&
+    ["Completa", "Despachada", "Recepción Cliente"].includes(item.estado)
+  );
+}
+
+function iniciarInventarioAlertasTiempoReal() {
+  cancelarEscuchaInventarioAlertas?.();
+  cancelarEscuchaInventarioAlertas = null;
+  inventarioAlertasCargado = false;
+  inventarioPorOSDashboard = new Map();
+
+  if (!etapaDashboardActiva("inventario") || !empresaActualDashboard?.id) return;
+
+  const restricciones = [where("empresaId", "==", empresaActualDashboard.id)];
+  if (!['super_admin', 'admin_empresa'].includes(usuario?.rol) && usuario?.sucursalId) {
+    restricciones.push(where("sucursalId", "==", usuario.sucursalId));
+  }
+
+  cancelarEscuchaInventarioAlertas = onSnapshot(
+    query(collection(db, "inventarioItems"), ...restricciones),
+    snapshot => {
+      const agrupados = new Map();
+      snapshot.docs.forEach(documento => {
+        const item = documento.data() || {};
+        const numeroOS = String(item.datos?.OS || "").trim();
+        if (!numeroOS) return;
+        const clave = normalizarClaveOS(numeroOS);
+        if (!agrupados.has(clave)) agrupados.set(clave, []);
+        agrupados.get(clave).push(item);
+      });
+      inventarioPorOSDashboard = agrupados;
+      inventarioAlertasCargado = true;
+      renderAlertasDashboard(listaFiltrada);
+    },
+    error => {
+      inventarioAlertasCargado = false;
+      console.warn("No fue posible actualizar las alertas de Inventario:", error);
+      renderAlertasDashboard(listaFiltrada);
+    }
+  );
+}
 
 
 async function cargarConfiguracionEmpresaDashboard() {
@@ -1068,7 +1120,7 @@ function pintarEstado(ot) {
       font-size:12px;
       font-weight:bold;
     ">
-      ${estado}
+      ${obtenerNombreEstado(estado)}
     </span>
   `;
 }
@@ -1160,17 +1212,46 @@ function obtenerMarcaTiempoOT(ot) {
 
 
 
-function esperaRepuestosActiva(ot) {
+function obtenerEstadoEsperaRepuestos(ot) {
   if (!etapaDashboardActiva("repuestos") || !etapaDashboardActiva("gantt")) {
-    return false;
+    return { activa: false };
   }
 
-  if (!ot?.gantt) return false;
+  if (!ot?.gantt || ot.cerrada === true || ot.estado === "CERRADA") {
+    return { activa: false };
+  }
+
+  const registrosInventario = inventarioPorOSDashboard.get(normalizarClaveOS(ot.os)) || [];
+  if (inventarioAlertasCargado && registrosInventario.length > 0) {
+    const recibidos = registrosInventario.filter(repuestoInventarioRecibido).length;
+    const pendientes = Math.max(0, registrosInventario.length - recibidos);
+    if (pendientes === 0) return { activa: false, total: registrosInventario.length, recibidos, pendientes: 0 };
+
+    const estadoFecha = calcularFechaEsperaRepuestos(ot);
+    return {
+      activa: true,
+      total: registrosInventario.length,
+      recibidos,
+      pendientes,
+      ...estadoFecha
+    };
+  }
+
+  const estadoFecha = calcularFechaEsperaRepuestos(ot);
+  return estadoFecha.configurada
+    ? { activa: true, total: 0, recibidos: 0, pendientes: null, ...estadoFecha }
+    : { activa: false };
+}
+
+function calcularFechaEsperaRepuestos(ot) {
+  if (!ot?.gantt) return { configurada: false, vencida: false, diasAtraso: 0 };
 
   const dias = Number(ot.gantt.diasRepuestos || 0);
   const fechaSolicitud = ot.gantt.fechaSolicitudRepuestos;
 
-  if (!dias || dias <= 0 || !fechaSolicitud) return false;
+  if (!dias || dias <= 0 || !fechaSolicitud) {
+    return { configurada: false, vencida: false, diasAtraso: 0 };
+  }
 
   const inicio = new Date(fechaSolicitud + "T00:00:00");
   const fechaLlegada = new Date(inicio);
@@ -1179,7 +1260,17 @@ function esperaRepuestosActiva(ot) {
   const hoy = new Date();
   hoy.setHours(0, 0, 0, 0);
 
-  return hoy <= fechaLlegada;
+  const diferencia = Math.floor((hoy - fechaLlegada) / (1000 * 60 * 60 * 24));
+  return {
+    configurada: true,
+    fechaLlegada,
+    vencida: diferencia > 0,
+    diasAtraso: Math.max(0, diferencia)
+  };
+}
+
+function esperaRepuestosActiva(ot) {
+  return obtenerEstadoEsperaRepuestos(ot).activa === true;
 }
 
 
@@ -1212,13 +1303,14 @@ function renderAlertasDashboard(lista = listaOTs) {
       });
     }
 
-    if (esTecnicoTaller() && ot.alertaJefe && resumenCorreccion) {
+    if (esTrabajadorTaller() && ot.alertaJefe && resumenCorreccion) {
       alertas.push({
         tipo: "correccion",
         indiceOT,
         titulo: "Corrección solicitada",
         texto: `${ot.os || "OS sin número"} · ${resumenCorreccion}`,
-        accion: "Corregir etapa"
+        accion: "Corregir etapa",
+        destinoEtapa: obtenerEtapaObservacionPendiente(ot)
       });
     }
 
@@ -1232,12 +1324,16 @@ function renderAlertasDashboard(lista = listaOTs) {
       });
     }
 
-    if (esperaRepuestosActiva(ot) && estado !== "CERRADA") {
+    const esperaRepuestos = obtenerEstadoEsperaRepuestos(ot);
+    if (esperaRepuestos.activa && estado !== "CERRADA") {
+      const detalleRecepcion = esperaRepuestos.pendientes == null
+        ? "Recepción pendiente"
+        : `${esperaRepuestos.pendientes} de ${esperaRepuestos.total} pendiente(s)`;
       alertas.push({
-        tipo: "repuestos",
+        tipo: esperaRepuestos.vencida ? "repuestos-vencidos" : "repuestos",
         indiceOT,
-        titulo: "Espera de repuestos",
-        texto: ot.os || "OS sin número",
+        titulo: esperaRepuestos.vencida ? "Repuestos atrasados" : "Espera de repuestos",
+        texto: `${ot.os || "OS sin número"} · ${detalleRecepcion}${esperaRepuestos.vencida ? ` · ${esperaRepuestos.diasAtraso} día(s)` : ""}`,
         accion: "Abrir OT"
       });
     }
@@ -1256,9 +1352,10 @@ function renderAlertasDashboard(lista = listaOTs) {
       alertas.push({
         tipo: "jefe",
         indiceOT,
-        titulo: "Respuesta técnica pendiente",
+        titulo: "Observación pendiente",
         texto: ot.os || "OS sin número",
-        accion: "Ver observación"
+        accion: "Ver observación",
+        resumenObservacion: resumenCorreccion
       });
     }
   });
@@ -1268,7 +1365,7 @@ function renderAlertasDashboard(lista = listaOTs) {
     return;
   }
 
-  alertas.slice(0, 6).forEach(alerta => {
+  const crearAlerta = alerta => {
     const boton = document.createElement("button");
     boton.type = "button";
     boton.className = `alerta-dashboard-item alerta-${alerta.tipo}`;
@@ -1283,17 +1380,54 @@ function renderAlertasDashboard(lista = listaOTs) {
     accion.textContent = `${alerta.accion} →`;
     contenido.append(titulo, detalle);
     boton.append(contenido, accion);
-    boton.addEventListener("click", () => abrirOT(alerta.indiceOT));
-    cont.appendChild(boton);
-  });
+    boton.addEventListener("click", () => {
+      if (alerta.resumenObservacion) {
+        abrirPopoverObservacion(alerta.resumenObservacion);
+        return;
+      }
+      abrirOT(alerta.indiceOT, alerta.destinoEtapa || "");
+    });
+    return boton;
+  };
+
+  alertas.slice(0, 6).forEach(alerta => cont.appendChild(crearAlerta(alerta)));
+
+  if (alertas.length > 6) {
+    const restantes = alertas.slice(6);
+    const botonMas = document.createElement("button");
+    botonMas.type = "button";
+    botonMas.className = "alertas-dashboard-mas";
+    botonMas.textContent = `Mostrar ${restantes.length} alerta(s) más`;
+    botonMas.addEventListener("click", () => {
+      restantes.forEach(alerta => cont.insertBefore(crearAlerta(alerta), botonMas));
+      botonMas.remove();
+    });
+    cont.appendChild(botonMas);
+  }
 }
 
 function esAutoridadSucursal() {
   return ["jefe_taller", "admin_sucursal"].includes(usuario?.rol);
 }
 
-function esTecnicoTaller() {
-  return usuario?.rol === "tecnico";
+function esTrabajadorTaller() {
+  return ["tecnico", "supervisor"].includes(usuario?.rol);
+}
+
+function obtenerEtapaObservacionPendiente(ot) {
+  const tienePendiente = lista => Array.isArray(lista) && lista.some(item =>
+    (item?.comentarios || []).some(comentario =>
+      ["jefe_taller", "admin_sucursal"].includes(comentario?.rol) &&
+      comentario?.atendido !== true
+    )
+  );
+
+  if (etapaDashboardActiva("ingreso") && tienePendiente(ot?.ingreso)) return "ingreso";
+  if (etapaDashboardActiva("evaluacion") && tienePendiente(ot?.evaluacion)) return "evaluacion";
+  if (etapaDashboardActiva("mantencion") && tienePendiente(ot?.overhaul)) return "overhaul";
+  if (etapaDashboardActiva("pruebas") && tienePendiente(obtenerListaPruebas(ot))) return "pruebas";
+  if (etapaDashboardActiva("despacho")) return "despacho";
+  return "";
 }
 
 function obtenerEtapaListaParaRevision(ot) {
@@ -1442,6 +1576,7 @@ function renderGanttTaller(lista = listaOTs) {
   otsConGantt.forEach(ot => {
 
     const estado = obtenerEstadoOT(ot);
+    const estadoVisible = obtenerNombreEstado(estado);
     const atrasada = estaOTAtrasada(ot);
 
     const inicio = new Date(ot.gantt.fechaInicio + "T00:00:00");
@@ -1483,14 +1618,14 @@ function renderGanttTaller(lista = listaOTs) {
           data-gantt='${JSON.stringify({
               os: ot.os || "Sin OS",
               equipo: ot.equipo || "Sin equipo",
-              estado,
+              estado: estadoVisible,
               inicio: formatearFechaCorta(inicio),
               termino: formatearFechaCorta(termino),
               progreso: calcularProgreso(ot)
             }).replace(/'/g, "&#39;")}'
             onclick="abrirPopoverGanttDesdeElemento(this)"
         >
-          ${atrasada ? "ATRASADA" : estado}
+          ${atrasada ? "ATRASADA" : estadoVisible}
         </div>
       </div>
     `;
@@ -1509,40 +1644,47 @@ function abrirPopoverGantt(data) {
 
   if (!modal || !cont) return;
 
+  const progreso = Math.max(0, Math.min(100, Number(data.progreso) || 0));
+  const textoSeguro = valor => String(valor ?? "-")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+
   cont.innerHTML = `
+    <div class="gantt-pop-resumen">
+      <section class="gantt-pop-identidad">
+        <span>Orden de servicio</span>
+        <strong>${textoSeguro(data.os)}</strong>
+        <small>${textoSeguro(data.equipo)}</small>
+      </section>
 
-    <div class="gantt-pop-grid">
+      <section class="gantt-pop-estado">
+        <span>Estado actual</span>
+        <strong>${textoSeguro(data.estado)}</strong>
+      </section>
 
-      <div>
-        <span>OS</span>
-        <strong>${data.os}</strong>
+      <div class="gantt-pop-fechas">
+        <section>
+          <span>Inicio</span>
+          <strong>${textoSeguro(data.inicio)}</strong>
+        </section>
+        <section>
+          <span>Término estimado</span>
+          <strong>${textoSeguro(data.termino)}</strong>
+        </section>
       </div>
 
-      <div>
-        <span>Equipo</span>
-        <strong>${data.equipo}</strong>
-      </div>
-
-      <div>
-        <span>Estado</span>
-        <strong>${data.estado}</strong>
-      </div>
-
-      <div>
-        <span>Inicio</span>
-        <strong>${data.inicio}</strong>
-      </div>
-
-      <div>
-        <span>Término</span>
-        <strong>${data.termino}</strong>
-      </div>
-
-      <div>
-        <span>Progreso</span>
-        <strong>${data.progreso}%</strong>
-      </div>
-
+      <section class="gantt-pop-progreso">
+        <div>
+          <span>Avance de la OT</span>
+          <strong>${progreso}%</strong>
+        </div>
+        <div class="gantt-pop-progreso-barra" role="progressbar" aria-label="Avance de la OT" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${progreso}">
+          <i style="width:${progreso}%"></i>
+        </div>
+      </section>
     </div>
   `;
 
@@ -1621,7 +1763,7 @@ function formatearFechaCorta(fecha) {
 // =======================
 // ABRIR OT
 // =======================
-function abrirOT(index) {
+function abrirOT(index, destinoEtapa = "") {
   if (
     !puedeAbrirOT(
       usuario,
@@ -1645,6 +1787,11 @@ function abrirOT(index) {
   }
 
   localStorage.setItem("otActiva", ot.id);
+  if (destinoEtapa) {
+    localStorage.setItem("otDestinoEtapa", destinoEtapa);
+  } else {
+    localStorage.removeItem("otDestinoEtapa");
+  }
   window.location.href = "flujo.html";
 }
 
@@ -1935,7 +2082,7 @@ function mostrarAlertasJefe(ot) {
   }
 
   if (etapaDashboardActiva("mantencion") && tienePendientesJefe(ot.overhaul)) {
-    alertas.add("🔧 Overhaul");
+    alertas.add("🔧 Mantención");
   }
 
   if (etapaDashboardActiva("pruebas") && tienePendientesJefe(obtenerListaPruebas(ot))) {

@@ -16,6 +16,7 @@ import {
   getFunctions,
   httpsCallable
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-functions.js";
+import { reautenticarAccionCritica } from "../session.js?v=20261017-1";
 
 const functions = getFunctions(app, "us-central1");
 const crearUsuarioEmpresaSeguro = httpsCallable(functions, "crearUsuarioEmpresa");
@@ -551,6 +552,7 @@ window.abrirAsignacionSucursal = function (uid) {
     boton.disabled = true;
     boton.textContent = "Guardando...";
     try {
+      if (!(await reautenticarAccionCritica("cambiar la sucursal asignada a este usuario"))) return;
       await actualizarSucursalUsuarioSeguro({ usuarioId: uid, sucursalId: nuevaSucursalId });
       cerrar();
       await alert("Sucursal actualizada correctamente");
@@ -586,6 +588,7 @@ window.filtrarUsuariosEmpresa = function () {
 
 window.cambiarEstadoUsuarioEmpresa = async function (uid, nuevoEstado) {
   const usuario = usuariosEmpresa.find(item => item.uid === uid);
+  if (!usuario || usuario.rol === "super_admin") return;
 
   if (!usuario) {
     alert("No se encontró el usuario seleccionado");
@@ -610,6 +613,8 @@ window.cambiarEstadoUsuarioEmpresa = async function (uid, nuevoEstado) {
   if (!confirmado) return;
 
   try {
+    if (!nuevoEstado && ["admin_empresa", "admin_sucursal", "jefe_taller"].includes(usuario.rol) &&
+        !(await reautenticarAccionCritica("desactivar este usuario administrativo"))) return;
     await cambiarEstadoUsuarioSeguro({
       usuarioId: uid,
       activo: nuevoEstado
@@ -631,6 +636,7 @@ window.cambiarEstadoUsuarioEmpresa = async function (uid, nuevoEstado) {
 
 window.eliminarUsuarioEmpresa = async function (uid) {
   const usuario = usuariosEmpresa.find(item => item.uid === uid);
+  if (!usuario || usuario.rol === "super_admin") return;
   if (!usuario) {
     alert("No se encontró el usuario seleccionado");
     return;
@@ -652,6 +658,7 @@ window.eliminarUsuarioEmpresa = async function (uid) {
   }
 
   try {
+    if (!(await reautenticarAccionCritica("eliminar definitivamente esta cuenta de usuario"))) return;
     await eliminarUsuarioEmpresaSeguro({ usuarioId: uid });
     alert("Usuario eliminado correctamente");
     await cargarUsuariosEmpresa();

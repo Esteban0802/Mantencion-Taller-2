@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="js/sidebar-preload.js?v=20261016-2"></script>
   <title>Órdenes de Trabajo | Vectaria</title>
   <link rel="icon" type="image/png" href="img/vectaria-favicon-official.png?v=3">
   <link rel="stylesheet" href="css/styles.css">
@@ -10,6 +11,7 @@
   <link rel="stylesheet" href="css/brand-overtrack-light.css">
   <link rel="stylesheet" href="css/desktop-density.css?v=20261004-7">
   <link rel="stylesheet" href="css/notificaciones.css?v=20261007-1">
+  <link rel="stylesheet" href="css/mobile-normalized.css?v=20261018-4">
 </head>
 <body class="dashboard-overtrack ordenes-page">
 <div class="app">
@@ -30,7 +32,7 @@
       <img class="sidebar-brand-logo" src="img/vectaria-logo-official.png?v=3" alt="Vectaria - Tu operación, en una misma dirección">
     </div>
     <ul>
-      <li role="button" tabindex="0" onclick="location.href='dashboard.html'">
+      <li id="menuDashboardOrdenes" role="button" tabindex="0" onclick="location.href='dashboard.html'">
         <svg class="ot-icon nav-icon" aria-hidden="true"><use href="img/icons-overtrack.svg#dashboard"></use></svg><span>Taller</span>
       </li>
       <li id="menuNuevaOT" role="button" tabindex="0" onclick="nuevaOT()">
@@ -41,6 +43,7 @@
       </li>
       <li id="menuInventarioOrdenes" role="button" tabindex="0" style="display:none" onclick="location.href='inventario.html'"><svg class="ot-icon nav-icon" aria-hidden="true"><use href="img/icons-overtrack.svg#clipboard"></use></svg><span>Inventario</span></li>
       <li id="menuSheqOrdenes" role="button" tabindex="0" style="display:none" onclick="location.href='sheq.html'"><span class="nav-icon" aria-hidden="true">🛡️</span><span>SHEQ</span></li>
+      <li id="menuProgramacionOrdenes" role="button" tabindex="0" style="display:none" onclick="location.href='programacion.html'"><svg class="ot-icon nav-icon" aria-hidden="true"><use href="img/icons-overtrack.svg#calendar"></use></svg><span>Programación</span></li>
       <li id="btnPanelEmpresa" role="button" tabindex="0" style="display:none" onclick="volverPanelEmpresa()">
         <svg class="ot-icon nav-icon" aria-hidden="true"><use href="img/icons-overtrack.svg#building-cog"></use></svg><span>Panel Empresa</span>
       </li>
@@ -78,6 +81,6 @@
   </main>
 </div>
 <script src="js/components/notificaciones.js?v=20261007-1"></script>
-<script type="module" src="js/ordenes.js?v=20261014-4"></script>
+<script type="module" src="js/ordenes.js?v=20261016-5"></script>
 </body>
 </html>

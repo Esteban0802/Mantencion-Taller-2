@@ -3,14 +3,16 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="js/sidebar-preload.js?v=20261016-2"></script>
   <title>Programación semanal | Vectaria</title>
   <link rel="icon" type="image/png" href="img/vectaria-favicon-official.png?v=3">
   <link rel="stylesheet" href="css/styles.css">
   <link rel="stylesheet" href="css/brand-overtrack.css">
   <link rel="stylesheet" href="css/brand-overtrack-light.css">
   <link rel="stylesheet" href="css/notificaciones.css?v=20261007-1">
-  <link rel="stylesheet" href="css/programacion.css?v=20261006-12">
+  <link rel="stylesheet" href="css/programacion.css?v=20261016-3">
   <link rel="stylesheet" href="css/desktop-density.css?v=20261006-10">
+  <link rel="stylesheet" href="css/mobile-normalized.css?v=20261018-4">
 </head>
 <body class="dashboard-overtrack programacion-page">
   <div class="app">
@@ -24,9 +26,9 @@
       <div class="sidebar-logo"><img class="sidebar-brand-logo" src="img/vectaria-logo-official.png?v=3" alt="Vectaria - Tu operación, en una misma dirección"></div>
       <ul>
         <li id="menuDashboardProgramacion" onclick="volverDashboard()"><svg class="ot-icon nav-icon" aria-hidden="true"><use href="img/icons-overtrack.svg#dashboard"></use></svg><span>Taller</span></li>
-        <li id="menuOrdenesProgramacion" onclick="volverOrdenes()"><svg class="ot-icon nav-icon" aria-hidden="true"><use href="img/icons-overtrack.svg#list"></use></svg><span>Todas las OS</span></li>
-        <li id="menuSheqProgramacion" style="display:none" onclick="volverSheq()"><span class="sheq-nav-icon">🛡️</span><span>SHEQ</span></li>
+        <li id="menuOrdenesProgramacion" onclick="volverOrdenes()"><svg class="ot-icon nav-icon" aria-hidden="true"><use href="img/icons-overtrack.svg#list"></use></svg><span>Todas las OT</span></li>
         <li id="menuInventarioProgramacion" style="display:none" onclick="volverInventario()"><svg class="ot-icon nav-icon" aria-hidden="true"><use href="img/icons-overtrack.svg#clipboard"></use></svg><span>Inventario</span></li>
+        <li id="menuSheqProgramacion" style="display:none" onclick="volverSheq()"><span class="sheq-nav-icon">🛡️</span><span>SHEQ</span></li>
         <li class="active"><svg class="ot-icon nav-icon" aria-hidden="true"><use href="img/icons-overtrack.svg#calendar"></use></svg><span>Programación</span></li>
         <li id="menuPanelEmpresaProgramacion" style="display:none" onclick="volverPanelEmpresa()"><svg class="ot-icon nav-icon" aria-hidden="true"><use href="img/icons-overtrack.svg#building-cog"></use></svg><span>Panel Empresa</span></li>
       </ul>
@@ -47,6 +49,8 @@
           <span id="estadoSemana" class="estado-semana borrador">Borrador</span>
         </div>
         <div class="acciones-programacion" id="accionesEdicionProgramacion">
+          <button type="button" class="btn-programacion-secundario" id="btnHistorialProgramacion">Historial</button>
+          <button type="button" class="btn-programacion-secundario" id="btnAusenciasProgramacion">Ausencias</button>
           <button type="button" class="btn-programacion-secundario" id="btnVistaCorreo">Vista del correo</button>
           <button type="button" class="btn-programacion-secundario" id="btnNuevaAsignacion">+ Nueva asignación</button>
           <button type="button" class="btn-primary" id="btnPublicarSemana">Publicar semana</button>
@@ -60,8 +64,11 @@
           <button type="button" data-grupo="sheq">SHEQ</button>
           <button type="button" data-grupo="mi-semana">Mi semana</button>
         </div>
-        <div class="programacion-leyenda"><span><i class="terreno"></i>Trabajo en terreno</span><span><i class="interno"></i>Trabajo interno</span><span><i class="capacitacion"></i>Capacitación</span></div>
+        <div class="programacion-leyenda"><span><i class="terreno"></i>Trabajo en terreno</span><span><i class="interno"></i>Trabajo interno</span><span><i class="capacitacion"></i>Capacitación</span><span><i class="emergencia"></i>Turno de emergencia</span></div>
       </section>
+
+      <section id="resumenCoberturaProgramacion" class="programacion-cobertura" aria-label="Resumen de cobertura"></section>
+      <section id="confirmacionProgramacion" class="confirmacion-programacion" hidden></section>
 
       <section class="card programacion-card">
         <div id="mensajeProgramacion" class="programacion-mensaje">Cargando programación...</div>
@@ -89,6 +96,7 @@
           <label class="control-modalidad-asignacion" for="asignacionFixPrice"><input type="checkbox" id="asignacionFixPrice"><span>Fix Price</span></label>
         </div>
         <div class="campo campo-ancho"><label>Órdenes de servicio</label><div id="listaAsignacionOs" class="lista-asignacion-os"></div><button type="button" id="btnAgregarOs" class="btn-agregar-os">+ Agregar nueva OS</button><small>Cada OS puede indicar su equipo, actividad, observación e instrucción de cierre.</small></div>
+        <div id="alertaInventarioProgramacion" class="alerta-inventario-programacion campo-ancho" hidden></div>
         <div class="campo campo-ancho"><label for="asignacionVehiculo">Vehículo</label><select id="asignacionVehiculo"><option value="">Sin vehículo asignado</option></select><small>Se muestran los vehículos incorporados en la sección SHEQ.</small></div>
         <div class="campo campo-ancho"><label for="asignacionObservaciones">Indicaciones</label><textarea id="asignacionObservaciones" rows="3" placeholder="Opcional"></textarea></div>
         <div class="form-programacion-acciones campo-ancho"><button type="button" class="btn-danger" id="btnEliminarAsignacion" style="display:none">Eliminar</button><span></span><button type="button" class="btn-programacion-secundario" data-cerrar-modal="modalAsignacion">Cancelar</button><button type="submit" class="btn-primary" id="btnGuardarAsignacion">Guardar asignación</button></div>
@@ -103,7 +111,30 @@
     </div>
   </div>
 
+  <div class="modal-programacion" id="modalHistorialProgramacion" aria-hidden="true">
+    <div class="modal-programacion-contenido modal-operativo-programacion" role="dialog" aria-modal="true" aria-labelledby="tituloHistorialProgramacion">
+      <div class="modal-programacion-header"><div><h2 id="tituloHistorialProgramacion">Historial de modificaciones</h2><p>Registro de asignaciones creadas, modificadas y eliminadas durante la semana.</p></div><button type="button" class="modal-cerrar" data-cerrar-modal="modalHistorialProgramacion">×</button></div>
+      <div id="listaHistorialProgramacion" class="lista-historial-programacion"></div>
+    </div>
+  </div>
+
+  <div class="modal-programacion" id="modalAusenciasProgramacion" aria-hidden="true">
+    <div class="modal-programacion-contenido modal-operativo-programacion" role="dialog" aria-modal="true" aria-labelledby="tituloAusenciasProgramacion">
+      <div class="modal-programacion-header"><div><h2 id="tituloAusenciasProgramacion">Ausencias y disponibilidad</h2><p>Registra vacaciones, licencias, permisos u otros días no disponibles.</p></div><button type="button" class="modal-cerrar" data-cerrar-modal="modalAusenciasProgramacion">×</button></div>
+      <form id="formAusenciaProgramacion" class="form-programacion form-ausencia-programacion">
+        <input type="hidden" id="ausenciaIdProgramacion">
+        <div class="campo campo-ancho"><label for="ausenciaUsuarioProgramacion">Trabajador</label><select id="ausenciaUsuarioProgramacion" required></select></div>
+        <div class="campo"><label for="ausenciaTipoProgramacion">Motivo</label><select id="ausenciaTipoProgramacion"><option>Vacaciones</option><option>Licencia médica</option><option>Permiso</option><option>Capacitación externa</option><option>Otro</option></select></div>
+        <div class="campo"><label for="ausenciaObservacionProgramacion">Observación</label><input id="ausenciaObservacionProgramacion" maxlength="300" placeholder="Opcional"></div>
+        <div class="campo"><label for="ausenciaInicioProgramacion">Desde</label><input type="date" id="ausenciaInicioProgramacion" required></div>
+        <div class="campo"><label for="ausenciaTerminoProgramacion">Hasta</label><input type="date" id="ausenciaTerminoProgramacion" required></div>
+        <div class="form-programacion-acciones campo-ancho"><span></span><span></span><button type="button" class="btn-programacion-secundario" data-cerrar-modal="modalAusenciasProgramacion">Cancelar</button><button type="submit" class="btn-primary">Guardar ausencia</button></div>
+      </form>
+      <div id="listaAusenciasProgramacion" class="lista-ausencias-programacion"></div>
+    </div>
+  </div>
+
 <script src="js/components/notificaciones.js?v=20261007-1"></script>
-  <script type="module" src="js/programacion.js?v=20261014-19"></script>
+  <script type="module" src="js/programacion.js?v=20261016-28"></script>
 </body>
 </html>

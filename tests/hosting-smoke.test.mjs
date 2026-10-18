@@ -32,6 +32,7 @@ test("la configuración incluye los encabezados de seguridad", async () => {
   assert.ok(encabezados.includes("X-Frame-Options:SAMEORIGIN"));
   assert.ok(encabezados.includes("Referrer-Policy:strict-origin-when-cross-origin"));
   assert.ok(encabezados.includes("Permissions-Policy:camera=(self), microphone=(), geolocation=()"));
+  assert.ok(encabezados.some(encabezado => encabezado.startsWith("Content-Security-Policy:default-src 'self';")));
 });
 
 test("Hosting no publica la configuración interna", async () => {

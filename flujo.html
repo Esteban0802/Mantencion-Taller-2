@@ -5,12 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Flujo de Trabajo - Vectaria</title>
   <link rel="icon" type="image/png" href="img/vectaria-favicon-official.png?v=3">
-  <link rel="stylesheet" href="css/styles.css?v=20261007-1">
+  <link rel="stylesheet" href="css/styles.css?v=20261018-6">
   <link rel="stylesheet" href="css/brand-overtrack.css">
-  <link rel="stylesheet" href="css/brand-overtrack-light.css">
+  <link rel="stylesheet" href="css/brand-overtrack-light.css?v=20261017-8">
   <link rel="stylesheet" href="css/notificaciones.css?v=20261007-1">
   <link rel="stylesheet" href="css/desktop-density.css?v=20261004-9">
-  <link rel="stylesheet" href="css/flow-professional.css?v=20261007-2">
+  <link rel="stylesheet" href="css/flow-professional.css?v=20261018-11">
+  <link rel="stylesheet" href="css/mobile-normalized.css?v=20261018-4">
 </head>
 <body class="ot-view flow-overtrack">
 
@@ -111,7 +112,7 @@
 <!-- TIMELINE TABS PRO -->
 <div class="tabs tabs-timeline-pro">
 
-  <button class="tab active" data-tab="crear">
+  <button class="tab active solo-jefe" data-tab="crear">
     <span class="tab-dot">1</span>
     <span class="tab-text">Crear OT</span>
   </button>
@@ -144,7 +145,7 @@
 </div>
 
   <!-- CREAR / EDITAR OT -->
-  <div id="crear" class="content active">
+  <div id="crear" class="content active solo-jefe">
     <div class="card">
       <h2>Identificación de la máquina</h2>
 
@@ -154,7 +155,28 @@
         <option value="">Seleccionar gama de equipo</option>
       </select>
       <input id="cliente" placeholder="Cliente" aria-label="Cliente">
-      <input id="os" placeholder="Número de OT (opcional)" aria-label="Número de orden de trabajo, opcional">
+      <div class="os-inventory-picker" id="selectorOSInventario">
+        <input id="os" autocomplete="off" placeholder="Número de OT (opcional)" aria-label="Número de orden de trabajo, opcional" aria-controls="osInventarioPanel" aria-expanded="false">
+        <button type="button" id="btnAlternarOSInventario" class="os-picker-toggle" aria-label="Mostrar OS de Inventario" aria-controls="osInventarioPanel" aria-expanded="false">⌄</button>
+        <div id="osInventarioPanel" class="os-inventory-panel" role="listbox" hidden>
+          <div class="os-inventory-panel-heading"><strong>OS disponibles en Inventario</strong><small>Selecciona una orden o continúa escribiendo.</small></div>
+          <div id="osInventarioOpciones" class="os-inventory-options"></div>
+          <p id="osInventarioVacio" class="os-inventory-empty" hidden>No se encontraron OS coincidentes.</p>
+        </div>
+      </div>
+
+      <details id="configAprobacionesOT" class="ot-approval-selector" hidden>
+        <summary>
+          <span><strong>Aprobaciones por etapa</strong><small>Selecciona dónde será obligatoria la decisión del Jefe de Taller.</small></span>
+          <b id="resumenAprobacionesOT">Sin aprobaciones</b>
+        </summary>
+        <div class="ot-approval-options">
+          <label><input type="checkbox" data-aprobacion-etapa="evaluacion"><span><strong>Evaluación</strong><small>Aprobar antes de iniciar Mantención.</small></span></label>
+          <label><input type="checkbox" data-aprobacion-etapa="mantencion"><span><strong>Mantención</strong><small>Aprobar antes de iniciar Pruebas.</small></span></label>
+          <label><input type="checkbox" data-aprobacion-etapa="pruebas"><span><strong>Pruebas</strong><small>Aprobar antes de iniciar Despacho.</small></span></label>
+          <label><input type="checkbox" data-aprobacion-etapa="despacho"><span><strong>Despacho</strong><small>Aprobar antes de cerrar la OT.</small></span></label>
+        </div>
+      </details>
 
       <button id="btnGuardarDatosOT" class="btn-primary" onclick="guardarDatosOS()">
         Siguiente
@@ -170,12 +192,6 @@
         <span class="stage-eyebrow">Etapa 02</span>
         <h2>Recepción e ingreso del equipo</h2>
         <p>Registra el estado inicial, adjunta evidencias y documenta cada revisión realizada.</p>
-      </div>
-      <div class="file-actions carga-checklist stage-import-box">
-        <input type="file" id="excelIngreso" accept=".xlsx,.xls" aria-label="Seleccionar checklist de ingreso">
-        <button class="btn-primary" onclick="cargarIngreso()">
-          Cargar checklist
-        </button>
       </div>
     </div>
 
@@ -206,10 +222,6 @@
           <span class="stage-eyebrow">Etapa 03</span>
           <h2>Evaluación técnica</h2>
           <p>Documenta el diagnóstico, registra hallazgos y reúne los antecedentes para autorizar la mantención.</p>
-        </div>
-        <div class="file-actions carga-checklist stage-import-box">
-          <input type="file" id="excelEvaluacion" accept=".xlsx,.xls" aria-label="Seleccionar checklist de evaluación">
-          <button class="btn-primary" onclick="cargarEvaluacion()">Cargar checklist</button>
         </div>
       </div>
 
@@ -281,18 +293,6 @@
 
   <div class="file-actions stage-maintenance-tools">
 
-  <div class="carga-checklist">
-    <input
-      type="file"
-      id="excelOverhaul"
-      accept=".xlsx,.xls"
-    >
-
-    <button class="btn-primary" onclick="cargarOverhaul()">
-      Cargar Checklist
-    </button>
-  </div>
-
   <div class="overhaul-actions">
 
     <button class="btn-warning" onclick="abrirModalRepuestos()" data-modulo-repuestos style="display:none !important">
@@ -314,22 +314,23 @@
 </div>
 </div>
 
-<div class="solo-jefe stage-secondary-panel" data-modulo-repuestos style="display:none !important">
-  <h3>Cargar listado de repuestos</h3>
-
-  <input type="file" id="excelRepuestos" accept=".xlsx,.xls">
-
-  <button class="btn-primary" onclick="cargarRepuestosExcel()">
-    Cargar Repuestos
-  </button>
-</div>
+<!-- Los checklist provienen exclusivamente de las plantillas configuradas
+     por el administrador de sucursal y los repuestos desde Inventario. -->
 
     <div id="progresoOverhaul"></div>
 
     <div id="listaOverhaul"></div>
+    <div id="decisionMantencionJefe" class="decision-box stage-decision-panel solo-jefe" hidden>
+      <h3>Aprobación de Mantención</h3>
+      <p class="decision-text">Para aprobar o rechazar la etapa debes ingresar un comentario y adjuntar evidencia.</p>
+      <textarea id="comentarioDecisionMantencion" placeholder="Comentario de aprobación o rechazo"></textarea>
+      <input type="file" id="docsDecisionMantencion" multiple>
+      <div class="decision-actions"><button class="btn-success" onclick="registrarDecisionEtapa('mantencion','APROBADO')">Aprobar Mantención</button><button class="btn-danger" onclick="registrarDecisionEtapa('mantencion','RECHAZADO')">Rechazar</button></div>
+      <div id="decisionMantencionGuardada"></div>
+    </div>
     <div class="stage-actions">
       <button class="btn-success btn-guardar-etapa" onclick="guardarOverhaul()">Guardar mantención</button>
-      <button class="btn-primary" onclick="aprobarOverhaul()">Continuar a pruebas</button>
+      <button id="btnContinuarMantencionSinAprobacion" class="btn-primary" onclick="aprobarOverhaul()">Continuar a pruebas</button>
       <button class="btn-danger solo-jefe" data-cierre-etapa="overhaul" style="display:none;" onclick="cerrarOT()">Cerrar OS</button>
     </div>
   </div>
@@ -347,18 +348,21 @@
         <h2>Pruebas y control de calidad</h2>
         <p>Valida el funcionamiento del equipo y deja respaldo de cada comprobación antes del despacho.</p>
       </div>
-      <div class="file-actions carga-checklist stage-import-box">
-        <input type="file" id="excelPruebas" accept=".xlsx,.xls" aria-label="Seleccionar checklist de pruebas">
-        <button class="btn-primary" onclick="cargarChecklist('general')">Cargar checklist</button>
-      </div>
     </div>
 
 <div id="progresoPruebas"></div>
 
 <div id="listaPruebas"></div>
+<div id="decisionPruebasJefe" class="decision-box stage-decision-panel solo-jefe" hidden>
+  <h3>Aprobación de Pruebas</h3>
+  <p class="decision-text">Para aprobar o rechazar la etapa debes ingresar un comentario y adjuntar evidencia.</p>
+  <textarea id="comentarioDecisionPruebas" placeholder="Comentario de aprobación o rechazo"></textarea>
+  <input type="file" id="docsDecisionPruebas" multiple>
+  <div class="decision-actions"><button class="btn-success" onclick="registrarDecisionEtapa('pruebas','APROBADO')">Aprobar Pruebas</button><button class="btn-danger" onclick="registrarDecisionEtapa('pruebas','RECHAZADO')">Rechazar</button></div>
+  <div id="decisionPruebasGuardada"></div>
+</div>
 <div class="stage-actions">
   <button class="btn-success btn-guardar-etapa" onclick="guardarPruebas()">Guardar progreso</button>
-  <button id="btnAprobarPruebasJefe" class="btn-primary solo-jefe" onclick="aprobarPruebas()">Aprobar pruebas</button>
   <button id="btnFinalizarPruebasSinAprobacion" class="btn-primary" style="display:none;" onclick="finalizarPruebasSinAprobacion()">Continuar a despacho</button>
   <button class="btn-danger solo-jefe" data-cierre-etapa="pruebas" style="display:none;" onclick="cerrarOT()">Cerrar OS</button>
 </div>
@@ -437,6 +441,14 @@
   <div id="comentarios-despacho-final"></div>
 </div>
 </section>
+    <div id="decisionDespachoJefe" class="decision-box stage-decision-panel solo-jefe" hidden>
+      <h3>Aprobación de Despacho</h3>
+      <p class="decision-text">Para aprobar o rechazar el despacho debes ingresar un comentario y adjuntar evidencia.</p>
+      <textarea id="comentarioDecisionDespacho" placeholder="Comentario de aprobación o rechazo"></textarea>
+      <input type="file" id="docsDecisionDespacho" multiple>
+      <div class="decision-actions"><button class="btn-success" onclick="registrarDecisionEtapa('despacho','APROBADO')">Aprobar Despacho</button><button class="btn-danger" onclick="registrarDecisionEtapa('despacho','RECHAZADO')">Rechazar</button></div>
+      <div id="decisionDespachoGuardada"></div>
+    </div>
     <div class="stage-actions">
     <button class="btn-success btn-guardar-etapa" onclick="guardarDespacho()">Guardar despacho</button>
     <button class="btn-danger solo-jefe" data-cierre-etapa="despacho" onclick="cerrarOT()">Cerrar OS</button>
@@ -460,19 +472,6 @@
   </button>
 </div>
 
-<!-- 🔥 MODAL VISOR DOCUMENTOS -->
-
-<!-- 🔥 MODAL VISOR DOCUMENTOS -->
-<div id="modalDoc" class="modal-doc">
-  <div class="modal-content-doc">
-
-    <span class="close-doc" onclick="cerrarModal()">✖</span>
-
-    <iframe id="visorDoc"></iframe>
-
-  </div>
-</div>
-
 <!-- 🔥 VISOR DE IMÁGENES PRO -->
 <div id="modalImagen" class="modal-img">
   <span class="cerrar-img" onclick="cerrarImagen()">×</span>
@@ -485,18 +484,15 @@
   <div class="modal-repuestos-content">
 
     <div class="modal-repuestos-header">
-      <h2>Repuestos Utilizados</h2>
-      <button onclick="cerrarModalRepuestos()" class="btn-danger permitido-bloqueo">
-        Cerrar
-      </button>
+      <div><span>ETAPA 04 · MANTENCIÓN</span><h2>Control de repuestos</h2><p>Revisa la disponibilidad y registra los repuestos utilizados en esta OS.</p></div>
+      <button onclick="cerrarModalRepuestos()" class="btn-danger permitido-bloqueo" aria-label="Cerrar modal">×</button>
     </div>
 
     <div id="listaRepuestosModal" class="repuestos-lista"></div>
 
     <div class="modal-repuestos-footer">
-      <button onclick="guardarRepuestosUsados()" class="btn-success">
-        💾 Guardar Repuestos
-      </button>
+      <button onclick="cerrarModalRepuestos()" class="btn-secondary permitido-bloqueo">Cancelar</button>
+      <button onclick="guardarRepuestosUsados()" class="btn-success">Guardar repuestos</button>
     </div>
 
   </div>
@@ -586,6 +582,17 @@
 
         </div>
 
+        <div class="gantt-etapa-card gantt-etapa-card--despacho">
+
+          <label>Despacho</label>
+
+          <div class="gantt-etapa-fechas">
+            <input type="date" id="ganttDespachoInicio">
+            <input type="date" id="ganttDespachoTermino">
+          </div>
+
+        </div>
+
       </div>
 
       <div class="gantt-field" data-modulo-repuestos style="display:none !important">
@@ -623,20 +630,20 @@
 
     <div class="modal-gantt-header">
       <div>
-        <h2>📊 Carta Gantt</h2>
+        <h2><span class="gantt-title-icon" aria-hidden="true">▥</span> Carta Gantt</h2>
         <p>Planificación del proyecto por etapas, fechas y duración.</p>
       </div>
 
       <div class="gantt-header-actions">
-        <button class="btn-warning" onclick="volverFormularioGantt()">
+        <button class="btn-warning" data-gantt-edicion onclick="volverFormularioGantt()">
           ← Volver
         </button>
         <button class="btn-success" onclick="descargarGanttExcel()">
-          📊 Descargar Excel
+          <span aria-hidden="true">⇩</span> Descargar Excel
         </button>
 
         <button class="btn-success" onclick="descargarGanttPDFProfesional()" data-modulo-reportes-pdf style="display:none !important">
-          📄 Descargar PDF
+          <span aria-hidden="true">⇩</span> Descargar PDF
         </button>
 
         <button class="btn-danger" onclick="cerrarModalGanttVisual()">
@@ -656,6 +663,6 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<script type="module" src="js/app.js?v=20261014-6"></script>
+<script type="module" src="js/app.js?v=20261018-10"></script>
 </body>
 </html>

@@ -1,4 +1,4 @@
-import { protegerPagina, cerrarSesion as cerrarSesionGlobal } from "./session.js?v=20261007-1";
+import { protegerPagina, cerrarSesion as cerrarSesionGlobal } from "./session.js?v=20261017-1";
 
 import { db, auth, storage } from "./firebase-config.js";
 
@@ -102,12 +102,12 @@ import {
 
 import {
     inicializarModuloRepuestos
-} from "./modulos/repuestos.js";
+} from "./modulos/repuestos.js?v=20261017-3";
 
 
 import {
     inicializarModuloInformePDF
-} from "./modulos/informePDF.js?v=20261007-1";
+} from "./modulos/informePDF.js?v=20261018-2";
 
 
 import {
@@ -116,7 +116,7 @@ import {
     renderCartaGantt,
     renderCartaGanttProject,
     actualizarEstadoGanttDesdeChecklist
-} from "./modulos/gantt.js";
+} from "./modulos/gantt.js?v=20261018-3";
 
 
 import {
@@ -153,6 +153,7 @@ import {
   setDoc,
   getDoc,
   getDocs,
+  onSnapshot,
   query,
   where,
   serverTimestamp
@@ -181,6 +182,7 @@ console.log("🧩 Contexto Vectaria cargado correctamente", {
 // =======================
 let ot = getOTContexto();
 let aprobacionesActivas = true;
+let aprobacionesLegadoActivas = true;
 let reportesPDFActivos = true;
 
 function notificarFlujo(mensaje, titulo = "Atención", tipo = "advertencia") {
@@ -195,6 +197,8 @@ let ganttActivo = true;
 let repuestosActivos = true;
 let plantillasMantenimiento = [];
 let creacionOTEnCurso = false;
+let ordenesInventarioDisponibles = [];
+let detenerInventarioTiempoReal = null;
 let etapasActivas = {
   ingreso: true,
   evaluacion: true,
@@ -287,8 +291,55 @@ function configurarInterfazEtapas() {
   });
 }
 
-function aprobacionesHabilitadas() {
-  return aprobacionesActivas;
+function aprobacionEtapaHabilitada(etapa) {
+  if (!aprobacionesActivas || etapa === "ingreso") return false;
+  if (ot?.aprobacionesPorEtapa && typeof ot.aprobacionesPorEtapa === "object") {
+    return ot.aprobacionesPorEtapa[etapa] === true;
+  }
+  // Compatibilidad con OT anteriores a la configuración por etapa.
+  return aprobacionesLegadoActivas && ["evaluacion", "pruebas"].includes(etapa);
+}
+
+function aprobacionesHabilitadas(etapa = "") {
+  return etapa ? aprobacionEtapaHabilitada(etapa) : aprobacionesActivas;
+}
+
+function obtenerAprobacionesSeleccionadas() {
+  return Object.fromEntries(["evaluacion", "mantencion", "pruebas", "despacho"].map(etapa => [
+    etapa,
+    Boolean(document.querySelector(`[data-aprobacion-etapa="${etapa}"]`)?.checked)
+  ]));
+}
+
+function actualizarResumenAprobaciones() {
+  const seleccionadas = Object.entries(obtenerAprobacionesSeleccionadas())
+    .filter(([, activa]) => activa)
+    .map(([etapa]) => ({ evaluacion: "Evaluación", mantencion: "Mantención", pruebas: "Pruebas", despacho: "Despacho" }[etapa]));
+  const resumen = document.getElementById("resumenAprobacionesOT");
+  if (resumen) resumen.textContent = seleccionadas.length ? seleccionadas.join(", ") : "Sin aprobaciones";
+}
+
+function renderDecisionEtapa(etapa) {
+  const nombres = { mantencion: "Mantención", pruebas: "Pruebas", despacho: "Despacho" };
+  const campos = { mantencion: "decisionMantencion", pruebas: "decisionPruebas", despacho: "decisionDespacho" };
+  const contenedor = document.getElementById(`decision${nombres[etapa]?.replace("ó", "o")}Guardada`);
+  const decision = ot?.[campos[etapa]];
+  if (!contenedor) return;
+  contenedor.replaceChildren();
+  if (!decision) return;
+
+  const tarjeta = document.createElement("div");
+  tarjeta.className = "decision-evaluacion-guardada";
+  const resultado = document.createElement("strong");
+  resultado.textContent = decision.resultado || "-";
+  const detalle = document.createElement("span");
+  detalle.textContent = `${decision.usuario || "-"} · ${decision.fecha || "-"}`;
+  const comentario = document.createElement("p");
+  comentario.textContent = decision.comentario || "-";
+  const evidencias = document.createElement("small");
+  evidencias.textContent = `${decision.documentos?.length || 0} evidencia(s)`;
+  tarjeta.append(resultado, detalle, comentario, evidencias);
+  contenedor.appendChild(tarjeta);
 }
 
 function reportesPDFHabilitados() {
@@ -303,17 +354,157 @@ function repuestosHabilitados() {
   return repuestosActivos;
 }
 
+function actualizarOpcionesAprobacionPorPlantilla() {
+  const selectorAprobaciones = document.getElementById("configAprobacionesOT");
+  const plantillaId = document.getElementById("gamaEquipo")?.value || "";
+  const plantilla = plantillasMantenimiento.find(item => item.id === plantillaId);
+  const etapasDisponibles = {
+    evaluacion: normalizarChecklistPlantilla(plantilla?.checklists?.evaluacion).length > 0,
+    mantencion: normalizarChecklistPlantilla(plantilla?.checklists?.mantencion).length > 0,
+    pruebas: normalizarChecklistPlantilla(plantilla?.checklists?.pruebas).length > 0,
+    despacho: plantilla?.etapasHabilitadas?.despacho === true
+  };
+
+  let cantidadDisponibles = 0;
+  document.querySelectorAll("[data-aprobacion-etapa]").forEach(campo => {
+    const etapa = campo.dataset.aprobacionEtapa;
+    const disponible = Boolean(plantilla && etapasDisponibles[etapa] && etapasActivas[etapa] !== false);
+    const contenedor = campo.closest("label");
+    if (contenedor) contenedor.hidden = !disponible;
+    if (!disponible) campo.checked = false;
+    if (disponible) cantidadDisponibles += 1;
+  });
+
+  if (selectorAprobaciones) {
+    selectorAprobaciones.hidden = !(
+      aprobacionesActivas &&
+      esJefeTaller() &&
+      !ot?.id &&
+      plantilla &&
+      cantidadDisponibles > 0
+    );
+    if (selectorAprobaciones.hidden) selectorAprobaciones.open = false;
+  }
+  actualizarResumenAprobaciones();
+}
+
 function configurarInterfazAprobaciones() {
+  actualizarOpcionesAprobacionPorPlantilla();
   const decisionEvaluacion = document.getElementById("decisionEvaluacionJefe");
   const continuarEvaluacion = document.getElementById("btnContinuarEvaluacionSinAprobacion");
-  const aprobarPruebas = document.getElementById("btnAprobarPruebasJefe");
+  const decisionMantencion = document.getElementById("decisionMantencionJefe");
+  const continuarMantencion = document.getElementById("btnContinuarMantencionSinAprobacion");
+  const decisionPruebas = document.getElementById("decisionPruebasJefe");
   const finalizarPruebas = document.getElementById("btnFinalizarPruebasSinAprobacion");
+  const decisionDespacho = document.getElementById("decisionDespachoJefe");
 
-  if (decisionEvaluacion) decisionEvaluacion.style.display = aprobacionesActivas ? "" : "none";
-  if (continuarEvaluacion) continuarEvaluacion.style.display = aprobacionesActivas ? "none" : "inline-flex";
-  if (aprobarPruebas) aprobarPruebas.style.display = aprobacionesActivas ? "" : "none";
-  if (finalizarPruebas) finalizarPruebas.style.display = aprobacionesActivas ? "none" : "inline-flex";
+  const requiereEvaluacion = aprobacionEtapaHabilitada("evaluacion");
+  const requiereMantencion = aprobacionEtapaHabilitada("mantencion");
+  const requierePruebas = aprobacionEtapaHabilitada("pruebas");
+  const requiereDespacho = aprobacionEtapaHabilitada("despacho");
+  if (decisionEvaluacion) decisionEvaluacion.style.display = requiereEvaluacion ? "" : "none";
+  if (continuarEvaluacion) continuarEvaluacion.style.display = requiereEvaluacion ? "none" : "inline-flex";
+  if (decisionMantencion) decisionMantencion.hidden = !requiereMantencion;
+  if (continuarMantencion) continuarMantencion.style.display = requiereMantencion ? "none" : "inline-flex";
+  if (decisionPruebas) decisionPruebas.hidden = !requierePruebas;
+  if (finalizarPruebas) finalizarPruebas.style.display = requierePruebas ? "none" : "inline-flex";
+  if (decisionDespacho) decisionDespacho.hidden = !requiereDespacho;
+  renderDecisionEtapa("mantencion");
+  renderDecisionEtapa("pruebas");
+  renderDecisionEtapa("despacho");
 }
+
+function validarEtapaParaDecision(etapa) {
+  const listas = {
+    mantencion: ot?.overhaul || [],
+    pruebas: Array.isArray(ot?.pruebas) ? ot.pruebas : (ot?.pruebas?.general || [])
+  };
+  if (etapa === "despacho") {
+    if (!ot?.despacho?.preparacion?.length || !ot?.despacho?.final?.length) {
+      notificarFlujo("Debes completar la documentación de preparación y despacho final.", "Despacho incompleto", "advertencia");
+      return false;
+    }
+    return true;
+  }
+  const lista = listas[etapa];
+  if (!Array.isArray(lista) || !lista.length) {
+    notificarFlujo("La etapa no contiene actividades para revisar.", "Checklist incompleto", "advertencia");
+    return false;
+  }
+  const pendiente = lista.findIndex(item => !itemCompleto(item));
+  if (pendiente >= 0) {
+    notificarFlujo(`Debes completar la actividad ${pendiente + 1}, incluyendo evidencia y comentario técnico.`, "Checklist incompleto", "advertencia");
+    return false;
+  }
+  return true;
+}
+
+async function registrarDecisionEtapa(etapa, resultado) {
+  if (!ot || OTBloqueada() || !aprobacionEtapaHabilitada(etapa)) return;
+  if (!esJefeTaller()) {
+    await notificarFlujo("Solo el Jefe de Taller puede registrar esta decisión.", "Acceso restringido", "advertencia");
+    return;
+  }
+  if (!validarEtapaParaDecision(etapa)) return;
+  const sufijos = { mantencion: "Mantencion", pruebas: "Pruebas", despacho: "Despacho" };
+  const camposDecision = { mantencion: "decisionMantencion", pruebas: "decisionPruebas", despacho: "decisionDespacho" };
+  const camposAprobado = { mantencion: "overhaulAprobado", pruebas: "pruebasAprobado", despacho: "despachoAprobado" };
+  const tabs = { mantencion: "overhaul", pruebas: "pruebas", despacho: "despacho" };
+  const sufijo = sufijos[etapa];
+  const comentario = document.getElementById(`comentarioDecision${sufijo}`)?.value.trim();
+  const archivos = [...(document.getElementById(`docsDecision${sufijo}`)?.files || [])];
+  if (!comentario || !archivos.length) {
+    await notificarFlujo("Ingresa un comentario y adjunta al menos una evidencia.", "Antecedentes obligatorios", "advertencia");
+    return;
+  }
+  const botones = [...document.querySelectorAll(`#decision${sufijo}Jefe button`)];
+  botones.forEach(boton => { boton.disabled = true; });
+  const campoDecision = camposDecision[etapa];
+  const campoAprobado = camposAprobado[etapa];
+  const anterior = { decision: ot[campoDecision], aprobado: ot[campoAprobado], estado: ot.estado };
+  const urls = [];
+  try {
+    const documentos = [];
+    for (const archivo of archivos) {
+      const url = await subirArchivoStorage(archivo, `decision_${etapa}_${resultado.toLowerCase()}`, "documentos");
+      urls.push(url);
+      documentos.push({ nombre: archivo.name, tipo: archivo.type, url, fecha: new Date().toLocaleString("es-CL") });
+    }
+    ot[campoDecision] = {
+      resultado,
+      comentario,
+      documentos,
+      usuario: usuario?.nombre || "Jefe Taller",
+      rol: usuario?.rol || "jefe_taller",
+      fecha: new Date().toLocaleString("es-CL")
+    };
+    ot[campoAprobado] = resultado === "APROBADO";
+    ot.estado = obtenerEstadoOT(ot);
+    agregarBitacora(`Etapa ${resultado === "APROBADO" ? "aprobada" : "rechazada"}`, `${sufijo}: ${comentario}`);
+    const guardado = await guardarCambiosOT();
+    if (!guardado) throw new Error("No fue posible guardar la decisión.");
+    configurarInterfazAprobaciones();
+    if (resultado === "APROBADO" && etapa !== "despacho") navegarSiguienteEtapa(tabs[etapa]);
+    await notificarFlujo(
+      resultado === "APROBADO"
+        ? (etapa === "despacho" ? "Despacho aprobado. La OT ya puede cerrarse." : `${sufijo} aprobada. Se habilitó la siguiente etapa.`)
+        : `${sufijo} rechazada. La etapa queda pendiente para realizar correcciones.`,
+      resultado === "APROBADO" ? "Aprobación registrada" : "Etapa rechazada",
+      resultado === "APROBADO" ? "exito" : "advertencia"
+    );
+  } catch (error) {
+    await Promise.allSettled(urls.map(url => eliminarArchivoStorage(url)));
+    ot[campoDecision] = anterior.decision;
+    ot[campoAprobado] = anterior.aprobado;
+    ot.estado = anterior.estado;
+    console.error("No fue posible registrar la decisión:", error);
+    await notificarFlujo(error.message || "Intenta nuevamente.", "No se pudo guardar", "error");
+  } finally {
+    botones.forEach(boton => { boton.disabled = false; });
+  }
+}
+
+window.registrarDecisionEtapa = registrarDecisionEtapa;
 
 function configurarInterfazReportesPDF() {
   const botonInforme = document.getElementById("btnGenerarInformePDF");
@@ -361,6 +552,9 @@ function configurarInterfazGantt() {
 
     elemento.style.setProperty("display", "none", "important");
   });
+  document.querySelectorAll("[data-gantt-edicion]").forEach(elemento => {
+    elemento.hidden = !esJefeTaller();
+  });
 }
 
 function configurarInterfazRepuestos() {
@@ -378,6 +572,7 @@ async function cargarConfiguracionAprobaciones() {
   const empresaId = ot?.empresaId || usuario?.empresaId;
   if (!empresaId) {
     aprobacionesActivas = true;
+    aprobacionesLegadoActivas = true;
     reportesPDFActivos = true;
     ganttActivo = true;
     repuestosActivos = true;
@@ -396,7 +591,10 @@ async function cargarConfiguracionAprobaciones() {
       ? empresaSnap.data()?.modulos || {}
       : {};
 
-    aprobacionesActivas = modulosEmpresa.aprobaciones !== false;
+    // Las OT nuevas ya no dependen de un módulo global de la empresa.
+    // El valor histórico solo se conserva para OT antiguas sin configuración por etapa.
+    aprobacionesActivas = true;
+    aprobacionesLegadoActivas = modulosEmpresa.aprobaciones !== false;
     reportesPDFActivos = modulosEmpresa.reportesPDF !== false;
     ganttActivo = modulosEmpresa.gantt !== false;
     repuestosActivos = modulosEmpresa.repuestos !== false;
@@ -410,6 +608,7 @@ async function cargarConfiguracionAprobaciones() {
   } catch (error) {
     console.error("No fue posible consultar la configuración de módulos:", error);
     aprobacionesActivas = true;
+    aprobacionesLegadoActivas = true;
     reportesPDFActivos = true;
     ganttActivo = true;
     repuestosActivos = true;
@@ -581,13 +780,226 @@ async function cargarGamasDisponibles() {
       document.getElementById("ayudaGamaEquipo").textContent =
         "No existen gamas con una plantilla activa. Solicita al administrador que configure una.";
     }
+    actualizarOpcionesAprobacionPorPlantilla();
   } catch (error) {
     console.error("No fue posible cargar las gamas de equipo:", error);
     selector.innerHTML = '<option value="">No fue posible cargar las gamas</option>';
   }
 }
 
+async function cargarOSInventarioDisponibles() {
+  const lista = document.getElementById("osInventarioOpciones");
+  if (!lista || !usuario?.empresaId || !usuario?.sucursalId) return;
+
+  try {
+    const snapshot = await getDocs(query(
+      collection(db, "inventarioItems"),
+      where("empresaId", "==", usuario.empresaId),
+      where("sucursalId", "==", usuario.sucursalId)
+    ));
+    actualizarOrdenesInventarioDesdeSnapshot(snapshot);
+  } catch (error) {
+    console.warn("No fue posible cargar las OS disponibles desde Inventario:", error);
+    ordenesInventarioDisponibles = [];
+    lista.replaceChildren();
+  }
+}
+
+function actualizarOrdenesInventarioDesdeSnapshot(snapshot) {
+    const ordenes = new Map();
+    snapshot.docs.forEach(documento => {
+      const registro = documento.data() || {};
+      const datos = registro.datos || {};
+      const numero = String(datos.OS || "").trim();
+      if (!numero) return;
+      const clave = numero.toLocaleLowerCase("es");
+      if (!ordenes.has(clave)) {
+        ordenes.set(clave, {
+          numero,
+          cliente: String(datos.CLIENTE || "").trim(),
+          equipo: String(datos.EQUIPO || "").trim(),
+          serie: String(datos.SERIE || "").trim(),
+          repuestos: []
+        });
+      }
+      ordenes.get(clave).repuestos.push({
+        inventarioItemId: documento.id,
+        codigo: String(datos.NP || "").trim(),
+        descripcion: String(datos.DESCRIPCION || "").trim(),
+        cantidad: String(datos.CANTIDAD ?? "").trim(),
+        recibidoInventario: registro.recibido === true
+      });
+    });
+
+    ordenesInventarioDisponibles = [...ordenes.values()]
+      .sort((a, b) => a.numero.localeCompare(b.numero, "es", { numeric: true }));
+    renderOpcionesOSInventario();
+}
+
+function iniciarInventarioTiempoReal() {
+  if (!usuario?.empresaId || !usuario?.sucursalId) return;
+
+  detenerInventarioTiempoReal?.();
+  const consulta = query(
+    collection(db, "inventarioItems"),
+    where("empresaId", "==", usuario.empresaId),
+    where("sucursalId", "==", usuario.sucursalId)
+  );
+
+  detenerInventarioTiempoReal = onSnapshot(consulta, snapshot => {
+    actualizarOrdenesInventarioDesdeSnapshot(snapshot);
+
+    if (!ot?.os) return;
+    const listado = crearListadoRepuestosInventario(ot.os, ot.repuestos);
+    if (!listado) return;
+
+    ot.repuestos = listado;
+    const visualGantt = document.getElementById("modalGanttVisual");
+    if (visualGantt && visualGantt.style.display !== "none") {
+      renderCartaGanttProject();
+    }
+  }, error => {
+    console.warn("No fue posible mantener Inventario actualizado en tiempo real:", error);
+  });
+}
+
+function normalizarBusquedaOS(valor = "") {
+  return String(valor).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+}
+
+function renderOpcionesOSInventario(filtro = "") {
+  const lista = document.getElementById("osInventarioOpciones");
+  const vacio = document.getElementById("osInventarioVacio");
+  if (!lista) return;
+  const busqueda = normalizarBusquedaOS(filtro);
+  const resultados = ordenesInventarioDisponibles.filter(orden =>
+    !busqueda || normalizarBusquedaOS([orden.numero, orden.cliente, orden.equipo, orden.serie].join(" ")).includes(busqueda)
+  );
+
+  lista.replaceChildren();
+  resultados.forEach(orden => {
+    const opcion = document.createElement("button");
+    opcion.type = "button";
+    opcion.className = "os-inventory-option";
+    opcion.setAttribute("role", "option");
+    const numero = document.createElement("strong");
+    numero.textContent = orden.numero;
+    const detalle = document.createElement("small");
+    detalle.textContent = [
+      orden.cliente,
+      orden.equipo,
+      orden.serie,
+      `${orden.repuestos.length} repuesto${orden.repuestos.length === 1 ? "" : "s"}`
+    ].filter(Boolean).join(" · ");
+    opcion.append(numero, detalle);
+    opcion.addEventListener("click", () => {
+      const input = document.getElementById("os");
+      if (input) {
+        input.value = orden.numero;
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+      cerrarSelectorOSInventario();
+    });
+    lista.appendChild(opcion);
+  });
+  if (vacio) vacio.hidden = resultados.length > 0;
+}
+
+function abrirSelectorOSInventario({ mostrarTodo = false } = {}) {
+  const panel = document.getElementById("osInventarioPanel");
+  const input = document.getElementById("os");
+  const boton = document.getElementById("btnAlternarOSInventario");
+  if (!panel || !input) return;
+  renderOpcionesOSInventario(mostrarTodo ? "" : input.value);
+  panel.hidden = false;
+  input.setAttribute("aria-expanded", "true");
+  boton?.setAttribute("aria-expanded", "true");
+}
+
+function cerrarSelectorOSInventario() {
+  const panel = document.getElementById("osInventarioPanel");
+  const input = document.getElementById("os");
+  const boton = document.getElementById("btnAlternarOSInventario");
+  if (panel) panel.hidden = true;
+  input?.setAttribute("aria-expanded", "false");
+  boton?.setAttribute("aria-expanded", "false");
+}
+
+function configurarSelectorOSInventario() {
+  const selector = document.getElementById("selectorOSInventario");
+  const input = document.getElementById("os");
+  const boton = document.getElementById("btnAlternarOSInventario");
+  const panel = document.getElementById("osInventarioPanel");
+  if (!selector || !input || !boton || !panel) return;
+
+  input.addEventListener("focus", () => abrirSelectorOSInventario({ mostrarTodo: true }));
+  input.addEventListener("input", () => abrirSelectorOSInventario());
+  boton.addEventListener("click", () => {
+    if (panel.hidden) {
+      abrirSelectorOSInventario({ mostrarTodo: true });
+      input.focus();
+    } else {
+      cerrarSelectorOSInventario();
+    }
+  });
+  document.addEventListener("click", evento => {
+    if (!selector.contains(evento.target)) cerrarSelectorOSInventario();
+  });
+  selector.addEventListener("keydown", evento => {
+    if (evento.key === "Escape") cerrarSelectorOSInventario();
+  });
+}
+
+function crearListadoRepuestosInventario(numeroOS, repuestosActuales = null) {
+  const clave = normalizarBusquedaOS(numeroOS);
+  const orden = ordenesInventarioDisponibles.find(item => normalizarBusquedaOS(item.numero) === clave);
+  if (!orden?.repuestos?.length) return null;
+
+  const anteriores = Array.isArray(repuestosActuales?.items) ? repuestosActuales.items : [];
+  const buscarAnterior = repuesto => anteriores.find(item =>
+    (repuesto.inventarioItemId && item.inventarioItemId === repuesto.inventarioItemId) ||
+    (!repuesto.inventarioItemId && normalizarBusquedaOS(item.codigo) === normalizarBusquedaOS(repuesto.codigo))
+  );
+  const items = orden.repuestos.map(repuesto => {
+    const anterior = buscarAnterior(repuesto);
+    return {
+      ...repuesto,
+      usado: repuesto.recibidoInventario === true && anterior?.usado === true,
+      comentario: String(anterior?.comentario || ""),
+      tecnico: String(anterior?.tecnico || ""),
+      fecha: String(anterior?.fecha || "")
+    };
+  });
+
+  return {
+    items,
+    origen: "inventario",
+    inventarioOS: orden.numero,
+    cargadoPor: repuestosActuales?.cargadoPor || "Inventario",
+    fechaCarga: repuestosActuales?.fechaCarga || new Date().toLocaleString("es-CL")
+  };
+}
+
+async function sincronizarRepuestosInventarioOT() {
+  if (!ot?.os) return null;
+  if (!ordenesInventarioDisponibles.length) {
+    await cargarOSInventarioDisponibles();
+  }
+  const listado = crearListadoRepuestosInventario(ot.os, ot.repuestos);
+  if (listado) ot.repuestos = listado;
+  return listado;
+}
+
 async function guardarDatosOS() {
+
+  if (!esJefeTaller()) {
+    await notificarFlujo(
+      "Solo el Jefe de Taller puede modificar los datos de identificación de la OT.",
+      "Acceso restringido",
+      "advertencia"
+    );
+    return;
+  }
 
   const equipo = document.getElementById("equipo").value.trim();
   const serie = document.getElementById("serie").value.trim();
@@ -616,7 +1028,8 @@ async function guardarDatosOS() {
       serie: ot.serie,
       cliente: ot.cliente,
       os: ot.os,
-      osGenerica: ot.osGenerica
+      osGenerica: ot.osGenerica,
+      repuestos: ot.repuestos
     };
 
     if (botonGuardarDatos) {
@@ -628,16 +1041,28 @@ async function guardarDatosOS() {
       ot.equipo = equipo;
       ot.serie = serie;
       ot.cliente = cliente;
-      ot.os = osIngresada || ot.os || generarNumeroOTGenerico();
-      ot.osGenerica = /^OT-AUTO-/.test(ot.os);
+      // Si el Jefe de Taller elimina la OS, se reemplaza por una nueva OS
+      // automática. No se debe recuperar silenciosamente el número anterior.
+      ot.os = osIngresada || generarNumeroOTGenerico();
+      ot.osGenerica = !osIngresada;
+      const repuestosInventario = crearListadoRepuestosInventario(ot.os, ot.repuestos);
+      if (repuestosInventario) {
+        ot.repuestos = repuestosInventario;
+      } else if (ot.repuestos?.origen === "inventario" && normalizarBusquedaOS(ot.repuestos.inventarioOS) !== normalizarBusquedaOS(ot.os)) {
+        delete ot.repuestos;
+      }
 
       const guardado = await guardarCambiosOT();
       if (!guardado) {
         Object.assign(ot, datosAnteriores);
+        cargarDatosIdentificacionOT();
+        renderHeaderOTPro();
         return;
       }
 
+      setOTContexto(ot);
       cargarDatosIdentificacionOT();
+      renderHeaderOTPro();
       await notificarFlujo("Los datos de la OT se actualizaron correctamente.", "Cambios guardados", "exito");
     } finally {
       creacionOTEnCurso = false;
@@ -650,6 +1075,7 @@ async function guardarDatosOS() {
   }
 
   const os = osIngresada || generarNumeroOTGenerico();
+  const repuestosInventario = crearListadoRepuestosInventario(os);
   const plantilla = plantillasMantenimiento.find(item => item.id === plantillaId);
   if (!plantilla) {
     notificarFlujo("La gama seleccionada no tiene una plantilla activa disponible.", "Plantilla no disponible", "error");
@@ -708,6 +1134,15 @@ async function guardarDatosOS() {
       plantillaMantenimientoId: plantilla.id,
       plantillaMantenimientoNombre: plantilla.nombre,
       plantillaMantenimientoVersion: Number(plantilla.version || 1),
+      aprobacionesPorEtapa: aprobacionesActivas && esJefeTaller()
+        ? obtenerAprobacionesSeleccionadas()
+        : { evaluacion: false, mantencion: false, pruebas: false, despacho: false },
+      etapasConActividad: {
+        evaluacion: false,
+        mantencion: false,
+        pruebas: false,
+        despacho: false
+      },
 
       empresaId: usuario.empresaId,
       sucursalId: usuario.sucursalId,
@@ -727,11 +1162,13 @@ async function guardarDatosOS() {
         general: etapasOT.pruebas ? normalizarChecklistPlantilla(checklists.pruebas) : []
       },
       despacho: null,
+      ...(repuestosInventario ? { repuestos: repuestosInventario } : {}),
 
       ingresoAprobado: false,
       evaluacionAprobada: false,
       overhaulAprobado: false,
       pruebasAprobado: false,
+      despachoAprobado: false,
 
       cerrada: false,
 
@@ -814,7 +1251,8 @@ inicializarModuloRepuestos({
 
     OTBloqueada,
     esJefeTaller,
-    repuestosHabilitados
+    repuestosHabilitados,
+    sincronizarRepuestosInventario: sincronizarRepuestosInventarioOT
 });
 
 
@@ -867,10 +1305,24 @@ function configurarMenuMovilFlujo() {
 document.addEventListener("DOMContentLoaded", async () => {
   await cargarConfiguracionAprobaciones();
   await cargarGamasDisponibles();
+  iniciarInventarioTiempoReal();
+  configurarSelectorOSInventario();
+  document.querySelectorAll("[data-aprobacion-etapa]").forEach(campo => {
+    campo.addEventListener("change", actualizarResumenAprobaciones);
+  });
+  actualizarResumenAprobaciones();
   restaurarBorradorIdentificacion();
+  actualizarOpcionesAprobacionPorPlantilla();
   ["equipo", "serie", "gamaEquipo", "cliente", "os"].forEach(id => {
     const campo = document.getElementById(id);
-    campo?.addEventListener(id === "gamaEquipo" ? "change" : "input", guardarBorradorIdentificacion);
+    if (id === "gamaEquipo") {
+      campo?.addEventListener("change", () => {
+        guardarBorradorIdentificacion();
+        actualizarOpcionesAprobacionPorPlantilla();
+      });
+    } else {
+      campo?.addEventListener("input", guardarBorradorIdentificacion);
+    }
   });
 });
 
@@ -1275,6 +1727,13 @@ window.onload = async () => {
   habilitarTab(tabActiva);
   cambiarTab(tabActiva);
 
+  const destinoSolicitado = localStorage.getItem("otDestinoEtapa");
+  localStorage.removeItem("otDestinoEtapa");
+  if (destinoSolicitado && etapaHabilitada(destinoSolicitado)) {
+    habilitarTab(destinoSolicitado);
+    cambiarTab(destinoSolicitado);
+  }
+
   configurarTabsSegunFlujo();
 
 if (ot.gantt) {
@@ -1307,37 +1766,25 @@ renderUsuarioActivo();
 
 
 // =======================
-// ABRIR DOCUMENTO (MODAL)
+// ABRIR DOCUMENTO EN EL VISOR NATIVO DEL NAVEGADOR
 // =======================
 function abrirDocumento(doc) {
+  const urlDocumento = doc?.url || doc?.data;
 
-  const modal = document.getElementById("modalDoc");
-  const visor = document.getElementById("visorDoc");
-
-  if (!modal || !visor) {
-    console.error("Modal o visor no existen en el HTML");
+  if (!urlDocumento) {
+    console.error("El documento no tiene una URL disponible");
     return;
   }
 
-  visor.src = doc.url || doc.data;
-  modal.style.display = "block";
+  const enlace = document.createElement("a");
+  enlace.href = urlDocumento;
+  enlace.target = "_blank";
+  enlace.rel = "noopener noreferrer";
+  enlace.setAttribute("aria-label", `Abrir ${doc?.nombre || "documento"} en una pestaña nueva`);
+  document.body.appendChild(enlace);
+  enlace.click();
+  enlace.remove();
 }
-
-function cerrarModal() {
-  const modal = document.getElementById("modalDoc");
-  const visor = document.getElementById("visorDoc");
-
-  modal.style.display = "none";
-  visor.src = "";
-}
-
-window.onclick = function(e) {
-  const modal = document.getElementById("modalDoc");
-
-  if (e.target === modal) {
-    cerrarModal();
-  }
-};
 
 // =======================
 // GUARDAR DESPACHO
@@ -1421,7 +1868,7 @@ function validarOTCompleta() {
 
   if (
     etapaHabilitada("evaluacion") &&
-    aprobacionesHabilitadas() &&
+    aprobacionesHabilitadas("evaluacion") &&
     !ot.evaluacionAprobada
   ) {
     notificarFlujo("Falta la decisión del Jefe de Taller en Evaluación.", "Aprobación pendiente", "advertencia");
@@ -1441,6 +1888,11 @@ function validarOTCompleta() {
       return false;
     }
 
+    if (etapaHabilitada("overhaul") && aprobacionesHabilitadas("mantencion") && !ot.overhaulAprobado) {
+      notificarFlujo("Falta la aprobación de Mantención por el Jefe de Taller.", "Aprobación pendiente", "advertencia");
+      return false;
+    }
+
     if (etapaHabilitada("pruebas")) {
       const pruebas = Array.isArray(ot.pruebas)
         ? ot.pruebas
@@ -1452,7 +1904,7 @@ function validarOTCompleta() {
 
     if (
       etapaHabilitada("pruebas") &&
-      aprobacionesHabilitadas() &&
+      aprobacionesHabilitadas("pruebas") &&
       !ot.pruebasAprobado
     ) {
       notificarFlujo("Falta la aprobación de Pruebas por el Jefe de Taller.", "Aprobación pendiente", "advertencia");
@@ -1473,6 +1925,11 @@ function validarOTCompleta() {
 
     if (!ot.despacho.final || ot.despacho.final.length === 0) {
       notificarFlujo("Despacho: falta la documentación de Despacho Final.", "Documentación pendiente", "advertencia");
+      return false;
+    }
+
+    if (aprobacionesHabilitadas("despacho") && !ot.despachoAprobado) {
+      notificarFlujo("Falta la aprobación de Despacho por el Jefe de Taller.", "Aprobación pendiente", "advertencia");
       return false;
     }
 
@@ -1609,7 +2066,6 @@ function renderHeaderOTPro() {
 // =======================
 window.guardarDatosOS = guardarDatosOS;
 
-window.cerrarModal = cerrarModal;
 window.cerrarImagen = cerrarImagen;
 
 window.verImagenModal = verImagenModal;

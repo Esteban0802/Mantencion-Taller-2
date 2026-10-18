@@ -353,7 +353,7 @@ export function inicializarModuloOverhaul(servicios) {
 
             <input
               type="file"
-              accept="image/*,.pdf,application/pdf"
+              accept=".jpg,.jpeg,.png,.webp,.heic,.heif,.avif,.pdf,image/jpeg,image/png,image/webp,image/heic,image/heif,image/avif,application/pdf"
               multiple
               onchange="subirFotoOverhaul(event, ${i})"
             >
@@ -455,21 +455,17 @@ export function inicializarModuloOverhaul(servicios) {
         ot.overhaul[i].fotos = [];
       }
 
-      for (const file of files) {
+      const cargas = await Promise.allSettled(files.map(async file => {
         const archivoEvidencia = await prepararEvidencia(file, "overhaul");
-
-        const urlFoto =
-          await subirArchivoStorage(
-            archivoEvidencia,
-            "overhaul",
-            i
-          );
-
+        const urlFoto = await subirArchivoStorage(archivoEvidencia, "overhaul", i);
         if (!urlFoto) throw new Error("La fotografía no obtuvo una URL válida");
-
-        urlsSubidasEnEsteIntento.push(urlFoto);
-        ot.overhaul[i].fotos.push(urlFoto);
-      }
+        return urlFoto;
+      }));
+      const urls = cargas.filter(item => item.status === "fulfilled").map(item => item.value);
+      urlsSubidasEnEsteIntento.push(...urls);
+      const cargaFallida = cargas.find(item => item.status === "rejected");
+      if (cargaFallida) throw cargaFallida.reason;
+      ot.overhaul[i].fotos.push(...urls);
 
       const guardado = await guardarCambiosOT();
       if (!guardado) {
@@ -643,15 +639,22 @@ export function inicializarModuloOverhaul(servicios) {
 
     if (inputTexto) inputTexto.value = "";
 
-    const guardado = await guardarCambiosOT();
+    // Respuesta optimista: el comentario aparece de inmediato mientras
+    // Firebase confirma el cambio. Si falla, se revierte abajo.
+    renderComentariosOverhaul(i);
+
+    const guardado = await guardarCambiosOT(true);
     if (!guardado) {
       ot.overhaul[i].comentarios.splice(cantidadComentariosAnterior);
       ot.alertaJefe = alertaJefeAnterior;
       if (inputTexto) inputTexto.value = texto;
+      renderComentariosOverhaul(i);
       return;
     }
 
-    renderOverhaul();
+    const tarjeta = document.getElementById("listaOverhaul")?.querySelector(`[data-checklist-index="${i}"]`);
+    const badgeComentarios = tarjeta?.querySelectorAll(".checklist-mini-badge")?.[1];
+    if (badgeComentarios) badgeComentarios.textContent = `💬 ${ot.overhaul[i].comentarios.length} comentario(s)`;
   }
 
   // ==========================================

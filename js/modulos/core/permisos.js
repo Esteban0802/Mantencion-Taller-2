@@ -19,18 +19,12 @@ export function puedeEliminarComentario(c) {
 
     if (!c) return false;
 
-    if (esJefeTaller()) return true;
-
-    if (esUsuarioTaller() && ["jefe_taller", "admin_sucursal"].includes(c.rol)) {
-        return false;
-    }
-
     // Cada trabajador puede eliminar solamente sus propios comentarios.
     const usuario = getUsuario();
     if (
-        esUsuarioTaller() &&
-        ROLES_OPERATIVOS.includes(c.rol) &&
-        (!c.creadoPorUid || c.creadoPorUid === usuario?.uid)
+        (esUsuarioTaller() || esJefeTaller()) &&
+        Boolean(c.creadoPorUid) &&
+        c.creadoPorUid === usuario?.uid
     ) {
         return true;
     }

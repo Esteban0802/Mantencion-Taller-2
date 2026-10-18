@@ -40,6 +40,7 @@ const NOMBRES_ETAPAS = {
     evaluacion: "Evaluación",
     overhaul: "Mantención",
     pruebas: "Pruebas",
+    despacho: "Despacho",
     despachoPreparacion: "Despacho Preparación",
     despachoFinal: "Despacho Final"
 };
@@ -178,6 +179,11 @@ if (ot.gantt && ot.gantt.actividades?.length) {
   return;
 }
 
+  if (!esJefeTaller()) {
+    alert("La Carta Gantt todavía no ha sido creada por el Jefe de Taller.");
+    return;
+  }
+
   // 🔥 PRIMER INGRESO
   cargarFormularioGantt();
 
@@ -260,6 +266,12 @@ function cargarFechasGanttEnFormulario() {
       setValue("ganttPruebasInicio", etapaPruebas.inicio);
       setValue("ganttPruebasTermino", etapaPruebas.termino);
     }
+
+    cargarEtapa(
+      NOMBRES_ETAPAS.despacho,
+      "ganttDespachoInicio",
+      "ganttDespachoTermino"
+    );
   }
 }
 
@@ -339,7 +351,7 @@ function obtenerActividadesDesdeChecklistDistribuido(
   etapa,
   checklist,
   fechaInicio,
-  diasTotalesEtapa
+  fechaTermino
 ) {
 
   const actividades = [];
@@ -348,36 +360,55 @@ function obtenerActividadesDesdeChecklistDistribuido(
     return actividades;
   }
 
-  let fechaCursor = new Date(fechaInicio);
-
   const cantidadItems = checklist.length;
+  const inicioRango = new Date(fechaInicio);
+  const terminoRango = new Date(`${normalizarFechaGantt(fechaTermino)}T00:00:00`);
+  const diasHabilesDisponibles = [];
 
-  const duracionBase =
-    Math.floor(diasTotalesEtapa / cantidadItems);
+  for (
+    let cursor = new Date(inicioRango);
+    cursor <= terminoRango;
+    cursor.setDate(cursor.getDate() + 1)
+  ) {
+    const diaSemana = cursor.getDay();
 
-  let diasSobrantes =
-    diasTotalesEtapa % cantidadItems;
-
-  checklist.forEach((item) => {
-
-    let duracion =
-      Math.max(1, duracionBase);
-
-    if (diasSobrantes > 0) {
-      duracion += 1;
-      diasSobrantes--;
+    if (diaSemana !== 0 && diaSemana !== 6) {
+      diasHabilesDisponibles.push(new Date(cursor));
     }
+  }
+
+  // Si toda la etapa cae en fin de semana, se conserva la fecha inicial
+  // impuesta en vez de desplazar las tareas fuera de su rango.
+  if (diasHabilesDisponibles.length === 0) {
+    diasHabilesDisponibles.push(new Date(inicioRango));
+  }
+
+  const cantidadDias = diasHabilesDisponibles.length;
+
+  checklist.forEach((item, indice) => {
+    const indiceInicio = Math.min(
+      cantidadDias - 1,
+      Math.floor((indice * cantidadDias) / cantidadItems)
+    );
+    const finExclusivo = Math.floor(
+      ((indice + 1) * cantidadDias) / cantidadItems
+    );
+    const indiceTermino = Math.min(
+      cantidadDias - 1,
+      Math.max(indiceInicio, finExclusivo - 1)
+    );
+    const inicioActividad = diasHabilesDisponibles[indiceInicio];
+    const terminoActividad = diasHabilesDisponibles[indiceTermino];
+    const duracion = indiceTermino - indiceInicio + 1;
 
     actividades.push({
       etapa,
       actividad: item.item || "Actividad",
-      inicio: fechaCursor.toISOString(),
-      termino: sumarDias(fechaCursor, duracion - 1).toISOString(),
+      inicio: inicioActividad.toISOString(),
+      termino: terminoActividad.toISOString(),
       duracion,
       estado: item.ok ? "Completado" : "Planificado"
     });
-
-    fechaCursor = sumarDias(fechaCursor, duracion);
   });
 
   return actividades;
@@ -392,6 +423,11 @@ export function cerrarModalGanttVisual() {
 export function volverFormularioGantt() {
 
     sincronizarContexto();
+
+  if (!esJefeTaller()) {
+    alert("Solo el Jefe de Taller puede modificar la Carta Gantt.");
+    return;
+  }
 
   const visual = document.getElementById("modalGanttVisual");
   const form = document.getElementById("modalGantt");
@@ -425,7 +461,7 @@ export async function generarCartaGantt(
 
     sincronizarContexto();
 
-  if (!esJefeTaller() && modo === "manual") {
+  if (!esJefeTaller()) {
     alert("Solo Jefe de Taller puede generar Carta Gantt");
     return;
   }
@@ -504,6 +540,12 @@ if (modo === "manual") {
       "Pruebas",
       "ganttPruebasInicio",
       "ganttPruebasTermino"
+    ),
+
+    leerEtapaManual(
+      NOMBRES_ETAPAS.despacho,
+      "ganttDespachoInicio",
+      "ganttDespachoTermino"
     )
   ];
 
@@ -530,6 +572,27 @@ if (modo === "manual") {
     return false;
   }
 }
+
+  const etapaConRangoInvalido = etapasManuales.find(etapa => {
+    const inicio = new Date(`${etapa.inicio}T00:00:00`);
+    const termino = new Date(`${etapa.termino}T00:00:00`);
+
+    return Number.isNaN(inicio.getTime()) ||
+      Number.isNaN(termino.getTime()) ||
+      termino < inicio;
+  });
+
+  if (etapaConRangoInvalido) {
+    const mensaje = `La fecha de término de ${etapaConRangoInvalido.etapa} no puede ser anterior a su fecha de inicio.`;
+
+    if (modo === "manual") {
+      alert(mensaje);
+    } else {
+      console.warn(`No se recalculó la Carta Gantt: ${mensaje}`);
+    }
+
+    return false;
+  }
 
   const diasTotales =
     Math.ceil(
@@ -634,7 +697,7 @@ const ingresoActs =
     "Ingreso",
     ot.ingreso,
     inicioIngreso,
-    diasIngreso
+    etapaIngreso.termino
   );
 
 actividades.push(...ingresoActs);
@@ -671,7 +734,7 @@ const evalActs =
     "Evaluación",
     ot.evaluacion,
     inicioEvaluacion,
-    diasEvaluacion
+    etapaEvaluacion.termino
   );
 
 actividades.push(...evalActs);
@@ -729,7 +792,7 @@ const etapaOverhaul =
   );
 
 if (!etapaOverhaul) {
-  console.warn("No se encontró la etapa Overhaul en la Carta Gantt");
+  console.warn("No se encontró la etapa Mantención en la Carta Gantt");
   return false;
 }
 
@@ -755,7 +818,7 @@ const overhaulActs =
     NOMBRES_ETAPAS.overhaul,
     ot.overhaul,
     inicioOverhaul,
-    diasOverhaul
+    etapaOverhaul.termino
   );
 
 actividades.push(...overhaulActs);
@@ -785,10 +848,53 @@ const pruebasActs = obtenerActividadesDesdeChecklistDistribuido(
   "Pruebas",
   listaPruebas,
   inicioPruebas,
-  diasPruebas
+  etapaPruebas.termino
 );
 
 actividades.push(...pruebasActs);
+
+// =========================
+// DESPACHO
+// =========================
+
+// Las cartas antiguas no tenían planificación manual de Despacho. Durante
+// su recálculo se conserva compatibilidad usando la fecha final existente.
+const etapaDespacho = obtenerEtapaManual(etapasManuales, NOMBRES_ETAPAS.despacho) || {
+  inicio: fechaTerminoInput,
+  termino: fechaTerminoInput
+};
+
+const inicioDespacho = new Date(etapaDespacho.inicio + "T00:00:00");
+const terminoDespacho = new Date(etapaDespacho.termino + "T00:00:00");
+
+if (terminoDespacho > fechaTermino) {
+  fechaTermino.setTime(terminoDespacho.getTime());
+}
+
+// Despacho es la última etapa del proyecto. Si la fecha general ingresada es
+// posterior, se extiende esta etapa hasta esa fecha para que ambas coincidan.
+const terminoDespachoEfectivo = new Date(fechaTermino);
+const diasDespacho = Math.max(
+  1,
+  calcularDiasHabilesEntreIncluyendoFinal(
+    inicioDespacho,
+    terminoDespachoEfectivo
+  )
+);
+
+agregarEtapaPlanificada(
+  NOMBRES_ETAPAS.despacho,
+  inicioDespacho,
+  diasDespacho
+);
+
+actividades.push(crear(
+  NOMBRES_ETAPAS.despacho,
+  "Preparación, documentación y entrega final",
+  inicioDespacho,
+  diasDespacho,
+  ot.despachoAprobado === true || ot.cerrada === true ? "Completado" : "Planificado"
+));
 
 const ultimaActividad =
   actividades
@@ -825,7 +931,7 @@ if (ultimaEtapaTecnica) {
 
   ot.gantt = {
   fechaInicio: fechaInicioInput,
-  fechaTermino: fechaTerminoInput,
+  fechaTermino: normalizarFechaGantt(fechaTermino.toISOString()),
   fechaDespachoEstimada: fechaTermino.toISOString(),
   fechaSolicitudRepuestos,
   diasRepuestos,
@@ -888,6 +994,7 @@ export async function recalcularGanttAutomatico() {
 
     sincronizarContexto();
 
+  if (!esJefeTaller()) return;
   if (recalculandoGantt) return;
   if (!ot?.gantt?.actividades?.length) return;
 
@@ -1144,7 +1251,7 @@ const duracion = Math.max(
       <div class="gantt-legend">
         <span><b class="azul"></b> Ingreso</span>
         <span><b class="naranjo"></b> Repuestos</span>
-        <span><b class="verde"></b> Overhaul</span>
+        <span><b class="verde"></b> Mantención</span>
         <span><b class="morado"></b> Pruebas</span>
         <span><b class="cyan"></b> Despacho</span>
       </div>
@@ -1282,9 +1389,13 @@ export function renderCartaGanttProject() {
 
       </div>
 
+      <p class="gantt-mobile-hint" aria-hidden="true">
+        Desliza la carta para recorrer las fechas
+      </p>
+
       <div class="gantt-project-scroll">
 
-        <div class="gantt-project-table" style="--timeline-width:${anchoTimeline}px;">
+        <div class="gantt-project-table" style="--timeline-width:${anchoTimeline}px; --gantt-info-width:520px;">
 
           <div class="gantt-project-row gantt-project-row-head">
 
@@ -1316,7 +1427,7 @@ export function renderCartaGanttProject() {
               posicionHoy !== null
                 ? `<div 
                     class="gantt-project-hoy-line"
-                    style="left: calc(680px + ${posicionHoy}px);">
+                    style="left: calc(var(--gantt-info-width, 520px) + ${posicionHoy}px);">
                     <span>HOY</span>
                   </div>`
                 : ""
@@ -1383,8 +1494,10 @@ width = Math.max(18, width);
 
   if (grupo.etapa === "Repuestos") {
     color = "repuestos";
-    textoBarra = `${grupo.actividades[0]?.duracion || 0} días corridos`;
-    grupo.porcentaje = 100;
+    const resumen = obtenerResumenRepuestosInventario();
+    textoBarra = resumen.total > 0
+      ? `${resumen.recibidos} de ${resumen.total} recibidos · ${grupo.porcentaje}%`
+      : "Sin repuestos vinculados";
   } else if (grupo.porcentaje >= 100) {
     color = "completado";
   } else if (grupo.porcentaje > 0) {
@@ -1402,7 +1515,9 @@ width = Math.max(18, width);
         </div>
 
         <div>
-          ${grupo.total} actividad(es)
+          ${grupo.etapa === "Repuestos" && obtenerResumenRepuestosInventario().total > 0
+            ? `${obtenerResumenRepuestosInventario().total} repuesto(s)`
+            : `${grupo.total} actividad(es)`}
         </div>
 
         <div>
@@ -1717,50 +1832,186 @@ export function descargarGanttPDFProfesional() {
     });
   }
 
-  pdf.setFillColor(15, 23, 42);
-  pdf.rect(0, 0, 297, 210, "F");
+  const COLORES = {
+    navy: [12, 41, 70],
+    blue: [22, 131, 232],
+    blueDark: [19, 93, 158],
+    green: [31, 169, 96],
+    amber: [231, 154, 19],
+    red: [215, 72, 88],
+    ink: [23, 61, 93],
+    muted: [103, 128, 148],
+    border: [205, 221, 232],
+    soft: [245, 249, 252],
+    white: [255, 255, 255]
+  };
 
-  pdf.setTextColor(255, 255, 255);
-  pdf.setFontSize(18);
-  pdf.text("VECTARIA - Carta Gantt", 14, 16);
+  const coloresEtapa = {
+    "Ingreso": [43, 126, 214],
+    "Evaluación": [70, 154, 216],
+    "Repuestos": [231, 154, 19],
+    [NOMBRES_ETAPAS.overhaul]: [94, 171, 75],
+    "Pruebas": [124, 71, 173],
+    "Pruebas Mecánicas": [124, 71, 173],
+    "Pruebas Eléctricas": [146, 86, 187],
+    "Despacho": [0, 166, 214]
+  };
 
-  pdf.setFontSize(10);
-  pdf.setTextColor(203, 213, 225);
-  pdf.text(`OS: ${ot.os || "-"}`, 14, 24);
-  pdf.text(`Equipo: ${ot.equipo || "-"}`, 55, 24);
-  pdf.text(`Cliente: ${ot.cliente || "-"}`, 105, 24);
-  pdf.text(`Inicio: ${formatearFecha(inicioProyecto)}`, 190, 24);
-  pdf.text(`Término: ${formatearFecha(terminoProyecto)}`, 235, 24);
+  const aclarar = (color, proporcion = 0.78) =>
+    color.map(canal => Math.round(canal + (255 - canal) * proporcion));
+
+  const formatearFechaPDF = fecha =>
+    new Date(fecha).toLocaleDateString("es-CL", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      timeZone: "UTC"
+    });
+
+  const dibujarMarca = (x, y) => {
+    pdf.setFillColor(...COLORES.blue);
+    pdf.roundedRect(x, y, 9, 9, 2, 2, "F");
+    pdf.setFillColor(...COLORES.white);
+    pdf.rect(x + 2.2, y + 2.2, 1.2, 4.6, "F");
+    pdf.rect(x + 4.1, y + 1.4, 1.2, 5.4, "F");
+    pdf.rect(x + 6, y + 3, 1.2, 3.8, "F");
+  };
+
+  const dibujarEncabezado = (titulo, subtitulo) => {
+    pdf.setFillColor(...COLORES.white);
+    pdf.rect(0, 0, 297, 210, "F");
+    pdf.setFillColor(...COLORES.navy);
+    pdf.rect(0, 0, 297, 32, "F");
+    pdf.setFillColor(...COLORES.blue);
+    pdf.rect(0, 31, 297, 1, "F");
+    dibujarMarca(14, 10);
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(16);
+    pdf.setTextColor(...COLORES.white);
+    pdf.text(titulo, 27, 15.5);
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(8.5);
+    pdf.setTextColor(205, 225, 240);
+    pdf.text(subtitulo, 27, 22);
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(9);
+    pdf.setTextColor(...COLORES.white);
+    pdf.text("VECTARIA", 283, 15, { align: "right" });
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(6.8);
+    pdf.setTextColor(163, 197, 220);
+    pdf.text("CONTROL OPERACIONAL", 283, 21, { align: "right" });
+  };
+
+  const dibujarTarjeta = (x, y, ancho, etiqueta, valor, color) => {
+    pdf.setFillColor(...COLORES.white);
+    pdf.setDrawColor(...COLORES.border);
+    pdf.roundedRect(x, y, ancho, 16, 2.5, 2.5, "FD");
+    pdf.setFillColor(...color);
+    pdf.roundedRect(x, y, 2.4, 16, 1.2, 1.2, "F");
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(6.5);
+    pdf.setTextColor(...COLORES.muted);
+    pdf.text(etiqueta.toUpperCase(), x + 5, y + 5.3);
+    pdf.setFontSize(10);
+    pdf.setTextColor(...COLORES.ink);
+    const valorCorto = pdf.splitTextToSize(String(valor || "-"), ancho - 9)[0];
+    pdf.text(valorCorto, x + 5, y + 11.8);
+  };
+
+  const dibujarResumen = (y) => {
+    const separacion = 3;
+    const ancho = (269 - separacion * 3) / 4;
+    dibujarTarjeta(14, y, ancho, "Orden de servicio", ot.os || "-", COLORES.blue);
+    dibujarTarjeta(14 + ancho + separacion, y, ancho, "Equipo", ot.equipo || "-", COLORES.green);
+    dibujarTarjeta(14 + (ancho + separacion) * 2, y, ancho, "Cliente", ot.cliente || "-", [124, 71, 173]);
+    dibujarTarjeta(
+      14 + (ancho + separacion) * 3,
+      y,
+      ancho,
+      "Periodo planificado",
+      `${formatearFechaPDF(inicioProyecto)} - ${formatearFechaPDF(terminoProyecto)}`,
+      COLORES.amber
+    );
+  };
+
+  const estadoAvance = porcentaje => {
+    if (porcentaje >= 100) return "Completado";
+    if (porcentaje > 0) return "En progreso";
+    return "Pendiente";
+  };
+
+  dibujarEncabezado(
+    "Carta Gantt",
+    "Resumen ejecutivo de planificación, fechas y avance por etapa"
+  );
+  dibujarResumen(39);
+
+  pdf.setFont("helvetica", "bold");
+  pdf.setFontSize(11);
+  pdf.setTextColor(...COLORES.ink);
+  pdf.text("Resumen por etapa", 14, 64);
+  pdf.setFont("helvetica", "normal");
+  pdf.setFontSize(7.5);
+  pdf.setTextColor(...COLORES.muted);
+  pdf.text("Las fechas y porcentajes corresponden al último estado registrado de la OT.", 14, 69);
 
   const body = etapasProject.map(e => [
     e.etapa,
-    formatearFecha(new Date(e.inicio)),
-    formatearFecha(new Date(e.termino)),
+    formatearFechaPDF(e.inicio),
+    formatearFechaPDF(e.termino),
     e.duracion || "",
     e.total || e.actividades?.length || 0,
-    `${e.porcentaje || 0}%`
+    `${e.porcentaje || 0}% · ${estadoAvance(e.porcentaje || 0)}`
   ]);
 
   pdf.autoTable({
-    startY: 34,
+    startY: 74,
     head: [["Etapa", "Inicio", "Término", "Duración", "Actividades", "Avance"]],
     body,
     theme: "grid",
+    margin: { left: 14, right: 14 },
     styles: {
-      fillColor: [15, 23, 42],
-      textColor: [255, 255, 255],
-      lineColor: [51, 65, 85],
-      lineWidth: 0.2,
-      fontSize: 9,
-      cellPadding: 3
+      fillColor: COLORES.white,
+      textColor: COLORES.ink,
+      lineColor: COLORES.border,
+      lineWidth: 0.18,
+      fontSize: 8.5,
+      cellPadding: 3.2,
+      valign: "middle"
     },
     headStyles: {
-      fillColor: [249, 115, 22],
-      textColor: [17, 24, 39],
+      fillColor: COLORES.navy,
+      textColor: COLORES.white,
       fontStyle: "bold"
     },
     alternateRowStyles: {
-      fillColor: [30, 41, 59]
+      fillColor: COLORES.soft
+    },
+    columnStyles: {
+      0: { fontStyle: "bold", cellWidth: 58 },
+      1: { cellWidth: 40 },
+      2: { cellWidth: 40 },
+      3: { halign: "center", cellWidth: 33 },
+      4: { halign: "center", cellWidth: 40 },
+      5: { halign: "center", cellWidth: 58 }
+    },
+    didParseCell: data => {
+      if (data.section !== "body" || data.column.index !== 5) return;
+      const porcentaje = etapasProject[data.row.index]?.porcentaje || 0;
+      data.cell.styles.fontStyle = "bold";
+      data.cell.styles.textColor = porcentaje >= 100
+        ? COLORES.green
+        : porcentaje > 0
+          ? COLORES.blueDark
+          : COLORES.muted;
+    },
+    didDrawCell: data => {
+      if (data.section !== "body" || data.column.index !== 0) return;
+      const etapa = etapasProject[data.row.index]?.etapa;
+      const color = coloresEtapa[etapa] || COLORES.muted;
+      pdf.setFillColor(...color);
+      pdf.rect(data.cell.x, data.cell.y, 1.5, data.cell.height, "F");
     }
   });
 
@@ -1768,44 +2019,40 @@ export function descargarGanttPDFProfesional() {
 // PÁGINA 2: CARTA GANTT VISUAL
 // ===============================
 
-pdf.addPage();
+  pdf.addPage();
+  dibujarEncabezado(
+    "Cronograma visual",
+    "Distribución temporal y estado de avance de las etapas de la OT"
+  );
+  dibujarResumen(39);
 
-pdf.setFillColor(15, 23, 42);
-pdf.rect(0, 0, 297, 210, "F");
+  const xNombre = 14;
+  const anchoNombre = 66;
+  const xTimeline = 87;
+  const yInicio = 78;
+  const altoFila = 18;
+  const anchoTimeline = 196;
+  const totalMs = Math.max(1, terminoProyecto - inicioProyecto);
 
-pdf.setTextColor(255, 255, 255);
-pdf.setFontSize(18);
-pdf.text("Carta Gantt Visual por Etapas", 14, 16);
+  pdf.setFillColor(...COLORES.soft);
+  pdf.setDrawColor(...COLORES.border);
+  pdf.roundedRect(14, 61, 269, 10, 2, 2, "FD");
+  pdf.setFont("helvetica", "bold");
+  pdf.setFontSize(7.5);
+  pdf.setTextColor(...COLORES.ink);
+  pdf.text("ETAPA", 18, 67.2);
+  pdf.text("LINEA DE TIEMPO DEL PROYECTO", xTimeline, 67.2);
+  pdf.setTextColor(...COLORES.blueDark);
+  pdf.text(formatearFechaPDF(inicioProyecto), xTimeline, 74);
+  pdf.text(formatearFechaPDF(terminoProyecto), xTimeline + anchoTimeline, 74, { align: "right" });
 
-pdf.setFontSize(10);
-pdf.setTextColor(203, 213, 225);
-pdf.text(`OS: ${ot.os || "-"}`, 14, 24);
-pdf.text(`Cliente: ${ot.cliente || "-"}`, 55, 24);
-pdf.text(`Equipo: ${ot.equipo || "-"}`, 115, 24);
-
-const coloresEtapa = {
-  "Ingreso": [68, 114, 196],
-  "Evaluación": [91, 155, 213],
-  "Repuestos": [237, 125, 49],
-  [NOMBRES_ETAPAS.overhaul]: [112, 173, 71],
-  "Pruebas": [112, 48, 160],
-  "Pruebas Mecánicas": [112, 48, 160],
-  "Pruebas Eléctricas": [142, 68, 173],
-  "Despacho": [0, 176, 240]
-};
-
-const xNombre = 14;
-const xTimeline = 65;
-const yInicio = 42;
-const altoFila = 14;
-const anchoTimeline = 205;
-
-const totalMs = terminoProyecto - inicioProyecto;
-
-pdf.setTextColor(249, 115, 22);
-pdf.setFontSize(9);
-pdf.text(formatearFecha(inicioProyecto), xTimeline, 34);
-pdf.text(formatearFecha(terminoProyecto), xTimeline + anchoTimeline - 25, 34);
+  const divisiones = 6;
+  for (let i = 0; i <= divisiones; i++) {
+    const x = xTimeline + (anchoTimeline / divisiones) * i;
+    pdf.setDrawColor(225, 235, 242);
+    pdf.setLineWidth(0.2);
+    pdf.line(x, yInicio - 2, x, yInicio + etapasProject.length * altoFila - 3);
+  }
 
 etapasProject.forEach((etapa, index) => {
   const y = yInicio + index * altoFila;
@@ -1817,24 +2064,59 @@ etapasProject.forEach((etapa, index) => {
   const duracionMs = termino - inicio;
 
   const left = Math.max(0, (offsetMs / totalMs) * anchoTimeline);
-  const width = Math.max(4, (duracionMs / totalMs) * anchoTimeline);
+  const width = Math.min(
+    anchoTimeline - left,
+    Math.max(5, (Math.max(86400000, duracionMs) / totalMs) * anchoTimeline)
+  );
 
   const color = coloresEtapa[etapa.etapa] || [100, 116, 139];
+  const porcentaje = etapa.porcentaje || 0;
+  const estado = estadoAvance(porcentaje);
 
-  pdf.setTextColor(255, 255, 255);
-  pdf.setFontSize(9);
-  pdf.text(etapa.etapa, xNombre, y + 4);
+  pdf.setFillColor(index % 2 === 0 ? 248 : 243, index % 2 === 0 ? 251 : 248, index % 2 === 0 ? 253 : 251);
+  pdf.roundedRect(14, y - 2, 269, 14, 2, 2, "F");
+  pdf.setFillColor(...color);
+  pdf.roundedRect(xNombre, y + 0.5, 3, 8, 1, 1, "F");
+  pdf.setFont("helvetica", "bold");
+  pdf.setTextColor(...COLORES.ink);
+  pdf.setFontSize(8.2);
+  pdf.text(etapa.etapa, xNombre + 6, y + 4);
+  pdf.setFont("helvetica", "normal");
+  pdf.setTextColor(...COLORES.muted);
+  pdf.setFontSize(6.5);
+  pdf.text(`${porcentaje}% - ${estado}`, xNombre + 6, y + 8.3);
 
-  pdf.setFillColor(30, 41, 59);
-  pdf.roundedRect(xTimeline, y, anchoTimeline, 7, 2, 2, "F");
+  pdf.setFillColor(...aclarar(color, 0.79));
+  pdf.setDrawColor(...color);
+  pdf.setLineWidth(0.35);
+  pdf.roundedRect(xTimeline + left, y, width, 9, 2.2, 2.2, "FD");
 
-  pdf.setFillColor(color[0], color[1], color[2]);
-  pdf.roundedRect(xTimeline + left, y, width, 7, 2, 2, "F");
+  if (porcentaje > 0) {
+    const anchoAvance = Math.max(2.5, width * Math.min(100, porcentaje) / 100);
+    pdf.setFillColor(...color);
+    pdf.roundedRect(xTimeline + left, y, anchoAvance, 9, 2.2, 2.2, "F");
+  }
 
-  pdf.setTextColor(203, 213, 225);
-  pdf.setFontSize(7);
-  pdf.text(`${etapa.porcentaje || 0}%`, xTimeline + left + width + 2, y + 5);
+  const etiqueta = porcentaje > 0 ? `${porcentaje}%` : "Pendiente";
+  pdf.setFont("helvetica", "bold");
+  pdf.setFontSize(6.2);
+  pdf.setTextColor(...COLORES.ink);
+  const textoX = Math.min(xTimeline + left + width + 2, 281);
+  pdf.text(etiqueta, textoX, y + 5.8, { align: textoX >= 281 ? "right" : "left" });
 });
+
+  const totalPaginas = pdf.getNumberOfPages();
+
+  for (let pagina = 1; pagina <= totalPaginas; pagina++) {
+    pdf.setPage(pagina);
+    pdf.setDrawColor(...COLORES.border);
+    pdf.line(14, 199, 283, 199);
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(6.8);
+    pdf.setTextColor(...COLORES.muted);
+    pdf.text("Documento generado por Vectaria - Control operacional", 14, 204);
+    pdf.text(`Página ${pagina} de ${totalPaginas}`, 283, 204, { align: "right" });
+  }
 
   pdf.save(`Carta_Gantt_${ot.os || "Proyecto"}.pdf`);
 }
@@ -1892,14 +2174,22 @@ function calcularEtapasGanttProject(actividades) {
     const inicio = new Date(Math.min(...fechasInicio));
     const termino = new Date(Math.max(...fechasTermino));
 
-    const total = grupo.actividades.length;
+    let total = grupo.actividades.length;
 
     const porcentaje =
       calcularPorcentajeEtapaReal(grupo.etapa);
 
-    const completadas = Math.round(
+    let completadas = Math.round(
       (porcentaje / 100) * total
     );
+
+    if (grupo.etapa === "Repuestos") {
+      const resumen = obtenerResumenRepuestosInventario();
+      if (resumen.total > 0) {
+        total = resumen.total;
+        completadas = resumen.recibidos;
+      }
+    }
 
     return {
       etapa: grupo.etapa,
@@ -1935,6 +2225,30 @@ function calcularPorcentajeChecklist(lista) {
   );
 }
 
+function obtenerResumenRepuestosInventario() {
+  const items = Array.isArray(ot?.repuestos?.items)
+    ? ot.repuestos.items
+    : [];
+
+  const cantidad = item => {
+    const valor = Number(String(item?.cantidad ?? "").replace(",", "."));
+    return Number.isFinite(valor) && valor > 0 ? valor : 1;
+  };
+  const total = items.reduce((suma, item) => suma + cantidad(item), 0);
+  const recibidos = items
+    .filter(item => item.recibidoInventario === true)
+    .reduce((suma, item) => suma + cantidad(item), 0);
+
+  return {
+    total,
+    recibidos,
+    pendientes: Math.max(0, total - recibidos),
+    porcentaje: total > 0
+      ? Math.round((recibidos / total) * 100)
+      : 0
+  };
+}
+
 
 function calcularPorcentajeEtapaReal(etapa) {
 
@@ -1960,7 +2274,7 @@ function calcularPorcentajeEtapaReal(etapa) {
   }
 
   if (etapa === "Repuestos") {
-    return 0;
+    return obtenerResumenRepuestosInventario().porcentaje;
   }
 
   return 0;
@@ -1979,6 +2293,7 @@ export function actualizarEstadoGanttDesdeChecklist() {
 
     sincronizarContexto();
 
+  if (!esJefeTaller()) return;
   if (!ot?.gantt?.actividades?.length) return;
 
   const buscarItem = (etapa, actividad) => {
@@ -1987,7 +2302,7 @@ export function actualizarEstadoGanttDesdeChecklist() {
 
     if (etapa === "Ingreso") lista = ot.ingreso || [];
     if (etapa === "Evaluación") lista = ot.evaluacion || [];
-    if (etapa === "Overhaul") lista = ot.overhaul || [];
+    if (["Overhaul", NOMBRES_ETAPAS.overhaul].includes(etapa)) lista = ot.overhaul || [];
     if (etapa === "Pruebas" || etapa === "Pruebas Mecánicas" || etapa === "Pruebas Eléctricas") {
       lista = Array.isArray(ot.pruebas?.general)
         ? ot.pruebas.general

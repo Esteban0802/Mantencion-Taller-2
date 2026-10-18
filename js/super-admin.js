@@ -1,4 +1,4 @@
-import { protegerPagina, cerrarSesion } from "./session.js?v=20261004-1";
+import { protegerPagina, cerrarSesion, reautenticarAccionCritica } from "./session.js?v=20261017-1";
 import { abrirWizard } from "./components/wizard.js";
 
 import { app, db } from "./firebase-config.js";
@@ -82,7 +82,6 @@ const MODULOS_PLAN = [
   { key: "despacho", nombre: "Despacho" },
   { key: "evidencias", nombre: "Evidencias Fotográficas" },
   { key: "comentarios", nombre: "Comentarios" },
-  { key: "aprobaciones", nombre: "Aprobaciones" },
   { key: "repuestos", nombre: "Repuestos" },
   { key: "gantt", nombre: "Carta Gantt" },
   { key: "reportesPDF", nombre: "Informes PDF" },
@@ -961,6 +960,7 @@ function refrescarTablaUsuariosGlobal() {
 window.cambiarEstadoUsuarioGlobal = async function (usuarioId, nuevoEstado) {
   const usuario = usuarios.find(item => item.id === usuarioId);
   if (!usuario || usuario.rol === "super_admin") return;
+  if (!usuario || usuario.rol === "super_admin") return;
   const accion = nuevoEstado ? "activar" : "desactivar";
   const confirmar = await window.OverTrackUI.confirmarAccion({
     titulo: nuevoEstado ? "Activar usuario" : "Desactivar usuario",
@@ -970,6 +970,8 @@ window.cambiarEstadoUsuarioGlobal = async function (usuarioId, nuevoEstado) {
     peligrosa: !nuevoEstado
   });
   if (!confirmar) return;
+  if (!nuevoEstado && ["admin_empresa", "admin_sucursal", "jefe_taller"].includes(usuario.rol) &&
+      !(await reautenticarAccionCritica("desactivar este usuario administrativo"))) return;
   try {
     await cambiarEstadoUsuarioSeguro({ usuarioId, activo: nuevoEstado });
     usuario.activo = nuevoEstado;
@@ -1763,6 +1765,7 @@ window.eliminarEmpresa = async function (empresaId) {
     peligrosa: true
   });
   if (confirmacion === null) return;
+  if (!(await reautenticarAccionCritica("eliminar definitivamente esta empresa"))) return;
 
   try {
     const resultado = await eliminarEmpresaCompletaSegura({

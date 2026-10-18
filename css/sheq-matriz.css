@@ -291,8 +291,9 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 12px 14px;
-  background: #f2f7fb;
+  padding: 15px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, .12);
+  background: linear-gradient(135deg, #0d2947 0%, #123c63 100%);
 }
 
 .sheq-matriz-bloque h3,
@@ -300,10 +301,28 @@
   margin: 0;
 }
 
+.sheq-matriz-bloque h3 {
+  color: #fff;
+  font-size: 17px;
+  font-weight: 850;
+  line-height: 1.2;
+  letter-spacing: -.01em;
+  overflow-wrap: anywhere;
+}
+
 .sheq-matriz-bloque p {
-  margin-top: 3px;
-  color: #6b8091;
+  margin-top: 5px;
+  color: #c7d9e8;
   font-size: 12px;
+  font-weight: 650;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.sheq-matriz-bloque > header .sheq-status {
+  flex: 0 0 auto;
+  border: 1px solid rgba(255, 255, 255, .35);
+  box-shadow: 0 4px 12px rgba(3, 15, 28, .2);
 }
 
 .sheq-matriz-lista {
@@ -326,6 +345,25 @@
 }
 
 @media (max-width: 700px) {
+  .sheq-matriz-bloque > header {
+    align-items: flex-start;
+    padding: 14px;
+  }
+
+  .sheq-matriz-bloque > header > div {
+    min-width: 0;
+  }
+
+  .sheq-matriz-bloque h3 {
+    font-size: 16px;
+  }
+
+  .sheq-matriz-bloque > header .sheq-status {
+    max-width: 44%;
+    white-space: normal;
+    text-align: center;
+  }
+
   .sheq-matriz-requisito {
     grid-template-columns: 1fr;
     gap: 6px;

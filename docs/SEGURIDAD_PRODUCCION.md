@@ -58,3 +58,14 @@ Antes de aplicar estas medidas se requiere:
 - Presupuesto mensual inicial aprobado.
 - Política de retención de datos definida.
 - Pruebas finales por rol completadas.
+
+## 6. Migración definitiva de Programación
+
+Antes de habilitar el dominio definitivo:
+
+1. Desplegar coordinadamente Cloud Functions, reglas de Firestore, reglas de Storage y Hosting.
+2. Volver a publicar todas las semanas vigentes para generar `programacionPublicadaUsuarios`.
+3. Verificar con cuentas reales que Técnicos y Supervisores solo lean su copia personal publicada.
+4. Verificar que SHEQ solo pueda leer semanas publicadas y que Bodega conserve borradores y publicados.
+5. Retirar de `js/programacion.js` la compatibilidad transitoria con `programacionSemanas` después de confirmar la migración.
+6. Ejecutar nuevamente las pruebas por rol y revisar que ningún borrador sea visible fuera de Planificación y Bodega.

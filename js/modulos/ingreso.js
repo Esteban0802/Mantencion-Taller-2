@@ -356,7 +356,7 @@ export function inicializarModuloIngreso(servicios) {
 
             <input
               type="file"
-              accept="image/*,.pdf,application/pdf"
+              accept=".jpg,.jpeg,.png,.webp,.heic,.heif,.avif,.pdf,image/jpeg,image/png,image/webp,image/heic,image/heif,image/avif,application/pdf"
               multiple
               onchange="subirFotoIngreso(event, ${i})"
             >
@@ -504,20 +504,21 @@ async function subirFotoIngreso(e, i) {
             ot.ingreso[i].fotos = [];
         }
 
-        for (const file of files) {
+        const cargas = await Promise.allSettled(files.map(async file => {
             const archivoEvidencia = await prepararEvidencia(file, "ingreso");
-
             const urlFoto = await subirArchivoStorage(
                 archivoEvidencia,
                 "ingreso",
                 i
             );
-
             if (!urlFoto) throw new Error("La fotografía no obtuvo una URL válida");
-
-            urlsSubidasEnEsteIntento.push(urlFoto);
-            ot.ingreso[i].fotos.push(urlFoto);
-        }
+            return urlFoto;
+        }));
+        const urls = cargas.filter(item => item.status === "fulfilled").map(item => item.value);
+        urlsSubidasEnEsteIntento.push(...urls);
+        const cargaFallida = cargas.find(item => item.status === "rejected");
+        if (cargaFallida) throw cargaFallida.reason;
+        ot.ingreso[i].fotos.push(...urls);
 
         agregarBitacora(
             "Evidencia agregada",

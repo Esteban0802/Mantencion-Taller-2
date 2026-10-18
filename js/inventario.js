@@ -1,7 +1,9 @@
 import { db, storage } from "./firebase-config.js";
-import { protegerPagina, cerrarSesion } from "./session.js?v=20261004-2";
+import { protegerPagina, cerrarSesion } from "./session.js?v=20261017-1";
 import { moduloActivo } from "./modulos.js";
 import { evaluarCuotaStorage, mensajeCuotaStorage } from "./storage-quota.js";
+import { optimizarFotoParaCarga } from "./modulos/core/imagenes.js";
+import { validarFirmaArchivo } from "./file-validation.js";
 import {
   addDoc, collection, deleteDoc, deleteField, doc, getDoc, getDocs,
   getCountFromServer, limit, orderBy, query, serverTimestamp, setDoc,
@@ -182,7 +184,7 @@ function celdaEvidencias(item) {
   const enlaces = evidencias.length
     ? `<div class="inventario-evidencias-lista">${evidencias.map((evidencia, indice) => `<a href="${escapar(evidencia.url)}" target="_blank" rel="noopener" title="${escapar(evidencia.nombre || `Evidencia ${indice + 1}`)}">${indice + 1}. ${escapar(evidencia.nombre || "Ver evidencia")}</a>`).join("")}</div>`
     : '<span class="inventario-sin-evidencia">Sin evidencia</span>';
-  return `<div class="inventario-evidencias">${enlaces}${puedeEditar ? `<label class="inventario-adjuntar"><input type="file" data-evidencia accept="image/*,.pdf,application/pdf" multiple><span>+ Adjuntar</span></label>` : ""}</div>`;
+  return `<div class="inventario-evidencias">${enlaces}${puedeEditar ? `<label class="inventario-adjuntar"><input type="file" data-evidencia accept=".jpg,.jpeg,.png,.webp,.heic,.heif,.avif,.pdf,image/jpeg,image/png,image/webp,image/heic,image/heif,image/avif,application/pdf" multiple><span>+ Adjuntar</span></label>` : ""}</div>`;
 }
 
 async function cargarInventario({ reiniciar = true, completo = true } = {}) {
@@ -426,12 +428,17 @@ async function subirEvidencias(fila, archivosSeleccionados) {
   const archivos = Array.from(archivosSeleccionados || []);
   if (!archivos.length || operacionesInventarioEnCurso.has(itemId)) return;
   if (archivos.length > 10) throw new Error("Puedes adjuntar un máximo de 10 archivos por carga.");
-  archivos.forEach(archivo => {
-    const valido = archivo.type === "application/pdf" || ["image/png", "image/jpeg", "image/webp", "image/heic", "image/heif"].includes(archivo.type);
+  for (const archivo of archivos) {
+    const extension = String(archivo.name || "").split(".").pop().toLowerCase();
+    const tipo = String(archivo.type || "").toLowerCase() || { jpg:"image/jpeg", jpeg:"image/jpeg", png:"image/png", webp:"image/webp", heic:"image/heic", heif:"image/heif", avif:"image/avif", pdf:"application/pdf" }[extension] || "";
+    const valido = tipo === "application/pdf" || ["image/png", "image/jpeg", "image/webp", "image/heic", "image/heif", "image/avif"].includes(tipo);
     if (!valido) throw new Error(`“${archivo.name}” no es una foto compatible ni un PDF.`);
     if (archivo.size > 20 * 1024 * 1024) throw new Error(`“${archivo.name}” supera el máximo de 20 MB.`);
-  });
-  const totalNuevo = archivos.reduce((total, archivo) => total + archivo.size, 0);
+    await validarFirmaArchivo(archivo, tipo);
+  }
+  const archivosPreparados = [];
+  for (const archivo of archivos) archivosPreparados.push(await optimizarFotoParaCarga(archivo));
+  const totalNuevo = archivosPreparados.reduce((total, resultado) => total + resultado.archivo.size, 0);
   const cuota = evaluarCuotaStorage({ usadoBytes: empresa?.storageUsadoBytes || 0, maxStorageGB: empresa?.maxStorageGB, nuevoBytes: totalNuevo });
   if (!cuota.permitido) throw new Error(mensajeCuotaStorage(cuota));
   if (cuota.nivel !== "normal") {
@@ -447,12 +454,15 @@ async function subirEvidencias(fila, archivosSeleccionados) {
   try {
     operacionesInventarioEnCurso.add(itemId);
     if (input) input.disabled = true;
-    for (const archivo of archivos) {
+    for (const resultado of archivosPreparados) {
+      const archivo = resultado.archivo;
+      const extension = String(archivo.name || "").split(".").pop().toLowerCase();
+      const contentType = String(archivo.type || "").toLowerCase() || { jpg:"image/jpeg", jpeg:"image/jpeg", png:"image/png", webp:"image/webp", heic:"image/heic", heif:"image/heif", avif:"image/avif", pdf:"application/pdf" }[extension] || "";
       const ruta = `empresas/${empresaId}/inventario/${sucursalId}/${itemId}/${Date.now()}_${crypto.randomUUID()}_${nombreArchivoSeguro(archivo.name)}`;
       const referencia = ref(storage, ruta);
-      await uploadBytes(referencia, archivo, { contentType: archivo.type });
+      await uploadBytes(referencia, archivo, { contentType });
       rutasCargadas.push(ruta);
-      nuevas.push({ nombre: archivo.name.slice(0, 180), url: await getDownloadURL(referencia), ruta, tipo: archivo.type, tamano: archivo.size, subidoPor: usuario.uid, subidoPorNombre: usuario.nombre || usuario.nombreCompleto || usuario.email || "Usuario", fechaSubida: new Date().toISOString() });
+      nuevas.push({ nombre: archivo.name.slice(0, 180), url: await getDownloadURL(referencia), ruta, tipo: contentType, tamano: archivo.size, subidoPor: usuario.uid, subidoPorNombre: usuario.nombre || usuario.nombreCompleto || usuario.email || "Usuario", fechaSubida: new Date().toISOString() });
     }
     await updateDoc(doc(db, "inventarioItems", itemId), { evidencias: [...anteriores, ...nuevas], fechaActualizacion: serverTimestamp(), actualizadoPor: usuario.uid });
     await cargarInventario();
@@ -822,14 +832,15 @@ async function iniciar() {
   const esBodeguero = usuario.rol === "bodeguero";
   $("menuDashboardInventario").style.display = esBodeguero ? "none" : "";
   $("menuOrdenesInventario").style.display = esBodeguero ? "none" : "";
-  $("menuProgramacionInventario").style.display = esBodeguero ? "" : "none";
-  puedeEditar = ["super_admin", "jefe_taller", "planificador", "bodeguero"].includes(usuario.rol);
+  $("menuProgramacionInventario").style.display = "none";
+  puedeEditar = ["super_admin", "jefe_taller", "planificador"].includes(usuario.rol);
   puedeGestionarEstados = ["super_admin", "bodeguero"].includes(usuario.rol);
   if (!puedeEditar) $("accionesEdicionInventario").querySelectorAll("button").forEach(b => { if (b.id !== "btnExportarInventario") b.style.display = "none"; });
   if (["super_admin", "admin_empresa"].includes(usuario.rol)) $("menuPanelEmpresaInventario").style.display = "";
   try {
     if (!(await cargarEmpresa())) return;
     $("menuSheqInventario").style.display = moduloActivo(empresa, "sheq") && ["super_admin", "admin_empresa", "admin_sucursal", "jefe_taller", "planificador"].includes(usuario.rol) ? "" : "none";
+    $("menuProgramacionInventario").style.display = moduloActivo(empresa, "programacion") && ["super_admin", "admin_empresa", "admin_sucursal", "planificador", "bodeguero"].includes(usuario.rol) ? "" : "none";
     await cargarSucursales();
   } catch (error) { await mensaje({ titulo: "No se pudo cargar Inventario", texto: error.message || "Intenta nuevamente.", tipo: "error" }); }
 }

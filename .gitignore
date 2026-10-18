@@ -1,5 +1,6 @@
 # Dependencias instaladas localmente
 node_modules/
+vendor/pdfjs/
 .firebase-cli-config*/
 functions/node_modules/
 
@@ -56,5 +57,6 @@ coverage/
 test-results/
 dist/
 outputs/
+tmp/
 
 gitignore-seguro.txt

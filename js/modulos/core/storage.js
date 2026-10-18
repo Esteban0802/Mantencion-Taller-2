@@ -2,6 +2,7 @@ import { auth, db, storage } from "../../firebase-config.js";
 import { getOT } from "../contexto.js";
 import { evaluarCuotaStorage, mensajeCuotaStorage } from "../../storage-quota.js";
 import { medirAsync } from "./rendimiento.js";
+import { validarFirmaArchivo } from "../../file-validation.js";
 
 import {
     ref,
@@ -17,8 +18,9 @@ import {
 
 let bytesSubidosEnSesion = 0;
 const bytesPorUrlSesion = new Map();
-const CONTEXTO_CACHE_MS = 30000;
+const CONTEXTO_CACHE_MS = 5 * 60 * 1000;
 let contextoCargaCache = null;
+let contextoCargaPendiente = null;
 
 function tipoContenidoArchivo(file) {
     const tipoDeclarado = String(file?.type || "").toLowerCase();
@@ -31,17 +33,22 @@ function tipoContenidoArchivo(file) {
         jpeg: "image/jpeg",
         png: "image/png",
         webp: "image/webp",
-        gif: "image/gif",
-        bmp: "image/bmp",
         avif: "image/avif",
-        svg: "image/svg+xml",
-        tif: "image/tiff",
-        tiff: "image/tiff",
         heic: "image/heic",
         heif: "image/heif",
         pdf: "application/pdf"
     }[extension] || "";
 }
+
+const TIPOS_EVIDENCIA_OT = new Set([
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+    "image/heic",
+    "image/heif",
+    "image/avif",
+    "application/pdf"
+]);
 
 function errorStorageReintentable(error) {
     return [
@@ -125,41 +132,54 @@ async function validarContextoCarga(otId, file) {
         };
     }
 
-    const [perfilSnap, otSnap] = await Promise.all([
-        getDoc(doc(db, "usuarios", uidAutenticado)),
-        getDoc(doc(db, "ots", otId))
-    ]);
-    if (!perfilSnap.exists()) throw new Error("No existe el perfil de acceso del usuario autenticado.");
-    if (!otSnap.exists()) throw new Error("No se encontró la OT asociada a la evidencia.");
-
-    const perfil = perfilSnap.data();
-    const orden = otSnap.data();
-    if (perfil.activo !== true) throw new Error("El usuario no está activo para cargar evidencias.");
-    if (perfil.empresaId !== orden.empresaId) throw new Error("El usuario y la OT pertenecen a empresas diferentes.");
-    if (!["super_admin", "admin_empresa"].includes(perfil.rol) && perfil.sucursalId !== orden.sucursalId) {
-        throw new Error("El usuario y la OT pertenecen a sucursales diferentes.");
-    }
-    if (orden.cerrada === true || String(orden.estado || "").toUpperCase() === "CERRADA") {
-        throw new Error("La OT está cerrada y no permite agregar evidencias.");
+    if (contextoCargaPendiente?.clave === claveCache) {
+        const contexto = await contextoCargaPendiente.promesa;
+        return { ...contexto, tipo: tipoContenidoArchivo(file) || "sin tipo" };
     }
 
-    const empresaSnap = await getDoc(doc(db, "empresas", orden.empresaId));
-    if (!empresaSnap.exists()) throw new Error("No se encontró la empresa asociada a la OT.");
-    if (empresaSnap.data().activa === false) throw new Error("La empresa está inactiva y no permite nuevas cargas.");
+    const promesaContexto = (async () => {
+        const [perfilSnap, otSnap] = await Promise.all([
+            getDoc(doc(db, "usuarios", uidAutenticado)),
+            getDoc(doc(db, "ots", otId))
+        ]);
+        if (!perfilSnap.exists()) throw new Error("No existe el perfil de acceso del usuario autenticado.");
+        if (!otSnap.exists()) throw new Error("No se encontró la OT asociada a la evidencia.");
 
-    const contexto = {
-        rol: perfil.rol || "sin rol",
-        sucursalUsuario: perfil.sucursalId || "sin sucursal",
-        sucursalOt: orden.sucursalId || "sin sucursal",
-        tipo: tipoContenidoArchivo(file) || "sin tipo",
-        empresa: empresaSnap.data()
-    };
-    contextoCargaCache = {
-        clave: claveCache,
-        expira: Date.now() + CONTEXTO_CACHE_MS,
-        valor: contexto
-    };
-    return contexto;
+        const perfil = perfilSnap.data();
+        const orden = otSnap.data();
+        if (perfil.activo !== true) throw new Error("El usuario no está activo para cargar evidencias.");
+        if (perfil.empresaId !== orden.empresaId) throw new Error("El usuario y la OT pertenecen a empresas diferentes.");
+        if (!["super_admin", "admin_empresa"].includes(perfil.rol) && perfil.sucursalId !== orden.sucursalId) {
+            throw new Error("El usuario y la OT pertenecen a sucursales diferentes.");
+        }
+        if (orden.cerrada === true || String(orden.estado || "").toUpperCase() === "CERRADA") {
+            throw new Error("La OT está cerrada y no permite agregar evidencias.");
+        }
+
+        const empresaSnap = await getDoc(doc(db, "empresas", orden.empresaId));
+        if (!empresaSnap.exists()) throw new Error("No se encontró la empresa asociada a la OT.");
+        if (empresaSnap.data().activa === false) throw new Error("La empresa está inactiva y no permite nuevas cargas.");
+
+        const contexto = {
+            rol: perfil.rol || "sin rol",
+            sucursalUsuario: perfil.sucursalId || "sin sucursal",
+            sucursalOt: orden.sucursalId || "sin sucursal",
+            tipo: tipoContenidoArchivo(file) || "sin tipo",
+            empresa: empresaSnap.data()
+        };
+        contextoCargaCache = {
+            clave: claveCache,
+            expira: Date.now() + CONTEXTO_CACHE_MS,
+            valor: contexto
+        };
+        return contexto;
+    })();
+    contextoCargaPendiente = { clave: claveCache, promesa: promesaContexto };
+    try {
+        return await promesaContexto;
+    } finally {
+        if (contextoCargaPendiente?.promesa === promesaContexto) contextoCargaPendiente = null;
+    }
 }
 
 /**
@@ -183,6 +203,13 @@ async function subirArchivoStorageInterno(file, etapa, itemIndex) {
     if (!contentType) {
         throw new Error("No fue posible identificar el tipo del archivo seleccionado.");
     }
+    if (!TIPOS_EVIDENCIA_OT.has(contentType)) {
+        throw new Error("Formato no permitido. Adjunta una foto JPG, PNG, WebP, HEIC, HEIF o AVIF, o un archivo PDF.");
+    }
+    if (file.size > 20 * 1024 * 1024) {
+        throw new Error("El archivo supera el máximo permitido de 20 MB.");
+    }
+    await validarFirmaArchivo(file, contentType);
 
     const contextoCarga = await validarContextoCarga(otId, file);
     await validarCuotaAntesDeSubir(file, otId, contextoCarga);

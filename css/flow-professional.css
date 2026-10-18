@@ -299,3 +299,1077 @@
   .flow-overtrack .dispatch-section .comentarios-despacho-box h4,
   .flow-overtrack .dispatch-section .comentarios-despacho-box > div { grid-column: auto; }
 }
+.ot-approval-selector {
+  grid-column: 1 / -1;
+  border: 1px solid #bfd5ea;
+  border-radius: 12px;
+  background: #f7fbff;
+  overflow: hidden;
+}
+
+.flow-overtrack #crear .os-inventory-picker {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+}
+
+.flow-overtrack #crear .os-inventory-picker > input {
+  width: 100%;
+  max-width: none;
+  min-height: 36px;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 7px 38px 7px 10px;
+  font-size: 11px;
+}
+
+.flow-overtrack #crear .os-picker-toggle {
+  position: absolute;
+  z-index: 2;
+  top: 50%;
+  right: 5px;
+  width: 28px;
+  height: 28px;
+  margin: 0;
+  padding: 0;
+  transform: translateY(-50%);
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #536b80;
+  font-size: 18px;
+  line-height: 1;
+  box-shadow: none;
+}
+
+.flow-overtrack #crear .os-picker-toggle:hover,
+.flow-overtrack #crear .os-picker-toggle[aria-expanded="true"] {
+  background: #eaf4ff;
+  color: #087be6;
+}
+
+.flow-overtrack #crear .os-inventory-panel {
+  position: absolute;
+  z-index: 80;
+  top: calc(100% + 7px);
+  right: 0;
+  left: 0;
+  overflow: hidden;
+  border: 1px solid #cbdbe9;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 16px 36px rgba(15, 42, 67, .18);
+}
+
+.flow-overtrack #crear .os-inventory-panel[hidden] { display: none; }
+
+.flow-overtrack #crear .os-inventory-panel-heading {
+  display: grid;
+  gap: 2px;
+  padding: 11px 13px;
+  border-bottom: 1px solid #e1e9f0;
+  background: #f5f9fc;
+}
+
+.flow-overtrack #crear .os-inventory-panel-heading strong { color: #17324d; font-size: 11px; }
+.flow-overtrack #crear .os-inventory-panel-heading small { color: #6c8092; font-size: 9px; }
+.flow-overtrack #crear .os-inventory-options { max-height: 230px; overflow-y: auto; padding: 5px; }
+
+.flow-overtrack #crear .os-inventory-option {
+  display: grid;
+  width: 100%;
+  gap: 3px;
+  margin: 0;
+  padding: 10px 11px;
+  border: 0;
+  border-radius: 8px;
+  background: #fff;
+  color: #17324d;
+  text-align: left;
+  box-shadow: none;
+}
+
+.flow-overtrack #crear .os-inventory-option + .os-inventory-option { margin-top: 2px; }
+.flow-overtrack #crear .os-inventory-option:hover,
+.flow-overtrack #crear .os-inventory-option:focus { background: #eaf4ff; outline: none; }
+.flow-overtrack #crear .os-inventory-option strong { color: #102a43; font-size: 11px; }
+.flow-overtrack #crear .os-inventory-option small { overflow: hidden; color: #5f7488; font-size: 9px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
+.flow-overtrack #crear .os-inventory-empty { margin: 0; padding: 16px 12px; color: #6c8092; font-size: 10px; text-align: center; }
+
+.flow-overtrack .tabla-repuestos-header,
+.flow-overtrack .tabla-repuestos-row {
+  grid-template-columns: 62px 105px minmax(180px, 1.7fr) 70px 130px minmax(170px, 1.2fr);
+  width: auto;
+}
+
+.flow-overtrack .tabla-repuestos-row.repuesto-pendiente-recepcion {
+  border-color: #ead9b5;
+  background: #fffaf0;
+  color: #53677a;
+}
+
+.flow-overtrack .tabla-repuestos-row.repuesto-pendiente-recepcion input { cursor: not-allowed; opacity: .65; }
+.flow-overtrack .repuesto-estado { display: inline-flex; align-items: center; min-height: 25px; padding: 3px 8px; border-radius: 999px; font-size: 9px; font-weight: 800; line-height: 1.2; }
+.flow-overtrack .repuesto-estado.disponible { border: 1px solid #b6dfc7; background: #eaf8f0; color: #167345; }
+.flow-overtrack .repuesto-estado.pendiente { border: 1px solid #efd29b; background: #fff4dc; color: #9a5a00; }
+
+@media (max-width: 900px) {
+  .flow-overtrack .tabla-repuestos-header,
+  .flow-overtrack .tabla-repuestos-row { grid-template-columns: 55px 90px minmax(150px, 1.4fr) 65px 120px minmax(140px, 1fr); font-size: 11px; }
+}
+
+@media (max-width: 600px) {
+  .flow-overtrack .tabla-repuestos-row { grid-template-columns: 1fr; }
+}
+
+/* Modal de control de repuestos */
+.flow-overtrack .modal-repuestos {
+  background: rgba(8, 24, 40, .6);
+  backdrop-filter: blur(5px);
+}
+
+.flow-overtrack .modal-repuestos-content {
+  width: min(1080px, calc(100% - 32px));
+  max-width: 1080px;
+  max-height: min(86vh, 760px);
+  margin: 7vh auto;
+  border: 1px solid #cbd9e5 !important;
+  border-radius: 17px !important;
+  background: #fff !important;
+  box-shadow: 0 24px 70px rgba(8, 32, 53, .28) !important;
+}
+
+.flow-overtrack .modal-repuestos-header {
+  gap: 20px;
+  padding: 20px 22px 17px;
+  border-bottom: 1px solid #dce6ee;
+  background: #fff;
+}
+
+.flow-overtrack .modal-repuestos-header > div { display: grid; gap: 3px; }
+.flow-overtrack .modal-repuestos-header span { color: #087be6; font-size: 9px; font-weight: 850; letter-spacing: .8px; }
+.flow-overtrack .modal-repuestos-header h2 { margin: 0; color: #102a43; font-size: 19px; line-height: 1.2; }
+.flow-overtrack .modal-repuestos-header p { margin: 0; color: #657b8f; font-size: 11px; }
+.flow-overtrack .modal-repuestos-header .btn-danger { display: grid; flex: 0 0 34px; width: 34px; height: 34px; min-height: 34px; margin: 0; padding: 0; place-items: center; border: 0; border-radius: 50%; background: #edf3f7; color: #31516d; font-size: 22px; font-weight: 500; box-shadow: none; }
+.flow-overtrack .modal-repuestos-header .btn-danger:hover { background: #fdecef; color: #c7374b; }
+
+.flow-overtrack .repuestos-lista { padding: 17px 22px 20px; background: #f7fafc; }
+.flow-overtrack .repuestos-modal-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px; }
+.flow-overtrack .repuestos-modal-summary > div { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; border: 1px solid #d9e4ed; border-radius: 10px; background: #fff; }
+.flow-overtrack .repuestos-modal-summary span { color: #667d90; font-size: 10px; font-weight: 700; }
+.flow-overtrack .repuestos-modal-summary strong { color: #102a43; font-size: 17px; }
+.flow-overtrack .repuestos-modal-summary .available { border-left: 3px solid #23a55a; }
+.flow-overtrack .repuestos-modal-summary .pending { border-left: 3px solid #e7a51b; }
+
+.flow-overtrack .tabla-repuestos-header { position: sticky; top: 0; padding: 11px 12px; border: 0; border-radius: 9px; background: #0d2945; color: #fff; font-size: 9px; letter-spacing: .25px; }
+.flow-overtrack .tabla-repuestos-row { margin: 7px 0 0; padding: 12px; border: 1px solid #dbe5ed; border-radius: 10px; background: #fff; color: #29445c; font-size: 10px; box-shadow: 0 2px 7px rgba(20, 50, 75, .035); }
+.flow-overtrack .tabla-repuestos-row input[type="checkbox"] { width: 18px; height: 18px; accent-color: #1683e8; }
+.flow-overtrack .tabla-repuestos-row input[type="text"] { width: 100%; min-height: 35px; box-sizing: border-box; padding: 7px 9px; border: 1px solid #cad9e5; border-radius: 8px; background: #fff; color: #29445c; font-size: 10px; }
+.flow-overtrack .tabla-repuestos-row input[type="text"]:focus { border-color: #1683e8; box-shadow: 0 0 0 3px rgba(22, 131, 232, .11); outline: none; }
+
+.flow-overtrack .modal-repuestos-footer { justify-content: flex-end; gap: 9px; padding: 14px 22px; border-top: 1px solid #dce6ee; background: #fff; }
+.flow-overtrack .modal-repuestos-footer button { min-height: 38px; margin: 0; padding: 0 17px; border-radius: 9px; font-size: 10px; font-weight: 800; }
+.flow-overtrack .modal-repuestos-footer .btn-secondary { border: 1px solid #bfd0df; background: #fff; color: #31516d; }
+.flow-overtrack .modal-repuestos-footer .btn-success { border: 1px solid #087be6; background: #087be6; color: #fff; box-shadow: 0 6px 14px rgba(8, 123, 230, .18); }
+
+@media (max-width: 600px) {
+  .flow-overtrack .modal-repuestos-content { width: calc(100% - 20px); max-width: none; margin: 10px auto; max-height: calc(100vh - 20px); }
+  .flow-overtrack .modal-repuestos-header { align-items: flex-start; padding: 16px; }
+  .flow-overtrack .modal-repuestos-header p { max-width: 260px; }
+  .flow-overtrack .repuestos-lista { padding: 12px; }
+  .flow-overtrack .repuestos-modal-summary { grid-template-columns: 1fr; }
+  .flow-overtrack .tabla-repuestos-row { gap: 9px; padding: 13px; }
+  .flow-overtrack .modal-repuestos-footer { padding: 12px 16px; }
+}
+
+.ot-approval-selector summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 14px 16px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.ot-approval-selector summary::-webkit-details-marker { display: none; }
+.ot-approval-selector summary span { display: grid; gap: 3px; }
+.ot-approval-selector summary small { color: #60758a; font-weight: 500; }
+.ot-approval-selector summary b { color: #0868c9; text-align: right; }
+
+.ot-approval-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  padding: 0 16px 16px;
+}
+
+.ot-approval-options label {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #d7e4ef;
+  border-radius: 10px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.ot-approval-options input { margin-top: 3px; }
+.ot-approval-options span { display: grid; gap: 2px; }
+.ot-approval-options small { color: #64788c; }
+
+@media (max-width: 700px) {
+  .ot-approval-options { grid-template-columns: 1fr; }
+  .ot-approval-selector summary { align-items: flex-start; flex-direction: column; }
+  .ot-approval-selector summary b { text-align: left; }
+}
+
+/* =========================================================
+   CARTA GANTT — LENGUAJE VISUAL VECTARIA
+========================================================= */
+.flow-overtrack #modalGanttVisual {
+  padding: 18px;
+  box-sizing: border-box;
+  background: rgba(7, 25, 42, .72);
+  backdrop-filter: blur(7px);
+}
+
+.flow-overtrack #modalGanttVisual .gantt-visual-modal {
+  width: min(1780px, 100%) !important;
+  height: min(92vh, 980px) !important;
+  max-width: 1780px !important;
+  border: 1px solid rgba(180, 202, 220, .8);
+  border-radius: 18px;
+  background: #f5f8fb;
+  color: #17324a;
+  box-shadow: 0 28px 80px rgba(5, 25, 42, .34);
+}
+
+.flow-overtrack #modalGanttVisual .modal-gantt-header {
+  min-height: 78px;
+  box-sizing: border-box;
+  gap: 22px;
+  padding: 17px 22px;
+  border: 0;
+  background: linear-gradient(116deg, #0b2843 0%, #0e3d68 72%, #0a5792 100%);
+  color: #fff;
+}
+
+.flow-overtrack #modalGanttVisual .modal-gantt-header h2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  color: #fff;
+  font-size: 19px;
+  line-height: 1.2;
+  letter-spacing: -.2px;
+}
+
+.flow-overtrack #modalGanttVisual .gantt-title-icon {
+  display: grid;
+  width: 31px;
+  height: 31px;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, .28);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, .12);
+  color: #68c2ff;
+  font-size: 16px;
+}
+
+.flow-overtrack #modalGanttVisual .modal-gantt-header p {
+  margin: 5px 0 0 41px;
+  color: #c5d8e9;
+  font-size: 11px;
+}
+
+.flow-overtrack #modalGanttVisual .gantt-header-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.flow-overtrack #modalGanttVisual .gantt-header-actions button {
+  min-height: 37px;
+  margin: 0;
+  padding: 0 14px;
+  border: 1px solid rgba(255, 255, 255, .32);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, .1);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  box-shadow: none;
+}
+
+.flow-overtrack #modalGanttVisual .gantt-header-actions .btn-success {
+  border-color: #4caaf3;
+  background: #087be6;
+}
+
+.flow-overtrack #modalGanttVisual .gantt-header-actions .btn-danger {
+  border-color: rgba(255, 255, 255, .35);
+  background: #fff;
+  color: #21425e;
+}
+
+.flow-overtrack #modalGanttVisual .gantt-header-actions button:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.06);
+}
+
+.flow-overtrack #modalGanttVisual .gantt-resultado {
+  height: calc(92vh - 78px) !important;
+  padding: 18px 20px 20px;
+  background: #f5f8fb;
+}
+
+.flow-overtrack #modalGanttVisual .gantt-project-summary {
+  grid-template-columns: repeat(4, minmax(150px, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.flow-overtrack #modalGanttVisual .gantt-project-summary > div {
+  position: relative;
+  min-height: 69px;
+  box-sizing: border-box;
+  padding: 13px 15px 12px 17px;
+  overflow: hidden;
+  border: 1px solid #d7e3ec;
+  border-radius: 11px;
+  background: #fff;
+  color: #17324a;
+  box-shadow: 0 3px 10px rgba(21, 55, 82, .05);
+  backdrop-filter: none;
+}
+
+.flow-overtrack #modalGanttVisual .gantt-project-summary > div::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: #1683e8;
+}
+
+.flow-overtrack #modalGanttVisual .gantt-project-summary > div:nth-child(2)::before { background: #20a567; }
+.flow-overtrack #modalGanttVisual .gantt-project-summary > div:nth-child(3)::before { background: #7657d6; }
+.flow-overtrack #modalGanttVisual .gantt-project-summary > div:nth-child(4)::before { background: #e9a11b; }
+.flow-overtrack #modalGanttVisual .gantt-project-summary span { margin: 0 0 5px; color: #6d8193; font-size: 9px; font-weight: 750; text-transform: uppercase; letter-spacing: .35px; }
+.flow-overtrack #modalGanttVisual .gantt-project-summary strong { color: #102a43; font-size: 18px; line-height: 1.1; }
+
+.flow-overtrack #modalGanttVisual .gantt-project-scroll {
+  border: 1px solid #d2e0ea;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 5px 18px rgba(22, 53, 78, .06);
+  scrollbar-color: #6eaee4 #e6eef5;
+  scrollbar-width: thin;
+}
+
+.flow-overtrack #modalGanttVisual .gantt-project-scroll::-webkit-scrollbar { width: 10px; height: 10px; }
+.flow-overtrack #modalGanttVisual .gantt-project-scroll::-webkit-scrollbar-track { border-radius: 10px; background: #e6eef5; }
+.flow-overtrack #modalGanttVisual .gantt-project-scroll::-webkit-scrollbar-thumb { border: 2px solid #e6eef5; border-radius: 10px; background: #6eaee4; }
+.flow-overtrack #modalGanttVisual .gantt-project-scroll::-webkit-scrollbar-thumb:hover { background: #378fd7; }
+
+.flow-overtrack #modalGanttVisual .gantt-project-row { min-height: 54px; border-bottom: 1px solid #e3ebf1; background: #fff; color: #29475f; }
+.flow-overtrack #modalGanttVisual .gantt-project-row:hover { background: #f7fbfe; }
+.flow-overtrack #modalGanttVisual .gantt-project-row-head { background: #0c2946; box-shadow: 0 4px 12px rgba(10, 41, 68, .16); }
+
+.flow-overtrack #modalGanttVisual .gantt-project-info {
+  position: sticky;
+  left: 0;
+  z-index: 4;
+  border-right: 1px solid #d4e1eb;
+  background: #fff;
+  color: #38556d;
+  font-size: 10px;
+  backdrop-filter: none;
+  box-shadow: 5px 0 12px rgba(18, 51, 76, .035);
+}
+
+.flow-overtrack #modalGanttVisual .gantt-project-info.head {
+  z-index: 25;
+  background: #0c2946;
+  color: #fff;
+  font-size: 9px;
+  letter-spacing: .25px;
+  text-transform: uppercase;
+}
+
+.flow-overtrack #modalGanttVisual .gantt-project-info-main { background: #f5f9fc; color: #203e57; font-weight: 700; }
+.flow-overtrack #modalGanttVisual .gantt-project-timeline-head,
+.flow-overtrack #modalGanttVisual .gantt-project-weeks { background: #0c2946; }
+.flow-overtrack #modalGanttVisual .gantt-project-weeks { height: 54px; }
+.flow-overtrack #modalGanttVisual .gantt-project-weeks span { border-right: 1px solid rgba(205, 225, 240, .15); color: #e8f2f9; font-size: 10px; }
+
+.flow-overtrack #modalGanttVisual .gantt-project-track {
+  background-color: #fff;
+  background-image: linear-gradient(to right, #e8eef3 1px, transparent 1px);
+}
+
+.flow-overtrack #modalGanttVisual .gantt-project-row-main .gantt-project-track { background-color: #f5f9fc; }
+.flow-overtrack #modalGanttVisual .gantt-detail-line { background: #e6edf2; }
+
+.flow-overtrack #modalGanttVisual .gantt-etapa-group { border-top: 0; }
+.flow-overtrack #modalGanttVisual .gantt-etapa-title {
+  position: sticky;
+  left: 0;
+  z-index: 6;
+  height: 40px;
+  box-sizing: border-box;
+  gap: 9px;
+  padding: 0 15px;
+  border-bottom: 1px solid #cddde8;
+  border-left: 4px solid #1683e8;
+  background: #eaf4fc;
+  color: #135d9e;
+  box-shadow: none;
+}
+
+.flow-overtrack #modalGanttVisual .gantt-etapa-title:hover { background: #e1f0fb; }
+.flow-overtrack #modalGanttVisual .gantt-etapa-title span { color: #1683e8; }
+.flow-overtrack #modalGanttVisual .gantt-etapa-title strong { color: #173d5d; font-size: 11px; }
+.flow-overtrack #modalGanttVisual .gantt-etapa-title small { color: #678094; font-size: 9px; font-weight: 700; }
+.flow-overtrack #modalGanttVisual .gantt-etapa-main-title { color: #173d5d; font-weight: 850; }
+
+.flow-overtrack #modalGanttVisual .gantt-project-bar-etapa {
+  height: 28px;
+  top: 13px;
+  overflow: visible;
+  border: 1px solid #a9bfd0;
+  background: #d7e4ee;
+  box-shadow: 0 5px 12px rgba(26, 65, 94, .14);
+}
+
+.flow-overtrack #modalGanttVisual .gantt-project-bar-etapa span {
+  z-index: 2;
+  box-sizing: border-box;
+  min-width: max-content;
+  padding: 3px 8px;
+  border: 1px solid rgba(86, 118, 143, .28);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .94);
+  color: #123653;
+  font-size: 9px;
+  font-weight: 850;
+  line-height: 1.2;
+  white-space: nowrap;
+  text-shadow: none;
+  box-shadow: 0 2px 6px rgba(18, 54, 83, .13);
+}
+
+.flow-overtrack #modalGanttVisual .gantt-project-bar-etapa.pendiente {
+  border-color: #6f96b3;
+  background: repeating-linear-gradient(
+    135deg,
+    #9fc3dd 0,
+    #9fc3dd 10px,
+    #bdd6e8 10px,
+    #bdd6e8 20px
+  );
+  box-shadow: 0 5px 14px rgba(55, 100, 133, .25);
+}
+
+.flow-overtrack #modalGanttVisual .gantt-project-bar-etapa.pendiente .gantt-project-bar-fill { background: transparent; }
+.flow-overtrack #modalGanttVisual .gantt-project-bar-etapa.proceso .gantt-project-bar-fill { background: linear-gradient(90deg, #1683e8, #36a2f5); }
+.flow-overtrack #modalGanttVisual .gantt-project-bar-etapa.completado .gantt-project-bar-fill { background: linear-gradient(90deg, #199f5b, #2dc575); }
+.flow-overtrack #modalGanttVisual .gantt-project-bar-etapa.atrasado .gantt-project-bar-fill { background: linear-gradient(90deg, #d74858, #eb6673); }
+.flow-overtrack #modalGanttVisual .gantt-project-bar-etapa.repuestos {
+  border-color: #d99a26;
+  background: #fff1cf;
+}
+.flow-overtrack #modalGanttVisual .gantt-project-bar-etapa.repuestos .gantt-project-bar-fill { background: linear-gradient(90deg, #e79a13, #f4b53d); }
+
+.flow-overtrack #modalGanttVisual .gantt-project-hoy-line { width: 2px; background: #e24b5b; box-shadow: 0 0 9px rgba(226, 75, 91, .45); }
+.flow-overtrack #modalGanttVisual .gantt-project-hoy-line::after { background: rgba(226, 75, 91, .045); }
+.flow-overtrack #modalGanttVisual .gantt-project-hoy-line span { padding: 4px 8px; background: #e24b5b; font-size: 8px; box-shadow: 0 3px 8px rgba(226, 75, 91, .25); }
+
+@media (max-width: 900px) {
+  .flow-overtrack #modalGanttVisual { padding: 8px; }
+  .flow-overtrack #modalGanttVisual .gantt-visual-modal { height: calc(100vh - 16px) !important; border-radius: 13px; }
+  .flow-overtrack #modalGanttVisual .modal-gantt-header { align-items: flex-start; flex-direction: column; padding: 14px 16px; }
+  .flow-overtrack #modalGanttVisual .modal-gantt-header p { margin-left: 0; }
+  .flow-overtrack #modalGanttVisual .gantt-header-actions { width: 100%; justify-content: flex-start; }
+  .flow-overtrack #modalGanttVisual .gantt-header-actions button { flex: 1 1 auto; }
+  .flow-overtrack #modalGanttVisual .gantt-resultado { height: auto !important; padding: 12px; }
+  .flow-overtrack #modalGanttVisual .gantt-project-summary { grid-template-columns: repeat(2, minmax(130px, 1fr)); }
+}
+
+@media (max-width: 520px) {
+  .flow-overtrack #modalGanttVisual { padding: 0; }
+
+  .flow-overtrack #modalGanttVisual .gantt-visual-modal {
+    width: 100vw !important;
+    height: 100dvh !important;
+    max-height: 100dvh !important;
+    border: 0;
+    border-radius: 0;
+  }
+
+  .flow-overtrack #modalGanttVisual .modal-gantt-header {
+    flex: 0 0 auto;
+    gap: 9px;
+    min-height: 0;
+    padding: max(10px, env(safe-area-inset-top)) 10px 9px;
+  }
+
+  .flow-overtrack #modalGanttVisual .modal-gantt-header h2 { gap: 7px; font-size: 16px; }
+  .flow-overtrack #modalGanttVisual .gantt-title-icon { width: 27px; height: 27px; border-radius: 7px; font-size: 13px; }
+  .flow-overtrack #modalGanttVisual .modal-gantt-header p { display: none; }
+
+  .flow-overtrack #modalGanttVisual .gantt-header-actions {
+    width: 100%;
+    flex-wrap: nowrap;
+    gap: 6px;
+    padding-bottom: 2px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .flow-overtrack #modalGanttVisual .gantt-header-actions::-webkit-scrollbar,
+  .flow-overtrack #modalGanttVisual .gantt-project-summary::-webkit-scrollbar { display: none; }
+
+  .flow-overtrack #modalGanttVisual .gantt-header-actions button {
+    flex: 0 0 auto;
+    min-height: 36px;
+    padding-inline: 11px;
+    white-space: nowrap;
+  }
+
+  .flow-overtrack #modalGanttVisual .gantt-resultado {
+    height: auto !important;
+    min-height: 0;
+    padding: 8px !important;
+    overflow: hidden !important;
+  }
+
+  .flow-overtrack #modalGanttVisual .gantt-project-summary {
+    display: flex;
+    gap: 7px;
+    margin-bottom: 6px;
+    padding-bottom: 3px;
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+    scrollbar-width: none;
+  }
+
+  .flow-overtrack #modalGanttVisual .gantt-project-summary > div {
+    flex: 0 0 126px;
+    min-height: 50px;
+    padding: 9px 10px 8px 13px;
+    scroll-snap-align: start;
+  }
+
+  .flow-overtrack #modalGanttVisual .gantt-project-summary span { margin-bottom: 3px; font-size: 8px; }
+  .flow-overtrack #modalGanttVisual .gantt-project-summary strong { font-size: 14px; }
+
+  .flow-overtrack #modalGanttVisual .gantt-mobile-hint {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0 0 6px;
+    color: #587086;
+    font-size: 10px;
+    font-weight: 750;
+  }
+
+  .flow-overtrack #modalGanttVisual .gantt-mobile-hint::before { content: "↔"; color: #1683e8; font-size: 14px; }
+
+  .flow-overtrack #modalGanttVisual .gantt-project-scroll {
+    border-radius: 9px;
+    overscroll-behavior: contain;
+    touch-action: pan-x pan-y;
+  }
+
+  .flow-overtrack #modalGanttVisual .gantt-project-table { --gantt-info-width: 132px !important; }
+
+  .flow-overtrack #modalGanttVisual .gantt-project-row {
+    grid-template-columns: var(--gantt-info-width) var(--timeline-width);
+    min-height: 48px;
+  }
+
+  .flow-overtrack #modalGanttVisual .gantt-project-info {
+    width: var(--gantt-info-width);
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+    padding: 0 9px;
+    font-size: 9px;
+  }
+
+  .flow-overtrack #modalGanttVisual .gantt-project-row-head .gantt-project-info > div:not(:first-child),
+  .flow-overtrack #modalGanttVisual .gantt-project-row-main .gantt-project-info > div:not(:first-child) { display: none; }
+
+  .flow-overtrack #modalGanttVisual .gantt-project-row:not(.gantt-project-row-head):not(.gantt-project-row-main) .gantt-project-info > div:first-child,
+  .flow-overtrack #modalGanttVisual .gantt-project-row:not(.gantt-project-row-head):not(.gantt-project-row-main) .gantt-project-info > div:nth-child(n + 3) { display: none; }
+
+  .flow-overtrack #modalGanttVisual .gantt-project-weeks,
+  .flow-overtrack #modalGanttVisual .gantt-project-weeks span { height: 48px; }
+  .flow-overtrack #modalGanttVisual .gantt-project-weeks span { font-size: 9px; }
+
+  .flow-overtrack #modalGanttVisual .gantt-etapa-title {
+    width: var(--gantt-info-width);
+    height: 36px;
+    padding-inline: 9px;
+  }
+
+  .flow-overtrack #modalGanttVisual .gantt-etapa-title small { display: none; }
+  .flow-overtrack #modalGanttVisual .gantt-project-bar-etapa { top: 10px; }
+}
+
+.flow-overtrack #modalGanttVisual .gantt-mobile-hint { display: none; }
+
+@media (max-width: 520px) {
+  .flow-overtrack #modalGanttVisual .gantt-mobile-hint { display: flex; }
+}
+
+/* =========================================================
+   Flujo OT en teléfonos
+   Esta capa se mantiene al final para neutralizar reglas
+   responsivas heredadas que ensanchan botones y contenedores.
+========================================================= */
+@media (max-width: 760px) {
+  html,
+  body.flow-overtrack {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  body.flow-overtrack {
+    min-width: 0;
+    padding-top: 64px;
+  }
+
+  .flow-overtrack *,
+  .flow-overtrack *::before,
+  .flow-overtrack *::after {
+    box-sizing: border-box;
+  }
+
+  .flow-overtrack .topbar-overtrack {
+    position: fixed;
+    inset: 0 0 auto 0;
+    z-index: 1002;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    height: 64px;
+    min-height: 64px;
+    max-height: 64px;
+    margin: 0;
+    padding: 7px 12px !important;
+    overflow: visible;
+  }
+
+  .flow-overtrack .mobile-topbar-brand {
+    display: flex;
+    min-width: 0;
+    width: auto !important;
+    max-width: 128px;
+    height: 48px;
+    margin: 0;
+    padding: 0;
+  }
+
+  .flow-overtrack .brand-overtrack .mobile-brand-composite {
+    width: 112px;
+    max-width: 100%;
+    height: 48px;
+    aspect-ratio: auto;
+  }
+
+  .flow-overtrack .brand-overtrack .mobile-brand-composite .mobile-brand-base {
+    inset: 0;
+    width: 112px !important;
+    max-width: 112px !important;
+    height: 48px !important;
+    object-fit: contain;
+  }
+
+  .flow-overtrack .mobile-menu-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    width: auto !important;
+    min-width: 88px;
+    min-height: 40px;
+    margin: 0 !important;
+    padding: 8px 12px !important;
+    border-radius: 11px;
+    font-size: 13px;
+    line-height: 1;
+    white-space: nowrap;
+  }
+
+  .flow-overtrack .mobile-menu-toggle > span:first-child {
+    font-size: 18px;
+  }
+
+  .flow-overtrack .mobile-flow-menu {
+    inset: 64px auto 0 0;
+    width: min(300px, 88vw);
+  }
+
+  .flow-overtrack .container {
+    display: block;
+    width: 100% !important;
+    max-width: 100%;
+    margin: 0 !important;
+    padding: 10px 12px 28px !important;
+    overflow: visible;
+  }
+
+  .flow-overtrack .flow-save-status {
+    width: 100%;
+    min-height: 40px;
+    margin: 0;
+    padding: 2px 4px 8px;
+    justify-content: flex-end;
+  }
+
+  .flow-overtrack .header-ot-pro {
+    width: 100%;
+    max-width: 100%;
+    margin: 0 0 12px;
+    padding: 17px;
+    overflow: hidden;
+    border-radius: 16px;
+  }
+
+  .flow-overtrack .header-ot-main {
+    display: flex;
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
+    min-width: 0;
+    margin-bottom: 14px;
+  }
+
+  .flow-overtrack .header-ot-main > div:first-child {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .flow-overtrack .header-ot-label {
+    font-size: 10px;
+    letter-spacing: 1.15px;
+  }
+
+  .flow-overtrack .header-ot-main h1 {
+    max-width: 100%;
+    margin-top: 5px;
+    overflow-wrap: anywhere;
+    color: var(--flow-text);
+    font-size: clamp(24px, 8vw, 29px);
+    line-height: 1.08;
+  }
+
+  .flow-overtrack .header-ot-estado {
+    align-self: flex-start;
+    width: auto !important;
+    max-width: 100%;
+    padding: 7px 12px;
+    white-space: normal;
+  }
+
+  .flow-overtrack .header-ot-grid {
+    display: grid;
+    grid-template-columns: 1fr !important;
+    gap: 8px;
+    width: 100%;
+    margin-bottom: 15px;
+  }
+
+  .flow-overtrack .header-ot-grid > div {
+    width: 100%;
+    min-height: 58px;
+    padding: 10px 12px;
+  }
+
+  .flow-overtrack .header-ot-grid strong {
+    overflow: visible;
+    font-size: 14px;
+    line-height: 1.3;
+    text-overflow: clip;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .flow-overtrack .header-ot-progress,
+  .flow-overtrack .header-ot-progress-bar {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .flow-overtrack .header-ot-progress-info {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+
+  .flow-overtrack .tabs-timeline-pro,
+  .flow-overtrack .container .tabs.tabs-timeline-pro {
+    display: flex !important;
+    align-items: stretch;
+    justify-content: flex-start;
+    gap: 8px;
+    width: 100%;
+    max-width: 100%;
+    margin: 0 0 12px;
+    padding: 9px !important;
+    overflow-x: auto;
+    overflow-y: hidden;
+    border-radius: 15px;
+    scroll-behavior: smooth;
+    scroll-snap-type: x proximity;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .flow-overtrack .tabs-timeline-pro::-webkit-scrollbar {
+    display: none;
+  }
+
+  .flow-overtrack .tabs-timeline-pro::before,
+  .flow-overtrack .container .tabs.tabs-timeline-pro::before {
+    display: none;
+  }
+
+  .flow-overtrack .tabs-timeline-pro .tab {
+    display: flex;
+    flex: 0 0 78px;
+    align-items: center;
+    flex-direction: column;
+    justify-content: center;
+    gap: 5px;
+    min-width: 78px !important;
+    width: 78px !important;
+    min-height: 61px;
+    margin: 0 !important;
+    padding: 6px 3px !important;
+    border-radius: 10px;
+    scroll-snap-align: center;
+    white-space: normal;
+  }
+
+  .flow-overtrack .tabs-timeline-pro .tab.active {
+    background: rgba(255, 255, 255, .08);
+  }
+
+  .flow-overtrack .tabs-timeline-pro .tab-dot {
+    width: 30px;
+    height: 30px;
+    border-width: 1px;
+    font-size: 11px;
+    box-shadow: none;
+  }
+
+  .flow-overtrack .tabs-timeline-pro .tab.active .tab-dot {
+    box-shadow: 0 4px 12px rgba(8, 123, 230, .35);
+  }
+
+  .flow-overtrack .tabs-timeline-pro .tab-text {
+    max-width: 100%;
+    font-size: 9px;
+    line-height: 1.15;
+    text-align: center;
+    white-space: normal;
+  }
+
+  .flow-overtrack .content,
+  .flow-overtrack .content.active {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    overflow: visible;
+  }
+
+  .flow-overtrack .content > .card,
+  .flow-overtrack .content > .flow-stage-card,
+  .flow-overtrack .content .flow-stage-card {
+    width: 100% !important;
+    max-width: 100%;
+    min-width: 0;
+    margin: 0;
+    padding: 16px !important;
+    overflow: hidden;
+    border-radius: 15px;
+  }
+
+  .flow-overtrack .stage-card-heading {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 14px;
+    padding-bottom: 15px;
+  }
+
+  .flow-overtrack .stage-card-heading > div,
+  .flow-overtrack .stage-card-heading h2,
+  .flow-overtrack .stage-card-heading p {
+    max-width: 100%;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .flow-overtrack .stage-card-heading h2 {
+    font-size: 20px;
+  }
+
+  .flow-overtrack .stage-card-heading p {
+    font-size: 12px;
+    line-height: 1.45;
+  }
+
+  .flow-overtrack .stage-maintenance-tools,
+  .flow-overtrack .stage-maintenance-tools .overhaul-actions,
+  .flow-overtrack .stage-import-box {
+    display: grid;
+    grid-template-columns: 1fr;
+    width: 100%;
+    max-width: 100%;
+    gap: 8px;
+  }
+
+  .flow-overtrack .stage-maintenance-tools button,
+  .flow-overtrack .stage-import-box button,
+  .flow-overtrack .stage-heading-actions button {
+    width: 100% !important;
+    max-width: 100%;
+  }
+
+  .flow-overtrack .flow-stage-checklist .checklist-card,
+  .flow-overtrack #ingreso .checklist-card {
+    display: grid;
+    grid-template-columns: 1fr;
+    width: 100%;
+    min-width: 0;
+    padding: 13px;
+  }
+
+  .flow-overtrack .flow-stage-checklist .checklist-card-header,
+  .flow-overtrack #ingreso .checklist-card-header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+    gap: 10px;
+    width: 100%;
+  }
+
+  .flow-overtrack .flow-stage-checklist .checklist-card-title h4,
+  .flow-overtrack #ingreso .checklist-card-title h4 {
+    overflow: visible;
+    font-size: 13px;
+    line-height: 1.4;
+    text-overflow: clip;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .flow-overtrack .flow-stage-checklist .checklist-card-footer,
+  .flow-overtrack #ingreso .checklist-card-footer {
+    display: flex;
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+  }
+
+  .flow-overtrack .flow-stage-checklist .checklist-upload-box,
+  .flow-overtrack #ingreso .checklist-upload-box,
+  .flow-overtrack .flow-stage-checklist .btn-upload-pro,
+  .flow-overtrack #ingreso .btn-upload-pro {
+    width: 100%;
+    max-width: 100%;
+    margin: 0;
+    text-align: center;
+  }
+
+  .flow-overtrack .flow-stage-checklist .checklist-fotos-pro,
+  .flow-overtrack #ingreso .checklist-fotos-pro {
+    width: 100%;
+    max-width: 100%;
+    overflow: hidden;
+  }
+
+  .flow-overtrack .flow-stage-checklist .checklist-comment-box,
+  .flow-overtrack #ingreso .checklist-comment-box,
+  .flow-overtrack .checklist-comment-box.checklist-comment-box--single {
+    display: grid;
+    grid-template-columns: 1fr;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .flow-overtrack .flow-stage-checklist .checklist-comment-box input,
+  .flow-overtrack #ingreso .checklist-comment-box input,
+  .flow-overtrack .flow-stage-checklist .checklist-comment-box button,
+  .flow-overtrack #ingreso .checklist-comment-box button {
+    grid-column: auto;
+    width: 100% !important;
+    max-width: 100%;
+  }
+
+  .flow-overtrack .stage-secondary-panel,
+  .flow-overtrack .stage-decision-panel,
+  .flow-overtrack .dispatch-section {
+    width: 100%;
+    max-width: 100%;
+    padding: 14px;
+    overflow: hidden;
+  }
+
+  .flow-overtrack .stage-actions,
+  .flow-overtrack .decision-actions,
+  .flow-overtrack .dispatch-section .file-actions {
+    align-items: stretch;
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .flow-overtrack .stage-actions button,
+  .flow-overtrack .decision-actions button,
+  .flow-overtrack .dispatch-section .file-actions button,
+  .flow-overtrack .dispatch-section .file-actions input {
+    width: 100% !important;
+    max-width: 100%;
+  }
+
+  .flow-overtrack .modal-content,
+  .flow-overtrack .modal-contenido {
+    width: calc(100% - 20px) !important;
+    max-width: calc(100% - 20px) !important;
+    max-height: calc(100dvh - 20px);
+    margin: 10px;
+    overflow-x: hidden;
+  }
+}
+
+@media (max-width: 390px) {
+  .flow-overtrack .container {
+    padding-inline: 9px !important;
+  }
+
+  .flow-overtrack .header-ot-pro,
+  .flow-overtrack .content > .card,
+  .flow-overtrack .content > .flow-stage-card,
+  .flow-overtrack .content .flow-stage-card {
+    padding: 14px !important;
+  }
+
+  .flow-overtrack .tabs-timeline-pro .tab {
+    flex-basis: 72px;
+    min-width: 72px !important;
+    width: 72px !important;
+  }
+}

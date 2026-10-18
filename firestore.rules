@@ -22,6 +22,11 @@ service cloud.firestore {
       return profileExists() && profile().activo == true;
     }
 
+    function recentAuthentication() {
+      return signedIn() && request.auth.token.auth_time is int &&
+        request.auth.token.auth_time >= (request.time.toMillis() / 1000) - 900;
+    }
+
     function companyOperational(empresaId) {
       let empresa = get(
         /databases/$(database)/documents/empresas/$(empresaId)
@@ -105,6 +110,24 @@ service cloud.firestore {
         hasRole(['sheq']) &&
         canWriteCompany(data)
       );
+    }
+
+    function canManageProgramming(data) {
+      return isSuperAdmin() || (
+        hasRole(['planificador']) && sameCompany(data)
+      );
+    }
+
+    function canReadProgrammingDraft(data) {
+      return isSuperAdmin() || (
+        sameCompany(data) && hasRole(['planificador', 'bodeguero'])
+      );
+    }
+
+    function canReadPublishedProgramming(data) {
+      return sameCompany(data) &&
+        data.estado == 'publicada' &&
+        hasRole(['admin_empresa', 'admin_sucursal', 'jefe_taller', 'sheq']);
     }
 
     function empresaDeOT(data) {
@@ -199,14 +222,79 @@ service cloud.firestore {
       return hasRole(['jefe_taller']);
     }
 
-    function cambiaCamposAprobacionOT() {
+    function aprobacionSeleccionada(data, etapa) {
+      return ('aprobacionesPorEtapa' in data && data.aprobacionesPorEtapa is map)
+        ? (etapa in data.aprobacionesPorEtapa && data.aprobacionesPorEtapa[etapa] == true)
+        : etapa in ['evaluacion', 'pruebas'];
+    }
+
+    function etapaIniciada(data, etapa) {
+      return ('etapasConActividad' in data && data.etapasConActividad is map) &&
+        (etapa in data.etapasConActividad) &&
+        data.etapasConActividad[etapa] == true;
+    }
+
+    function marcasActividadValidas() {
+      let cambios = request.resource.data.diff(resource.data).affectedKeys();
+      return !('etapasConActividad' in request.resource.data)
+        ? !cambios.hasAny(['evaluacion', 'overhaul', 'repuestos', 'pruebas', 'despacho'])
+        : marcasActividadPresentesValidas(cambios);
+    }
+
+    function marcasActividadPresentesValidas(cambios) {
+      let nuevas = request.resource.data.etapasConActividad;
+      return nuevas is map &&
+        nuevas.evaluacion is bool &&
+        nuevas.mantencion is bool &&
+        nuevas.pruebas is bool &&
+        nuevas.despacho is bool &&
+        (!etapaIniciada(resource.data, 'evaluacion') || nuevas.evaluacion == true) &&
+        (!etapaIniciada(resource.data, 'mantencion') || nuevas.mantencion == true) &&
+        (!etapaIniciada(resource.data, 'pruebas') || nuevas.pruebas == true) &&
+        (!etapaIniciada(resource.data, 'despacho') || nuevas.despacho == true) &&
+        (!cambios.hasAny(['evaluacion']) || nuevas.evaluacion == true) &&
+        (!cambios.hasAny(['overhaul', 'repuestos']) || nuevas.mantencion == true) &&
+        (!cambios.hasAny(['pruebas']) || nuevas.pruebas == true) &&
+        (!cambios.hasAny(['despacho']) || nuevas.despacho == true);
+    }
+
+    function cambiaConfiguracionAprobaciones() {
+      return request.resource.data.diff(resource.data).affectedKeys()
+        .hasAny(['aprobacionesPorEtapa']);
+    }
+
+    function configuracionAprobacionesValida() {
+      let anterior = resource.data.aprobacionesPorEtapa;
+      let nueva = request.resource.data.aprobacionesPorEtapa;
+      return puedeAprobarOCerrarOT() &&
+        anterior is map && nueva is map &&
+        nueva.evaluacion is bool && nueva.mantencion is bool &&
+        nueva.pruebas is bool && nueva.despacho is bool &&
+        (anterior.evaluacion == nueva.evaluacion || !etapaIniciada(resource.data, 'evaluacion')) &&
+        (anterior.mantencion == nueva.mantencion || !etapaIniciada(resource.data, 'mantencion')) &&
+        (anterior.pruebas == nueva.pruebas || !etapaIniciada(resource.data, 'pruebas')) &&
+        (anterior.despacho == nueva.despacho || !etapaIniciada(resource.data, 'despacho'));
+    }
+
+    function cambiaDatosExclusivosJefe() {
       return request.resource.data.diff(resource.data).affectedKeys().hasAny([
-        'decisionEvaluacion',
-        'evaluacionAprobada',
-        'overhaulRequerido',
-        'decisionPruebas',
-        'pruebasAprobado'
+        'equipo', 'serie', 'cliente', 'os', 'osGenerica',
+        'gamaEquipo', 'plantillaMantenimientoId', 'plantillaMantenimientoNombre',
+        'plantillaMantenimientoVersion', 'etapasHabilitadas', 'gantt'
       ]);
+    }
+
+    function cambiaCamposAprobacionOT() {
+      let cambios = request.resource.data.diff(resource.data).affectedKeys();
+      return
+        (aprobacionSeleccionada(resource.data, 'evaluacion') &&
+          cambios.hasAny(['decisionEvaluacion', 'evaluacionAprobada', 'overhaulRequerido'])) ||
+        (aprobacionSeleccionada(resource.data, 'mantencion') &&
+          cambios.hasAny(['decisionMantencion', 'overhaulAprobado'])) ||
+        (aprobacionSeleccionada(resource.data, 'pruebas') &&
+          cambios.hasAny(['decisionPruebas', 'pruebasAprobado'])) ||
+        (aprobacionSeleccionada(resource.data, 'despacho') &&
+          cambios.hasAny(['decisionDespacho', 'despachoAprobado']));
     }
 
     function cambiaCamposCierreOT() {
@@ -219,15 +307,60 @@ service cloud.firestore {
       ]);
     }
 
+    function actualizacionRecepcionBodegueroValida() {
+      let cambios = request.resource.data.diff(resource.data).affectedKeys();
+      let cambiaRecepcion = cambios.hasAny([
+        'recibido', 'fechaRecepcion', 'recibidoPor', 'recibidoPorNombre'
+      ]);
+      return hasRole(['bodeguero']) &&
+        cambios.hasOnly([
+          'recibido', 'fechaRecepcion', 'recibidoPor', 'recibidoPorNombre',
+          'estado', 'fechaActualizacion', 'actualizadoPor'
+        ]) &&
+        request.resource.data.actualizadoPor == request.auth.uid &&
+        request.resource.data.estado in ['Parcial', 'Completa'] &&
+        (
+          !cambiaRecepcion ||
+          (
+            request.resource.data.recibido is bool &&
+            request.resource.data.recibido == true &&
+            request.resource.data.recibidoPor == request.auth.uid &&
+            request.resource.data.recibidoPorNombre is string &&
+            request.resource.data.recibidoPorNombre.size() > 0 &&
+            request.resource.data.fechaRecepcion is timestamp
+          ) ||
+          (
+            request.resource.data.recibido is bool &&
+            request.resource.data.recibido == false &&
+            !('recibidoPor' in request.resource.data) &&
+            !('recibidoPorNombre' in request.resource.data) &&
+            !('fechaRecepcion' in request.resource.data)
+          )
+        );
+    }
+
     function actualizacionOTValida() {
       let empresa = empresaDeOT(request.resource.data);
       return (
           !(
-            (cambiaCamposAprobacionOT() &&
-              moduloEtapaActivo(empresa, 'aprobaciones')) ||
-            cambiaCamposCierreOT()
+            cambiaCamposAprobacionOT() ||
+            cambiaCamposCierreOT() ||
+            cambiaDatosExclusivosJefe()
           ) ||
           puedeAprobarOCerrarOT()
+        ) && (
+          !cambiaConfiguracionAprobaciones() ||
+          configuracionAprobacionesValida()
+        ) && marcasActividadValidas() && (
+          puedeAprobarOCerrarOT() ||
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'ingreso', 'evaluacion', 'overhaul', 'pruebas', 'despacho',
+            'repuestos', 'estado', 'ingresoAprobado', 'evaluacionAprobada',
+            'overhaulRequerido', 'overhaulAprobado', 'pruebasAprobado',
+            'despachoAprobado', 'decisionEvaluacion', 'decisionMantencion',
+            'decisionPruebas', 'decisionDespacho', 'bitacora',
+            'etapasConActividad', 'revision', 'fechaActualizacion'
+          ])
         ) && (
           request.resource.data.estado == resource.data.estado || (
             estadoOTValido(request.resource.data) &&
@@ -248,7 +381,9 @@ service cloud.firestore {
         ingresoCompleto(request.resource.data, empresa) &&
         evaluacionCompleta(request.resource.data, empresa) &&
         mantencionCompleta(request.resource.data, empresa) &&
-        pruebasCompletas(request.resource.data, empresa);
+        pruebasCompletas(request.resource.data, empresa) &&
+        (!aprobacionSeleccionada(request.resource.data, 'despacho') ||
+          indicadorActivo(request.resource.data, 'despachoAprobado'));
     }
 
     // Los perfiles se crean y administran mediante Cloud Functions.
@@ -352,8 +487,6 @@ service cloud.firestore {
       allow read: if canReadBranchData(resource.data);
 
       allow create: if activeUser() && (
-        isSuperAdmin() ||
-        (
           sameCompany(request.resource.data) &&
           canWriteCompany(request.resource.data) &&
           sameBranch(request.resource.data) &&
@@ -374,10 +507,9 @@ service cloud.firestore {
                 empresaDeOT(request.resource.data)
               ))
           )
-        )
       );
 
-      allow update: if isSuperAdmin() || (
+      allow update: if (
         activeUser() &&
         canWriteCompany(resource.data) &&
         sameCompany(resource.data) &&
@@ -392,7 +524,7 @@ service cloud.firestore {
           request.resource.data.cerrada == true ==
             (request.resource.data.estado == 'CERRADA') &&
           (
-            (solicitaCierreOT() && cierreOTValido()) ||
+            (solicitaCierreOT() && recentAuthentication() && cierreOTValido()) ||
             (!solicitaCierreOT() && actualizacionOTValida())
           ) &&
           hasRole([
@@ -402,9 +534,10 @@ service cloud.firestore {
           ])
         );
 
-      allow delete: if isSuperAdmin() || (
+      allow delete: if (
         hasRole(['jefe_taller']) && sameCompany(resource.data) &&
-        sameBranch(resource.data) && canWriteCompany(resource.data)
+        sameBranch(resource.data) && canWriteCompany(resource.data) &&
+        recentAuthentication()
       );
     }
 
@@ -503,7 +636,7 @@ service cloud.firestore {
         activeUser() &&
         canWriteCompany(request.resource.data) &&
         canReadBranchData(request.resource.data) &&
-        hasRole(['jefe_taller', 'planificador', 'bodeguero']) &&
+        hasRole(['jefe_taller', 'planificador']) &&
         moduloEtapaActivo(empresaDeOT(request.resource.data), 'inventario')
       );
 
@@ -512,7 +645,7 @@ service cloud.firestore {
         canWriteCompany(resource.data) &&
         canReadBranchData(resource.data) &&
         canReadBranchData(request.resource.data) &&
-        hasRole(['jefe_taller', 'planificador', 'bodeguero']) &&
+        hasRole(['jefe_taller', 'planificador']) &&
         request.resource.data.empresaId == resource.data.empresaId &&
         request.resource.data.sucursalId == resource.data.sucursalId &&
         moduloEtapaActivo(empresaDeOT(request.resource.data), 'inventario')
@@ -533,7 +666,7 @@ service cloud.firestore {
         activeUser() &&
         canWriteCompany(request.resource.data) &&
         canReadBranchData(request.resource.data) &&
-        hasRole(['jefe_taller', 'planificador', 'bodeguero']) &&
+        hasRole(['jefe_taller', 'planificador']) &&
         request.resource.data.datos is map &&
         request.resource.data.creadoPor == request.auth.uid &&
         moduloEtapaActivo(empresaDeOT(request.resource.data), 'inventario')
@@ -544,19 +677,30 @@ service cloud.firestore {
         canWriteCompany(resource.data) &&
         canReadBranchData(resource.data) &&
         canReadBranchData(request.resource.data) &&
-        hasRole(['jefe_taller', 'planificador', 'bodeguero']) &&
+        hasRole(['jefe_taller', 'planificador']) &&
         request.resource.data.empresaId == resource.data.empresaId &&
         request.resource.data.sucursalId == resource.data.sucursalId &&
         request.resource.data.creadoPor == resource.data.creadoPor &&
         request.resource.data.datos is map &&
         moduloEtapaActivo(empresaDeOT(request.resource.data), 'inventario')
+      ) || (
+        activeUser() &&
+        canWriteCompany(resource.data) &&
+        canReadBranchData(resource.data) &&
+        canReadBranchData(request.resource.data) &&
+        request.resource.data.empresaId == resource.data.empresaId &&
+        request.resource.data.sucursalId == resource.data.sucursalId &&
+        request.resource.data.creadoPor == resource.data.creadoPor &&
+        request.resource.data.datos == resource.data.datos &&
+        moduloEtapaActivo(empresaDeOT(resource.data), 'inventario') &&
+        actualizacionRecepcionBodegueroValida()
       );
 
       allow delete: if isSuperAdmin() || (
         activeUser() &&
         canWriteCompany(resource.data) &&
         canReadBranchData(resource.data) &&
-        hasRole(['jefe_taller', 'planificador', 'bodeguero']) &&
+        hasRole(['jefe_taller', 'planificador']) &&
         moduloEtapaActivo(empresaDeOT(resource.data), 'inventario')
       );
     }
@@ -564,7 +708,9 @@ service cloud.firestore {
     // Planificación semanal por empresa. Los trabajadores consultan su
     // programación y las jefaturas publican o actualizan asignaciones.
     match /programaciones/{programacionId} {
-      allow read: if isSuperAdmin() || sameCompany(resource.data);
+      // La planificación de trabajo todavía editable solo es visible para
+      // Planificación y Bodega. Los demás roles consumen copias publicadas.
+      allow read: if canReadProgrammingDraft(resource.data);
 
       allow create: if isSuperAdmin() || (
         hasRole(['planificador']) &&
@@ -602,7 +748,8 @@ service cloud.firestore {
     }
 
     match /programacionSemanas/{semanaId} {
-      allow read: if isSuperAdmin() || sameCompany(resource.data);
+      allow read: if canReadProgrammingDraft(resource.data) ||
+        canReadPublishedProgramming(resource.data);
 
       allow create: if isSuperAdmin() || (
         hasRole(['planificador']) &&
@@ -622,6 +769,67 @@ service cloud.firestore {
       allow delete: if isSuperAdmin() || (
         hasRole(['planificador']) && sameCompany(resource.data)
       );
+    }
+
+    match /programacionHistorial/{historialId} {
+      allow read: if canManageProgramming(resource.data);
+      allow create: if isSuperAdmin() || (
+        hasRole(['planificador']) &&
+        sameCompany(request.resource.data) &&
+        canWriteCompany(request.resource.data) &&
+        request.resource.data.realizadoPor == request.auth.uid
+      );
+      allow update, delete: if false;
+    }
+
+    match /programacionAusencias/{ausenciaId} {
+      allow read: if canManageProgramming(resource.data) || (
+        activeUser() && sameCompany(resource.data) &&
+        resource.data.usuarioId == request.auth.uid
+      );
+      allow create: if isSuperAdmin() || (
+        hasRole(['planificador']) &&
+        sameCompany(request.resource.data) &&
+        canWriteCompany(request.resource.data) &&
+        request.resource.data.creadoPor == request.auth.uid
+      );
+      allow update: if isSuperAdmin() || (
+        hasRole(['planificador']) &&
+        sameCompany(resource.data) &&
+        sameCompany(request.resource.data) &&
+        request.resource.data.empresaId == resource.data.empresaId &&
+        canWriteCompany(resource.data)
+      );
+      allow delete: if isSuperAdmin() || (
+        hasRole(['planificador']) && sameCompany(resource.data) && canWriteCompany(resource.data)
+      );
+    }
+
+    match /programacionConfirmaciones/{confirmacionId} {
+      allow read: if canManageProgramming(resource.data) || (
+        activeUser() && sameCompany(resource.data) &&
+        resource.data.usuarioId == request.auth.uid
+      );
+      allow create: if activeUser() &&
+        sameCompany(request.resource.data) &&
+        request.resource.data.usuarioId == request.auth.uid &&
+        request.resource.data.empresaId == profile().empresaId;
+      allow update: if activeUser() &&
+        sameCompany(resource.data) && sameCompany(request.resource.data) &&
+        resource.data.usuarioId == request.auth.uid &&
+        request.resource.data.usuarioId == request.auth.uid &&
+        request.resource.data.empresaId == resource.data.empresaId &&
+        request.resource.data.semanaInicio == resource.data.semanaInicio;
+      allow delete: if false;
+    }
+
+    // Copia mínima e inmutable de la semana publicada para cada trabajador.
+    // Se genera exclusivamente desde la Cloud Function de publicación.
+    match /programacionPublicadaUsuarios/{publicacionId} {
+      allow read: if activeUser() && sameCompany(resource.data) &&
+        resource.data.estado == 'publicada' &&
+        resource.data.usuarioId == request.auth.uid;
+      allow create, update, delete: if false;
     }
 
     // Acreditaciones SHEQ. Los documentos conservan metadatos, vigencias,
@@ -645,7 +853,7 @@ service cloud.firestore {
         moduloEtapaActivo(empresaDeOT(request.resource.data), 'sheq');
       allow update: if canManageSheq(resource.data) && canManageSheq(request.resource.data) &&
         request.resource.data.empresaId == resource.data.empresaId;
-      allow delete: if canManageSheq(resource.data);
+      allow delete: if canManageSheq(resource.data) && recentAuthentication();
     }
 
     match /sheqDocumentos/{documentoId} {
@@ -661,7 +869,7 @@ service cloud.firestore {
         request.resource.data.creadoPor == resource.data.creadoPor &&
         request.resource.data.entidadTipo in ['persona', 'vehiculo'] &&
         request.resource.data.estado in ['pendiente', 'aprobado', 'observado', 'rechazado'];
-      allow delete: if canManageSheq(resource.data);
+      allow delete: if canManageSheq(resource.data) && recentAuthentication();
     }
 
     match /planes/{planId} {
@@ -679,12 +887,10 @@ service cloud.firestore {
       allow read: if isSuperAdmin() ||
         (isCompanyWideAdmin() && sameCompany(resource.data));
 
-      allow create: if activeUser() &&
-        sameCompany(request.resource.data) &&
-        canWriteCompany(request.resource.data) &&
-        request.resource.data.usuarioId == request.auth.uid;
-
-      allow update, delete: if false;
+      // Los registros de auditoría solo se crean mediante Cloud Functions.
+      // El SDK Admin omite estas reglas y completa identidad y fecha desde
+      // el servidor; ningún navegador puede inventar o alterar eventos.
+      allow create, update, delete: if false;
     }
 
     // Todo lo no declarado queda bloqueado.

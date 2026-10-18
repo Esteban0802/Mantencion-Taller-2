@@ -1,0 +1,681 @@
+/* Vectaria: normalización móvil compartida.
+   Se carga al final de cada módulo para neutralizar estilos heredados. */
+
+@media (max-width: 760px) {
+  html,
+  body {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  body,
+  body * { box-sizing: border-box; }
+
+  body.dashboard-overtrack .app,
+  body.empresa-admin-page .admin-layout,
+  body.super-admin-page .admin-layout {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: hidden;
+  }
+
+  /* Acceso y cambio de contraseña */
+  body.login-overtrack {
+    min-width: 0;
+    padding: 0;
+  }
+
+  body.login-overtrack .login-wrapper {
+    display: flex;
+    align-items: stretch;
+    flex-direction: column;
+    gap: 14px;
+    width: 100%;
+    max-width: 100%;
+    min-height: 100dvh;
+    margin: 0;
+    padding: 28px 14px;
+    overflow-x: hidden;
+  }
+
+  body.login-overtrack .login-brand,
+  body.login-overtrack .login-panel {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    margin: 0;
+  }
+
+  body.login-overtrack .login-brand {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 126px;
+    padding: 4px 0;
+    overflow: hidden;
+  }
+
+  body.login-overtrack .brand-identity,
+  body.login-overtrack .login-brand-composite {
+    width: min(310px, 100%) !important;
+    max-width: 100%;
+    min-width: 0;
+    margin: 0 auto;
+  }
+
+  body.login-overtrack .login-brand-composite {
+    position: relative;
+    height: 104px !important;
+  }
+
+  body.login-overtrack .login-brand-layer {
+    position: absolute;
+    inset: 0;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: 100% !important;
+    object-fit: contain;
+  }
+
+  body.login-overtrack .login-panel {
+    min-height: 0;
+    padding: 28px 20px;
+    border-radius: 18px;
+  }
+
+  body.login-overtrack .login-panel h1,
+  body.login-overtrack .login-panel h2 {
+    font-size: 24px;
+    line-height: 1.2;
+  }
+
+  body.login-overtrack .login-panel input,
+  body.login-overtrack .login-panel button {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  /* Encabezado común */
+  body.dashboard-overtrack .mobile-topbar,
+  body.empresa-admin-page .mobile-topbar,
+  body.super-admin-page .mobile-topbar {
+    position: fixed;
+    inset: 0 0 auto 0;
+    z-index: 1002;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    height: 64px;
+    min-height: 64px;
+    max-height: 64px;
+    margin: 0;
+    padding: 7px 12px !important;
+    border-bottom: 1px solid #26374d;
+    background: linear-gradient(90deg, #0b1726, #132237);
+    box-shadow: 0 7px 22px rgba(13, 27, 42, .2);
+  }
+
+  body.dashboard-overtrack .mobile-topbar-brand,
+  body.empresa-admin-page .mobile-topbar-brand,
+  body.super-admin-page .mobile-topbar-brand {
+    display: flex;
+    align-items: center;
+    width: 128px !important;
+    max-width: 128px;
+    min-width: 0;
+    height: 48px;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+  }
+
+  body.dashboard-overtrack .mobile-brand-composite,
+  body.empresa-admin-page .mobile-brand-composite,
+  body.super-admin-page .mobile-brand-composite {
+    position: relative;
+    display: block;
+    width: 112px !important;
+    max-width: 112px !important;
+    height: 48px !important;
+    overflow: hidden;
+    aspect-ratio: auto;
+  }
+
+  body.dashboard-overtrack .mobile-topbar-brand > img,
+  body.dashboard-overtrack .mobile-brand-base,
+  body.empresa-admin-page .mobile-brand-base,
+  body.super-admin-page .mobile-brand-base {
+    position: absolute;
+    inset: 0;
+    display: block;
+    width: 112px !important;
+    max-width: 112px !important;
+    height: 48px !important;
+    object-fit: contain;
+  }
+
+  body.dashboard-overtrack .mobile-topbar-brand > img { position: static; }
+
+  body.dashboard-overtrack .mobile-menu-toggle,
+  body.empresa-admin-page .mobile-menu-toggle,
+  body.super-admin-page .mobile-menu-toggle {
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    width: auto !important;
+    min-width: 88px;
+    min-height: 40px;
+    margin: 0 !important;
+    padding: 8px 12px !important;
+    border: 1px solid rgba(255, 255, 255, .16);
+    border-radius: 11px;
+    background: rgba(255, 255, 255, .06);
+    color: #fff;
+    font-size: 13px;
+    font-weight: 800;
+    line-height: 1;
+    white-space: nowrap;
+  }
+
+  body.dashboard-overtrack .mobile-menu-toggle > span:first-child,
+  body.empresa-admin-page .mobile-menu-toggle > span:first-child,
+  body.super-admin-page .mobile-menu-toggle > span:first-child { font-size: 18px; }
+
+  /* Menús laterales móviles */
+  body.dashboard-overtrack .sidebar,
+  body.empresa-admin-page .admin-sidebar,
+  body.super-admin-page .admin-sidebar {
+    inset: 64px auto 0 0 !important;
+    width: min(300px, 88vw) !important;
+    max-width: 88vw;
+  }
+
+  /* Compatibilidad con módulos antiguos que abren el menú con .open/.active. */
+  body.dashboard-overtrack .sidebar.open,
+  body.empresa-admin-page .admin-sidebar.open,
+  body.super-admin-page .admin-sidebar.open {
+    transform: translateX(0) !important;
+  }
+
+  body.dashboard-overtrack .mobile-menu-backdrop.active,
+  body.empresa-admin-page .mobile-menu-backdrop.active,
+  body.super-admin-page .mobile-menu-backdrop.active {
+    display: block !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+  }
+
+  /* Área de contenido común */
+  body.dashboard-overtrack .main-content,
+  body.empresa-admin-page .main-content,
+  body.super-admin-page .main-content {
+    width: 100% !important;
+    max-width: 100%;
+    min-width: 0;
+    margin: 0 !important;
+    padding: 80px 12px 32px !important;
+    overflow: visible;
+  }
+
+  body.dashboard-overtrack .header,
+  body.empresa-admin-page .page-header,
+  body.super-admin-page .page-header {
+    display: flex !important;
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 6px;
+    width: 100%;
+    min-height: 0;
+    margin: 0 0 14px;
+    padding: 0 0 13px;
+  }
+
+  body.dashboard-overtrack .header h1,
+  body.dashboard-overtrack .header h2,
+  body.empresa-admin-page .page-header h1,
+  body.super-admin-page .page-header h1 {
+    max-width: 100%;
+    margin: 0;
+    font-size: 22px;
+    line-height: 1.2;
+    overflow-wrap: anywhere;
+  }
+
+  body.dashboard-overtrack .header-right,
+  body.dashboard-overtrack .header .user-box,
+  body.empresa-admin-page .page-header .user-box,
+  body.super-admin-page .page-header .user-box { display: none !important; }
+
+  body.dashboard-overtrack .card,
+  body.dashboard-overtrack .panel-pro,
+  body.dashboard-overtrack .chart-card,
+  body.empresa-admin-page .card,
+  body.super-admin-page .card {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    border-radius: 15px !important;
+  }
+
+  body.dashboard-overtrack input,
+  body.dashboard-overtrack select,
+  body.dashboard-overtrack textarea,
+  body.empresa-admin-page input,
+  body.empresa-admin-page select,
+  body.empresa-admin-page textarea,
+  body.super-admin-page input,
+  body.super-admin-page select,
+  body.super-admin-page textarea {
+    max-width: 100%;
+    min-width: 0;
+    font-size: 16px;
+  }
+
+  body.dashboard-overtrack .tabla-wrapper,
+  body.dashboard-overtrack .table-wrap,
+  body.dashboard-overtrack .sheq-table-wrap,
+  body.dashboard-overtrack .inventario-table-wrap,
+  body.empresa-admin-page .table-wrap,
+  body.super-admin-page .table-wrap {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    border-radius: 12px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Barras de herramientas y acciones */
+  body.dashboard-overtrack .inventario-toolbar,
+  body.dashboard-overtrack .programacion-toolbar,
+  body.dashboard-overtrack .sheq-toolbar,
+  body.dashboard-overtrack .sheq-list-header,
+  body.dashboard-overtrack .panel-header-pro {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 10px;
+    width: 100%;
+  }
+
+  body.dashboard-overtrack .inventario-toolbar-actions,
+  body.dashboard-overtrack .programacion-toolbar-actions,
+  body.dashboard-overtrack .sheq-toolbar-actions,
+  body.dashboard-overtrack .sheq-filters {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+    width: 100%;
+  }
+
+  body.dashboard-overtrack .inventario-toolbar-actions button,
+  body.dashboard-overtrack .programacion-toolbar-actions button,
+  body.dashboard-overtrack .sheq-toolbar-actions button,
+  body.dashboard-overtrack .sheq-filters > *,
+  body.dashboard-overtrack .panel-header-pro > button {
+    width: 100% !important;
+    max-width: 100%;
+  }
+
+  /* Taller / panel operacional */
+  body.dashboard-page .buscador {
+    width: 100%;
+    margin: 0 0 20px;
+    padding: 0;
+  }
+
+  body.dashboard-page .buscador input {
+    width: 100% !important;
+    max-width: none !important;
+    height: 48px;
+    margin: 0;
+    padding-inline: 16px;
+    border-radius: 13px;
+  }
+
+  body.dashboard-page .dashboard-hero {
+    margin: 0 0 18px;
+    padding: 0;
+  }
+
+  body.dashboard-page .dashboard-title h1 {
+    margin: 0 0 7px;
+    font-size: 27px;
+    line-height: 1.12;
+  }
+
+  body.dashboard-page .dashboard-title p {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.45;
+  }
+
+  body.dashboard-page .kpis-pro {
+    display: grid;
+    grid-template-columns: 1fr !important;
+    gap: 10px !important;
+    width: 100%;
+    margin: 0 0 18px;
+  }
+
+  body.dashboard-page .kpis-pro .kpi-card {
+    display: grid;
+    grid-template-columns: 58px minmax(0, 1fr);
+    align-items: center;
+    gap: 14px;
+    width: 100%;
+    min-height: 96px;
+    margin: 0 !important;
+    padding: 14px 16px !important;
+    overflow: hidden;
+    border-radius: 15px !important;
+  }
+
+  body.dashboard-page .kpis-pro .kpi-icon {
+    display: grid;
+    width: 54px;
+    height: 58px;
+    min-width: 54px;
+    margin: 0;
+    place-items: center;
+    border-radius: 12px;
+  }
+
+  body.dashboard-page .kpis-pro .kpi-card > div:last-child { min-width: 0; }
+
+  body.dashboard-page .kpis-pro .kpi-card span,
+  body.dashboard-page .kpis-pro .kpi-card small {
+    display: block;
+    max-width: 100%;
+    overflow: visible;
+    line-height: 1.35;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  body.dashboard-page .kpis-pro .kpi-card h3 {
+    margin: 2px 0;
+    font-size: 27px;
+    line-height: 1;
+  }
+
+  body.dashboard-page #panelOTs,
+  body.dashboard-page .panel-pro,
+  body.dashboard-page .chart-card {
+    margin: 0 0 14px !important;
+    padding: 15px !important;
+  }
+
+  body.dashboard-page .panel-header-pro h3,
+  body.dashboard-page .chart-card h3 {
+    font-size: 17px;
+    line-height: 1.3;
+  }
+
+  body.dashboard-page .cards-ot-grid,
+  body.dashboard-page .charts,
+  body.dashboard-page .dashboard-grid-pro {
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 12px !important;
+    width: 100%;
+  }
+
+  body.dashboard-page .ot-card,
+  body.dashboard-page .ot-card-pro {
+    min-width: 0;
+    width: 100%;
+    padding: 14px;
+  }
+
+  body.dashboard-page .chart-card { min-height: 260px; }
+
+  /* SHEQ */
+  body.sheq-page .sheq-kpis,
+  body.sheq-page .sheq-matriz-kpis {
+    grid-template-columns: 1fr !important;
+    gap: 9px;
+  }
+
+  body.sheq-page .sheq-kpi {
+    min-height: 88px;
+    padding: 14px;
+  }
+
+  /* Tablas operativas convertidas en fichas legibles. */
+  body.dashboard-overtrack .mobile-cardized-table,
+  body.dashboard-overtrack .mobile-cardized-table tbody {
+    display: block;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100%;
+  }
+
+  body.dashboard-overtrack .mobile-cardized-table thead {
+    display: none;
+  }
+
+  body.dashboard-overtrack .mobile-cardized-table tbody {
+    display: grid;
+    gap: 11px;
+    padding: 2px;
+  }
+
+  body.dashboard-overtrack .mobile-cardized-table tbody tr {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    overflow: hidden;
+    border: 1px solid #d8e4ed;
+    border-left: 4px solid #1683e8;
+    border-radius: 14px;
+    background: #fff;
+    box-shadow: 0 6px 18px rgba(13, 45, 70, .07);
+  }
+
+  body.dashboard-overtrack .mobile-cardized-table tbody td {
+    display: grid !important;
+    grid-template-columns: minmax(82px, 34%) minmax(0, 1fr);
+    align-items: center;
+    gap: 10px;
+    width: 100% !important;
+    min-width: 0 !important;
+    height: auto !important;
+    min-height: 45px;
+    padding: 9px 12px !important;
+    overflow: visible !important;
+    border: 0 !important;
+    border-bottom: 1px solid #e7edf2 !important;
+    color: #263b4b;
+    background: #fff !important;
+    text-align: left !important;
+    white-space: normal !important;
+    overflow-wrap: anywhere;
+  }
+
+  body.dashboard-overtrack .mobile-cardized-table tbody td:last-child {
+    border-bottom: 0 !important;
+  }
+
+  body.dashboard-overtrack .mobile-cardized-table tbody td::before {
+    align-self: start;
+    padding-top: 2px;
+    color: #60788d;
+    content: attr(data-label);
+    font-size: 9px;
+    font-weight: 850;
+    line-height: 1.25;
+    letter-spacing: .045em;
+    text-transform: uppercase;
+  }
+
+  body.dashboard-overtrack .mobile-cardized-table tbody td > * {
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  body.dashboard-overtrack .mobile-cardized-table tbody td button,
+  body.dashboard-overtrack .mobile-cardized-table tbody td select,
+  body.dashboard-overtrack .mobile-cardized-table tbody td input {
+    width: 100% !important;
+    max-width: 100%;
+    margin: 0;
+  }
+
+  body.dashboard-overtrack .mobile-cardized-table tbody td a,
+  body.dashboard-overtrack .mobile-cardized-table .sheq-row-actions,
+  body.dashboard-overtrack .mobile-cardized-table .table-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+  }
+
+  body.dashboard-overtrack .mobile-cardized-table .mobile-card-empty,
+  body.dashboard-overtrack .mobile-cardized-table td[colspan] {
+    display: block !important;
+    padding: 18px !important;
+    text-align: center !important;
+  }
+
+  body.dashboard-overtrack .mobile-cardized-table .mobile-card-empty::before,
+  body.dashboard-overtrack .mobile-cardized-table td[colspan]::before {
+    content: none;
+  }
+
+  body.inventario-page .inventario-tabla-scroll,
+  body.inventario-page .inventario-detalle-tabla-wrap,
+  body.sheq-page .sheq-table-wrap {
+    max-height: none;
+    overflow: visible;
+  }
+
+  body.inventario-page .inventario-tabla-card,
+  body.sheq-page .sheq-list-card {
+    overflow: visible;
+  }
+
+  /* Modales comunes */
+  body.dashboard-overtrack [class*="modal-content"],
+  body.dashboard-overtrack [class*="modal-contenido"],
+  body.empresa-admin-page [class*="modal-content"],
+  body.super-admin-page [class*="modal-content"] {
+    max-width: calc(100vw - 20px) !important;
+    max-height: calc(100dvh - 20px);
+    margin: 10px;
+    overflow-x: hidden;
+  }
+
+  /* Modales como panel inferior: contenido desplazable y acciones siempre visibles. */
+  body.inventario-page .inventario-modal,
+  body.sheq-page .sheq-modal {
+    align-items: end;
+    place-items: end center;
+    padding: 8px 8px 0;
+  }
+
+  body.inventario-page .inventario-modal-contenido,
+  body.sheq-page .sheq-modal-content {
+    width: 100% !important;
+    max-width: none !important;
+    max-height: calc(100dvh - 8px) !important;
+    margin: 0 !important;
+    box-sizing: border-box;
+    padding: 18px 16px calc(14px + env(safe-area-inset-bottom)) !important;
+    border-radius: 20px 20px 0 0 !important;
+    overscroll-behavior: contain;
+  }
+
+  body.inventario-page .inventario-modal-header,
+  body.sheq-page .sheq-modal-content > header {
+    position: sticky;
+    top: -18px;
+    z-index: 8;
+    margin: -18px -16px 16px !important;
+    padding: 18px 16px 14px !important;
+    background: #fff !important;
+  }
+
+  body.inventario-page .inventario-modal-header h2,
+  body.sheq-page .sheq-modal-content > header h2 {
+    font-size: 20px !important;
+  }
+
+  body.inventario-page .inventario-modal-header p,
+  body.sheq-page .sheq-modal-content > header p {
+    max-width: 32ch;
+    font-size: 12px !important;
+    line-height: 1.4;
+  }
+
+  body.inventario-page .inventario-modal-header button,
+  body.sheq-page .sheq-modal-content > header button {
+    width: 44px !important;
+    min-width: 44px !important;
+    height: 44px !important;
+    min-height: 44px !important;
+  }
+
+  body.inventario-page .inventario-form-grid,
+  body.sheq-page .sheq-form {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  body.inventario-page .inventario-form-grid > *,
+  body.sheq-page .sheq-form > * {
+    grid-column: 1 !important;
+    min-width: 0;
+  }
+
+  body.inventario-page .inventario-modal-acciones,
+  body.sheq-page .sheq-form-actions {
+    position: sticky;
+    bottom: calc(-14px - env(safe-area-inset-bottom));
+    z-index: 7;
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 9px;
+    margin: 16px -16px calc(-14px - env(safe-area-inset-bottom)) !important;
+    padding: 12px 16px calc(12px + env(safe-area-inset-bottom)) !important;
+    border-top: 1px solid #dce6ee;
+    background: rgba(255, 255, 255, .97);
+    box-shadow: 0 -10px 24px rgba(10, 38, 61, .08);
+  }
+
+  body.inventario-page .inventario-modal-acciones > *,
+  body.sheq-page .sheq-form-actions > * {
+    width: 100%;
+    min-height: 46px;
+  }
+
+  body.inventario-page .inventario-repuestos-tabla-wrap,
+  body.inventario-page .inventario-detalle-tabla-wrap {
+    max-width: 100%;
+    overscroll-behavior-inline: contain;
+  }
+
+  body.inventario-page button,
+  body.inventario-page [role="button"],
+  body.sheq-page button,
+  body.sheq-page [role="button"] {
+    touch-action: manipulation;
+  }
+
+  body.inventario-page .inventario-form-grid input,
+  body.sheq-page .sheq-form input,
+  body.sheq-page .sheq-form select,
+  body.sheq-page .sheq-form textarea {
+    min-height: 46px !important;
+    font-size: 16px !important;
+  }
+}
+
+@media (max-width: 390px) {
+  body.dashboard-overtrack .main-content,
+  body.empresa-admin-page .main-content,
+  body.super-admin-page .main-content { padding-inline: 9px !important; }
+
+  body.login-overtrack .login-wrapper { padding-inline: 10px; }
+  body.login-overtrack .login-panel { padding-inline: 17px; }
+}

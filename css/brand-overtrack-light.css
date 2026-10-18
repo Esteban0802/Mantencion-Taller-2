@@ -1074,6 +1074,10 @@ body.flow-overtrack {
   background: #fff;
 }
 
+.flow-overtrack #modalGantt .gantt-etapa-card--despacho {
+  grid-column: 1 / -1;
+}
+
 .flow-overtrack #modalGantt .gantt-etapa-fechas {
   gap: 10px;
   margin-top: 10px;
@@ -1121,6 +1125,10 @@ body.flow-overtrack {
 
   .flow-overtrack #modalGantt .gantt-etapa-fechas {
     flex-direction: column;
+  }
+
+  .flow-overtrack #modalGantt .gantt-etapa-card--despacho {
+    grid-column: auto;
   }
 
   .flow-overtrack #modalGantt .gantt-actions button {

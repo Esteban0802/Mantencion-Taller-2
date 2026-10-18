@@ -106,7 +106,7 @@ service firebase.storage {
       return activeUser() && (
         isSuperAdmin() ||
         (profile().empresaId == empresaId && (
-          (profile().sucursalId == sucursalId && profile().rol in ['jefe_taller', 'planificador', 'bodeguero'])
+          (profile().sucursalId == sucursalId && profile().rol in ['jefe_taller', 'planificador'])
         ))
       );
     }
@@ -117,18 +117,32 @@ service firebase.storage {
         request.resource.contentType.matches('image/(png|jpeg|webp)');
     }
 
-    function validUpload() {
+    function validMobileImage() {
+      return request.resource.contentType != null &&
+        request.resource.contentType.matches('image/(jpeg|png|webp|heic|heif|avif)');
+    }
+
+    function validOperationalDocument() {
       return request.resource != null &&
         request.resource.size < 20 * 1024 * 1024 &&
-        request.resource.contentType != null && (
-          request.resource.contentType.matches('image/.*') ||
+        (validMobileImage() || request.resource.contentType == 'application/pdf');
+    }
+
+    function validSheqDocument() {
+      return request.resource != null &&
+        request.resource.size < 20 * 1024 * 1024 &&
+        (validMobileImage() ||
           request.resource.contentType == 'application/pdf' ||
-          request.resource.contentType == 'application/vnd.ms-excel' ||
-          request.resource.contentType == 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
           request.resource.contentType == 'application/msword' ||
-          request.resource.contentType == 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
-          request.resource.contentType == 'text/csv' ||
-          request.resource.contentType == 'text/plain'
+          request.resource.contentType == 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+    }
+
+    function validChecklistTemplate() {
+      return request.resource != null &&
+        request.resource.size < 5 * 1024 * 1024 &&
+        request.resource.contentType != null && (
+          request.resource.contentType == 'application/vnd.ms-excel' ||
+          request.resource.contentType == 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         );
     }
 
@@ -137,7 +151,7 @@ service firebase.storage {
 
       allow create, update: if canManageOT(otId) &&
         otOpen(otId) &&
-        validUpload();
+        validOperationalDocument();
 
       allow delete: if canManageOT(otId) &&
         otOpen(otId);
@@ -155,7 +169,7 @@ service firebase.storage {
     match /empresas/{empresaId}/plantillas/{allPaths=**} {
       allow read: if canReadCompanyBranding(empresaId);
       allow create, update: if canManageCompanyBranding(empresaId) &&
-        (isSuperAdmin() || companyOperational(empresaId)) && validUpload();
+        (isSuperAdmin() || companyOperational(empresaId)) && validChecklistTemplate();
       allow delete: if canManageCompanyBranding(empresaId) &&
         (isSuperAdmin() || companyOperational(empresaId));
     }
@@ -163,7 +177,7 @@ service firebase.storage {
     match /empresas/{empresaId}/sheq/{allPaths=**} {
       allow read: if canReadSheq(empresaId);
       allow create, update: if canManageSheq(empresaId) &&
-        (isSuperAdmin() || companyOperational(empresaId)) && validUpload();
+        (isSuperAdmin() || companyOperational(empresaId)) && validSheqDocument();
       allow delete: if canManageSheq(empresaId) &&
         (isSuperAdmin() || companyOperational(empresaId));
     }
@@ -171,7 +185,7 @@ service firebase.storage {
     match /empresas/{empresaId}/inventario/{sucursalId}/{allPaths=**} {
       allow read: if canReadInventory(empresaId, sucursalId);
       allow create, update: if canManageInventory(empresaId, sucursalId) &&
-        (isSuperAdmin() || companyOperational(empresaId)) && validUpload();
+        (isSuperAdmin() || companyOperational(empresaId)) && validOperationalDocument();
       allow delete: if canManageInventory(empresaId, sucursalId) &&
         (isSuperAdmin() || companyOperational(empresaId));
     }
