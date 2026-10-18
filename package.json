@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "private": true,
   "description": "Plataforma Vectaria para la gestión operativa, órdenes de trabajo y mantenimiento.",
+  "engines": {
+    "node": "22.x"
+  },
   "directories": {
     "doc": "docs"
   },
