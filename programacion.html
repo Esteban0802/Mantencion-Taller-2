@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <script src="js/sidebar-preload.js?v=20261016-2"></script>
+  <script src="js/sidebar-preload.js?v=20261018-6"></script>
   <title>Programación semanal | Vectaria</title>
   <link rel="icon" type="image/png" href="img/vectaria-favicon-official.png?v=3">
   <link rel="stylesheet" href="css/styles.css">
@@ -26,6 +26,7 @@
       <div class="sidebar-logo"><img class="sidebar-brand-logo" src="img/vectaria-logo-official.png?v=3" alt="Vectaria - Tu operación, en una misma dirección"></div>
       <ul>
         <li id="menuDashboardProgramacion" onclick="volverDashboard()"><svg class="ot-icon nav-icon" aria-hidden="true"><use href="img/icons-overtrack.svg#dashboard"></use></svg><span>Taller</span></li>
+        <li id="menuNuevaOTProgramacion" style="display:none" onclick="localStorage.removeItem('otActiva');location.href='flujo.html'"><svg class="ot-icon nav-icon" aria-hidden="true"><use href="img/icons-overtrack.svg#plus-circle"></use></svg><span>Nueva OT</span></li>
         <li id="menuOrdenesProgramacion" onclick="volverOrdenes()"><svg class="ot-icon nav-icon" aria-hidden="true"><use href="img/icons-overtrack.svg#list"></use></svg><span>Todas las OT</span></li>
         <li id="menuInventarioProgramacion" style="display:none" onclick="volverInventario()"><svg class="ot-icon nav-icon" aria-hidden="true"><use href="img/icons-overtrack.svg#clipboard"></use></svg><span>Inventario</span></li>
         <li id="menuSheqProgramacion" style="display:none" onclick="volverSheq()"><span class="sheq-nav-icon">🛡️</span><span>SHEQ</span></li>
@@ -134,7 +135,7 @@
     </div>
   </div>
 
-<script src="js/components/notificaciones.js?v=20261007-1"></script>
-  <script type="module" src="js/programacion.js?v=20261016-28"></script>
+<script src="js/components/notificaciones.js?v=20261018-2"></script>
+  <script type="module" src="js/programacion.js?v=20261018-33"></script>
 </body>
 </html>

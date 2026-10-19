@@ -140,6 +140,12 @@ const usuarioSucursalInactiva = {
   suspendidoPorSucursal: true,
 };
 
+const superAdmin = {
+  uid: "super-admin",
+  rol: "super_admin",
+  activo: true,
+};
+
 function firestoreComo(uid, authTime = Math.floor(Date.now() / 1000)) {
   return testEnv.authenticatedContext(uid, { auth_time: authTime }).firestore();
 }
@@ -166,6 +172,7 @@ async function sembrarDatos() {
       usuarioTallerB,
       usuarioInactivo,
       usuarioSucursalInactiva,
+      superAdmin,
     ]) {
       await setDoc(doc(db, "usuarios", usuario.uid), usuario);
     }
@@ -351,6 +358,23 @@ async function sembrarDatos() {
       asignaciones: [],
     });
 
+    await setDoc(doc(db, "clientes", "cliente-a"), {
+      empresaId: "empresa-a",
+      nombre: "Cliente A",
+    });
+
+    await setDoc(doc(db, "equipos", "equipo-a"), {
+      empresaId: "empresa-a",
+      nombre: "Equipo A",
+    });
+
+    await setDoc(doc(db, "plantillasMantenimiento", "plantilla-a"), {
+      empresaId: "empresa-a",
+      sucursalId: "sucursal-a",
+      nombre: "Plantilla A",
+      creadoPor: "admin-a",
+    });
+
     const storage = context.storage();
     await uploadBytes(
       ref(storage, "ots/ot-abierta-a/documentos/existente.txt"),
@@ -366,6 +390,11 @@ async function sembrarDatos() {
       ref(storage, "empresas/empresa-a/sheq/persona/taller-a/examen.pdf"),
       new TextEncoder().encode("documento sheq"),
       { contentType: "application/pdf" },
+    );
+    await uploadBytes(
+      ref(storage, "empresas/empresa-a/informe/logo.png"),
+      new TextEncoder().encode("logo"),
+      { contentType: "image/png" },
     );
   });
 }
@@ -412,6 +441,65 @@ after(async () => {
 test("un visitante sin sesión no puede leer una OT", async () => {
   const db = testEnv.unauthenticatedContext().firestore();
   await assertFails(getDoc(doc(db, "ots", "ot-abierta-a")));
+});
+
+test("Super Admin conserva la administración global de empresas y usuarios", async () => {
+  const db = firestoreComo("super-admin");
+  await assertSucceeds(getDoc(doc(db, "empresas", "empresa-a")));
+  await assertSucceeds(getDoc(doc(db, "usuarios", "admin-a")));
+  await assertSucceeds(getDoc(doc(db, "sucursales", "sucursal-a")));
+  await assertSucceeds(updateDoc(doc(db, "empresas", "empresa-a"), {
+    plan: "profesional",
+  }));
+});
+
+test("Super Admin no puede consultar datos operacionales de una empresa", async () => {
+  const db = firestoreComo("super-admin");
+  for (const [coleccion, id] of [
+    ["ots", "ot-abierta-a"],
+    ["clientes", "cliente-a"],
+    ["equipos", "equipo-a"],
+    ["plantillasMantenimiento", "plantilla-a"],
+    ["inventarioConfiguraciones", "empresa-a_sucursal-a"],
+    ["inventarioItems", "item-a"],
+    ["programaciones", "programacion-vehiculo-a"],
+    ["programacionSemanas", "empresa-a_2026-10-12"],
+    ["sheqDocumentos", "documento-sheq-a"],
+  ]) {
+    await assertFails(getDoc(doc(db, coleccion, id)));
+  }
+});
+
+test("Super Admin no puede crear ni modificar información operacional", async () => {
+  const db = firestoreComo("super-admin");
+  await assertFails(setDoc(doc(db, "inventarioItems", "item-super-admin"), {
+    empresaId: "empresa-a",
+    sucursalId: "sucursal-a",
+    creadoPor: "super-admin",
+    datos: { Código: "NO-AUTORIZADO" },
+  }));
+  await assertFails(updateDoc(doc(db, "programaciones", "programacion-vehiculo-a"), {
+    cliente: "Alterado por Super Admin",
+  }));
+  await assertFails(updateDoc(doc(db, "sheqDocumentos", "documento-sheq-a"), {
+    estado: "rechazado",
+  }));
+});
+
+test("Super Admin no puede acceder a archivos operacionales", async () => {
+  const storage = storageComo("super-admin");
+  await assertFails(getBytes(ref(storage, "ots/ot-abierta-a/documentos/existente.txt")));
+  await assertFails(getBytes(ref(storage, "empresas/empresa-a/sheq/persona/taller-a/examen.pdf")));
+  await assertFails(uploadBytes(
+    ref(storage, "empresas/empresa-a/inventario/sucursal-a/item-super-admin/evidencia.pdf"),
+    new TextEncoder().encode("no autorizado"),
+    { contentType: "application/pdf" },
+  ));
+});
+
+test("Super Admin conserva acceso al branding administrativo", async () => {
+  const storage = storageComo("super-admin");
+  await assertSucceeds(getBytes(ref(storage, "empresas/empresa-a/informe/logo.png")));
 });
 
 test("un usuario activo puede leer su propio perfil", async () => {

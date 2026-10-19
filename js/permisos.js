@@ -1,4 +1,4 @@
-import { moduloActivo } from "./modulos.js";
+import { moduloActivo } from "./modulos.js?v=20261018-2";
 
 const ROLES = {
   SUPER_ADMIN: "super_admin",

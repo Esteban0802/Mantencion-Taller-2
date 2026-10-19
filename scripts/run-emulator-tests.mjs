@@ -42,7 +42,9 @@ const result = spawnSync(
     "--only",
     selected.emulators,
     "--project",
-    "overtrack-42387",
+    // Un ID con prefijo demo mantiene las pruebas completamente locales y
+    // evita que una sesión de Firebase pueda tocar recursos de producción.
+    "demo-overtrack",
     selected.command,
   ],
   {

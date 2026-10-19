@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <script src="js/sidebar-preload.js?v=20261016-2"></script>
+  <script src="js/sidebar-preload.js?v=20261018-6"></script>
   <title>SHEQ y Acreditaciones | Vectaria</title>
   <link rel="icon" type="image/png" href="img/vectaria-favicon-official.png?v=3">
   <link rel="stylesheet" href="css/styles.css">
@@ -26,6 +26,7 @@
     <div class="sidebar-logo"><img class="sidebar-brand-logo" src="img/vectaria-logo-official.png?v=3" alt="Vectaria"></div>
     <ul>
       <li id="menuDashboardSheq" onclick="location.href='dashboard.html'"><svg class="ot-icon nav-icon"><use href="img/icons-overtrack.svg#dashboard"></use></svg><span>Taller</span></li>
+      <li id="menuNuevaOTSheq" style="display:none" onclick="localStorage.removeItem('otActiva');location.href='flujo.html'"><svg class="ot-icon nav-icon"><use href="img/icons-overtrack.svg#plus-circle"></use></svg><span>Nueva OT</span></li>
       <li id="menuOrdenesSheq" onclick="location.href='ordenes.html'"><svg class="ot-icon nav-icon"><use href="img/icons-overtrack.svg#list"></use></svg><span>Todas las OT</span></li>
       <li id="menuInventarioSheq" style="display:none" onclick="location.href='inventario.html'"><svg class="ot-icon nav-icon"><use href="img/icons-overtrack.svg#clipboard"></use></svg><span>Inventario</span></li>
       <li class="active"><span class="sheq-nav-icon">🛡️</span><span>SHEQ</span></li>
@@ -111,5 +112,5 @@
 
 <div class="sheq-modal" id="modalHistorialDocumento" hidden><section class="sheq-modal-content sheq-modal-matriz"><header><div><h2 id="historialDocumentoTitulo">Historial del documento</h2><p>Versiones anteriores, responsables y motivos de modificación.</p></div><button data-cerrar-modal="modalHistorialDocumento">×</button></header><div id="historialDocumentoContenido" class="sheq-historial-contenido"></div><div class="sheq-form-actions"><button type="button" class="btn-sheq-secondary" data-cerrar-modal="modalHistorialDocumento">Cerrar</button></div></section></div>
 
-<script src="js/components/notificaciones.js?v=20261007-1"></script><script src="js/mobile-table-cards.js?v=20261017-1"></script><script type="module" src="js/sheq.js?v=20261014-10"></script>
+<script src="js/components/notificaciones.js?v=20261018-2"></script><script src="js/mobile-table-cards.js?v=20261017-1"></script><script type="module" src="js/sheq.js?v=20261018-15"></script>
 </body></html>

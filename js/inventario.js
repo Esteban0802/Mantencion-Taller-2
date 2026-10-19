@@ -1,6 +1,6 @@
 import { db, storage } from "./firebase-config.js";
 import { protegerPagina, cerrarSesion } from "./session.js?v=20261017-1";
-import { moduloActivo } from "./modulos.js";
+import { moduloActivo } from "./modulos.js?v=20261018-2";
 import { evaluarCuotaStorage, mensajeCuotaStorage } from "./storage-quota.js";
 import { optimizarFotoParaCarga } from "./modulos/core/imagenes.js";
 import { validarFirmaArchivo } from "./file-validation.js";
@@ -11,7 +11,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 import { deleteObject, getDownloadURL, ref, uploadBytes } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 
-const usuario = protegerPagina(["super_admin", "admin_empresa", "admin_sucursal", "jefe_taller", "planificador", "bodeguero"]);
+const usuario = protegerPagina(["admin_empresa", "admin_sucursal", "jefe_taller", "planificador", "bodeguero"]);
 if (!usuario) throw new Error("Acceso no autorizado");
 
 let empresa = null;
@@ -832,17 +832,19 @@ async function iniciar() {
   const esBodeguero = usuario.rol === "bodeguero";
   $("menuDashboardInventario").style.display = esBodeguero ? "none" : "";
   $("menuOrdenesInventario").style.display = esBodeguero ? "none" : "";
+  $("menuNuevaOTInventario").style.display = usuario.rol === "jefe_taller" ? "" : "none";
   $("menuProgramacionInventario").style.display = "none";
   puedeEditar = ["super_admin", "jefe_taller", "planificador"].includes(usuario.rol);
   puedeGestionarEstados = ["super_admin", "bodeguero"].includes(usuario.rol);
   if (!puedeEditar) $("accionesEdicionInventario").querySelectorAll("button").forEach(b => { if (b.id !== "btnExportarInventario") b.style.display = "none"; });
-  if (["super_admin", "admin_empresa"].includes(usuario.rol)) $("menuPanelEmpresaInventario").style.display = "";
+  if (["super_admin", "admin_empresa", "admin_sucursal"].includes(usuario.rol)) $("menuPanelEmpresaInventario").style.display = "";
   try {
     if (!(await cargarEmpresa())) return;
     $("menuSheqInventario").style.display = moduloActivo(empresa, "sheq") && ["super_admin", "admin_empresa", "admin_sucursal", "jefe_taller", "planificador"].includes(usuario.rol) ? "" : "none";
-    $("menuProgramacionInventario").style.display = moduloActivo(empresa, "programacion") && ["super_admin", "admin_empresa", "admin_sucursal", "planificador", "bodeguero"].includes(usuario.rol) ? "" : "none";
+    $("menuProgramacionInventario").style.display = moduloActivo(empresa, "programacion") && ["super_admin", "admin_empresa", "admin_sucursal", "jefe_taller", "planificador", "bodeguero"].includes(usuario.rol) ? "" : "none";
     await cargarSucursales();
   } catch (error) { await mensaje({ titulo: "No se pudo cargar Inventario", texto: error.message || "Intenta nuevamente.", tipo: "error" }); }
+  finally { window.OverTrackUI?.finalizarCargaPagina?.(); }
 }
 
 document.addEventListener("DOMContentLoaded", iniciar);

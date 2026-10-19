@@ -12,9 +12,11 @@ Esta matriz define los casos mínimos que deben aprobarse antes de considerar te
 | Supervisor | Solo su sucursal | Completar etapas; gestionar sus propios comentarios y evidencias; registrar el uso de repuestos y visualizar la Carta Gantt. |
 | Técnico de taller | Solo su sucursal | Completar etapas; gestionar sus propios comentarios y evidencias; registrar el uso de repuestos y visualizar la Carta Gantt. |
 
-La cuenta de superadministrador pertenece al dueño de la plataforma. No se elimina ni se modifica desde los paneles operativos del sistema.
+La cuenta de superadministrador pertenece al dueño de la plataforma. No se elimina ni se modifica desde los paneles operativos del sistema. Administra empresas, planes, usuarios, sucursales, pagos y configuración global, pero no puede consultar ni modificar OT, clientes y equipos operacionales, inventario, programación, SHEQ, plantillas de mantenimiento ni archivos operacionales. La eliminación completa de una empresa continúa siendo una operación administrativa exclusiva del superadministrador y se ejecuta en el servidor después del periodo de exportación.
 
 ## Casos automáticos cubiertos
+
+Las reglas se validan contra emuladores locales aislados mediante `npm run test:rules`. Esta comprobación también forma parte del flujo automático de publicación y no utiliza el proyecto Firebase de producción.
 
 - Aislamiento entre empresas y sucursales.
 - Acceso y actualización de OT según el rol.

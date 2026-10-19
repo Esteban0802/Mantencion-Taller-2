@@ -1,6 +1,6 @@
 import { app, auth, db } from "./firebase-config.js";
 import { protegerPagina, cerrarSesion } from "./session.js?v=20261017-1";
-import { moduloActivo } from "./modulos.js";
+import { moduloActivo } from "./modulos.js?v=20261018-2";
 import {
   etiquetaRolProgramacion,
   grupoProgramacionUsuario,
@@ -28,7 +28,6 @@ const functions = getFunctions(app, "us-central1");
 const publicarProgramacionSegura = httpsCallable(functions, "publicarProgramacion");
 
 const usuario = protegerPagina([
-  "super_admin",
   "admin_empresa",
   "admin_sucursal",
   "jefe_taller",
@@ -41,8 +40,8 @@ const usuario = protegerPagina([
 
 if (!usuario) throw new Error("Acceso no autorizado");
 
-const PUEDE_EDITAR = ["super_admin", "planificador"].includes(usuario.rol);
-const PUEDE_VER_PROGRAMACION_COMPLETA = ["super_admin", "admin_empresa", "admin_sucursal", "jefe_taller", "planificador", "bodeguero", "sheq"].includes(usuario.rol);
+const PUEDE_EDITAR = usuario.rol === "planificador";
+const PUEDE_VER_PROGRAMACION_COMPLETA = ["admin_empresa", "admin_sucursal", "jefe_taller", "planificador", "bodeguero", "sheq"].includes(usuario.rol);
 const ES_TRABAJADOR_CON_SEMANA_PERSONAL = ["tecnico", "supervisor"].includes(usuario.rol);
 const PUEDE_VER_BORRADORES = PUEDE_EDITAR || usuario.rol === "bodeguero";
 const DIAS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
@@ -1279,13 +1278,14 @@ function configurarInterfaz() {
   $("usuarioNombreProgramacion").textContent = usuario.nombre || usuario.email || "Usuario";
   $("usuarioRolProgramacion").textContent = usuario.rol || "Rol";
   $("accionesEdicionProgramacion").style.display = PUEDE_EDITAR ? "flex" : "none";
-  $("menuPanelEmpresaProgramacion").style.display = ["super_admin", "admin_empresa"].includes(usuario.rol) ? "" : "none";
+  $("menuPanelEmpresaProgramacion").style.display = ["super_admin", "admin_empresa", "admin_sucursal"].includes(usuario.rol) ? "" : "none";
   const esUsuarioSheq = usuario.rol === "sheq";
   const esBodeguero = usuario.rol === "bodeguero";
   $("menuDashboardProgramacion").style.display = esUsuarioSheq || esBodeguero ? "none" : "";
   $("menuOrdenesProgramacion").style.display = esUsuarioSheq || esBodeguero ? "none" : "";
-  $("menuSheqProgramacion").style.display = ["sheq", "planificador", "admin_empresa", "admin_sucursal"].includes(usuario.rol) ? "" : "none";
-  $("menuInventarioProgramacion").style.display = ["planificador", "admin_empresa", "admin_sucursal", "bodeguero"].includes(usuario.rol) ? "" : "none";
+  $("menuNuevaOTProgramacion").style.display = usuario.rol === "jefe_taller" ? "" : "none";
+  $("menuSheqProgramacion").style.display = moduloActivo(empresa, "sheq") && ["sheq", "planificador", "admin_empresa", "admin_sucursal", "jefe_taller"].includes(usuario.rol) ? "" : "none";
+  $("menuInventarioProgramacion").style.display = moduloActivo(empresa, "inventario") && ["planificador", "admin_empresa", "admin_sucursal", "jefe_taller", "bodeguero"].includes(usuario.rol) ? "" : "none";
   if (ES_TRABAJADOR_CON_SEMANA_PERSONAL) {
     grupoActivo = "mi-semana";
     document.querySelectorAll("[data-grupo]").forEach(boton => {
@@ -1428,6 +1428,8 @@ async function iniciar() {
     if ($("asignacionSupervisor")) $("asignacionSupervisor").innerHTML = `<option value="">${escapar(detalle)}</option>`;
     if ($("asignacionSheq")) $("asignacionSheq").innerHTML = `<option value="">${escapar(detalle)}</option>`;
     mostrarMensaje(error.message || "No fue posible cargar el módulo.");
+  } finally {
+    window.OverTrackUI?.finalizarCargaPagina?.();
   }
 }
 

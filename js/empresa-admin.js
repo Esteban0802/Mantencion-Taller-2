@@ -2,7 +2,7 @@ import { renderVistaUsuariosEmpresa } from "./empresa/usuarios.js";
 import { renderVistaSucursalesEmpresa } from "./empresa/sucursales.js";
 import { app, db } from "./firebase-config.js";
 import { protegerPagina, cerrarSesion, reautenticarAccionCritica } from "./session.js?v=20261017-1";
-import { aplicarModulosEnInterfaz, moduloActivo, obtenerModulosEmpresa} from "./modulos.js";
+import { aplicarModulosEnInterfaz, moduloActivo, obtenerModulosEmpresa} from "./modulos.js?v=20261018-2";
 import { evaluarCuotaStorage, mensajeCuotaStorage } from "./storage-quota.js";
 import { validarFirmaArchivo } from "./file-validation.js";
 
@@ -140,7 +140,10 @@ async function validarAccesoEmpresa() {
 }
 
 async function cargarEmpresa() {
-  if (!(await validarAccesoEmpresa())) return;
+  if (!(await validarAccesoEmpresa())) {
+    window.OverTrackUI?.finalizarCargaPagina?.();
+    return;
+  }
 
   try {
     const refEmpresa = doc(db, "empresas", empresaIdActual);
@@ -168,6 +171,8 @@ async function cargarEmpresa() {
   } catch (error) {
     console.error("Error cargando empresa:", error);
     alert("Error al cargar empresa");
+  } finally {
+    window.OverTrackUI?.finalizarCargaPagina?.();
   }
 }
 
@@ -207,7 +212,11 @@ function aplicarAccesoSoloRespaldo() {
   const kpis = document.getElementById("kpiEmpresaGrid");
   if (kpis) kpis.innerHTML = "";
   const descripcion = document.getElementById("descripcionPanelEmpresa");
-  if (descripcion) descripcion.textContent = "Acceso limitado a la descarga del respaldo antes del cierre del servicio.";
+  if (descripcion) {
+    descripcion.textContent = usuarioActivo.rol === "super_admin"
+      ? "Empresa en periodo de salida. La exportación corresponde exclusivamente al Administrador de Empresa."
+      : "Acceso limitado a la descarga del respaldo antes del cierre del servicio.";
+  }
 }
 
 
@@ -232,6 +241,7 @@ function renderBotonSalida() {
 function configurarMenuSegunRol() {
   const menuModulos = document.getElementById("menuModulosEmpresa");
   const esAdminSucursal = usuarioActivo.rol === "admin_sucursal";
+  const esSuperAdmin = usuarioActivo.rol === "super_admin";
   const descripcion = document.getElementById("descripcionPanelEmpresa");
 
   if (descripcion) {
@@ -246,6 +256,17 @@ function configurarMenuSegunRol() {
   ].forEach(id => {
     const elemento = document.getElementById(id);
     if (elemento) elemento.style.display = esAdminSucursal ? "none" : "";
+  });
+
+  // El Super Admin administra la cuenta y su configuración, pero no participa
+  // en la operación diaria de las empresas clientes.
+  [
+    "menuSistemaOperacional",
+    "menuProgramacionEmpresa",
+    "menuSheqEmpresa"
+  ].forEach(id => {
+    const elemento = document.getElementById(id);
+    if (elemento) elemento.style.display = esSuperAdmin ? "none" : "";
   });
 
   if (!menuModulos) return;
@@ -402,6 +423,11 @@ window.irSistemaOperacional = function () {
     return;
   }
 
+  if (usuarioActivo.rol === "super_admin") {
+    alert("El Super Administrador no tiene acceso a la operación interna de las empresas.");
+    return;
+  }
+
   if (!empresaActual?.id) {
     alert("No se encontró la empresa activa.");
     return;
@@ -426,6 +452,11 @@ window.irSistemaOperacional = function () {
 };
 
 window.irProgramacionSemanal = function () {
+  if (usuarioActivo.rol === "super_admin") {
+    alert("El Super Administrador no tiene acceso a la programación interna de las empresas.");
+    return;
+  }
+
   if (!empresaActual?.id) {
     alert("No se encontró la empresa activa.");
     return;
@@ -441,6 +472,10 @@ window.irProgramacionSemanal = function () {
 };
 
 window.irModuloSheq = function () {
+  if (usuarioActivo.rol === "super_admin") {
+    alert("El Super Administrador no tiene acceso a la operación SHEQ de las empresas.");
+    return;
+  }
   if (!empresaActual?.id) {
     alert("No se encontró la empresa activa.");
     return;
@@ -1191,7 +1226,7 @@ function renderVistaConfiguracionEmpresa() {
         <p class="config-helper">${modulosActivos.length} módulo(s) activo(s).</p>
       </section>
 
-      ${["super_admin", "admin_empresa"].includes(usuarioActivo.rol) ? `
+      ${usuarioActivo.rol === "admin_empresa" ? `
         <section class="config-panel config-export-panel">
           <div class="config-export-icon" aria-hidden="true">⇩</div>
           <div class="config-export-content">

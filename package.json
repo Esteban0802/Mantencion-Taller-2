@@ -12,7 +12,7 @@
   "scripts": {
     "build:production": "node scripts/build-production.mjs",
     "check:functions": "npm --prefix functions run check",
-    "test:unit": "node --test tests/storage-quota.test.mjs tests/sheq-acreditacion.test.mjs tests/programacion-roles.test.mjs tests/flujo-roles.test.mjs tests/file-validation.test.mjs tests/flujo-sin-cargas-locales.test.mjs",
+    "test:unit": "node --test tests/storage-quota.test.mjs tests/sheq-acreditacion.test.mjs tests/programacion-roles.test.mjs tests/flujo-roles.test.mjs tests/file-validation.test.mjs tests/flujo-sin-cargas-locales.test.mjs tests/planes-flexibles.test.mjs tests/sidebar-roles.test.mjs tests/carga-global.test.mjs tests/super-admin-no-operativo.test.mjs",
     "test:rules": "node scripts/run-emulator-tests.mjs rules",
     "test:hosting": "node scripts/run-emulator-tests.mjs hosting",
     "test": "npm run check:functions && npm run test:unit && npm run test:rules"

@@ -1,5 +1,13 @@
 import { protegerPagina, cerrarSesion, reautenticarAccionCritica } from "./session.js?v=20261017-1";
 import { abrirWizard } from "./components/wizard.js";
+import {
+  MODULOS_COMERCIALES,
+  PLANES_FLEXIBLES_BASE,
+  expandirModulosContratados,
+  inferirModulosContratados,
+  normalizarModulosContratados,
+  validarSeleccionModulos
+} from "./planes-flexibles.js?v=20261018-3";
 
 import { app, db } from "./firebase-config.js";
 
@@ -51,7 +59,7 @@ const CONFIGURACION_BASE = {
   paisPredeterminado: "Chile",
   colorPrimarioPredeterminado: "#2563eb",
   colorSecundarioPredeterminado: "#f97316",
-  planPredeterminado: "professional",
+  planPredeterminado: "profesional",
   datosComerciales: {
     razonSocial: "",
     nombreFantasia: "Vectaria",
@@ -68,30 +76,6 @@ const CONFIGURACION_BASE = {
 };
 
 let configuracionSistema = { ...CONFIGURACION_BASE };
-
-const MODULOS_PLAN = [
-  { key: "dashboard", nombre: "Dashboard", obligatorio: true },
-  { key: "usuarios", nombre: "Usuarios", obligatorio: true },
-  { key: "sucursales", nombre: "Sucursales", obligatorio: true },
-  { key: "ordenesServicio", nombre: "Crear OT", obligatorio: true },
-  { key: "checklists", nombre: "Checklists", obligatorio: true },
-  { key: "ingreso", nombre: "Ingreso" },
-  { key: "evaluacion", nombre: "Evaluación" },
-  { key: "mantencion", nombre: "Mantención" },
-  { key: "pruebas", nombre: "Pruebas" },
-  { key: "despacho", nombre: "Despacho" },
-  { key: "evidencias", nombre: "Evidencias Fotográficas" },
-  { key: "comentarios", nombre: "Comentarios" },
-  { key: "repuestos", nombre: "Repuestos" },
-  { key: "gantt", nombre: "Carta Gantt" },
-  { key: "reportesPDF", nombre: "Informes PDF" },
-  { key: "clientes", nombre: "Clientes" },
-  { key: "equipos", nombre: "Equipos" },
-  { key: "inventario", nombre: "Inventario" },
-  { key: "programacion", nombre: "Programación semanal" },
-  { key: "sheq", nombre: "SHEQ y acreditaciones" },
-  { key: "ia", nombre: "IA" }
-];
 
 const ETAPAS_FLUJO_EMPRESA = [
   { key: "ingreso", nombre: "Ingreso" },
@@ -143,44 +127,64 @@ function actualizarVistaPreviaFlujoEmpresa(overlay) {
 }
 
 function crearPlanBase(id, nombre, descripcion, maxUsuarios, maxSucursales, maxStorageGB, destacado = false) {
-  const modulos = {};
-  MODULOS_PLAN.forEach(modulo => {
-    modulos[modulo.key] = !["clientes", "equipos", "inventario", "programacion", "sheq", "ia"].includes(modulo.key);
-  });
+  const modulosIncluidos = [];
   return {
     id, nombre, descripcion, maxUsuarios, maxSucursales, maxStorageGB,
+    maxOTMensuales: 50,
+    maxModulosElegibles: 2,
     precioMensualNeto: 0,
     precioAnualNeto: 0,
     moneda: "CLP",
     diasPrueba: 14,
     destacado,
     activo: true,
-    modulos
+    modulosIncluidos,
+    modulos: expandirModulosContratados(modulosIncluidos)
   };
 }
 
-const PLANES_BASE = [
-  crearPlanBase("starter", "Starter", "Para operaciones pequeñas que están comenzando.", 10, 1, 5),
-  crearPlanBase("professional", "Professional", "Para talleres con operación estable y mayor capacidad.", 50, 5, 25, true),
-  crearPlanBase("enterprise", "Enterprise", "Para organizaciones con múltiples sucursales y alto volumen.", 200, 20, 100)
-];
+const PLANES_BASE = PLANES_FLEXIBLES_BASE.map(plan => ({
+  ...plan,
+  moneda: "CLP",
+  diasPrueba: 14,
+  activo: true,
+  modulos: expandirModulosContratados(plan.modulosIncluidos)
+}));
+const MAPA_PLANES_ANTERIORES = Object.freeze({
+  starter: "esencial",
+  professional: "profesional",
+  enterprise: "corporativo"
+});
+
+function normalizarPlanId(planId) {
+  return MAPA_PLANES_ANTERIORES[planId] || planId || "esencial";
+}
 
 function normalizarPlan(plan) {
   const base = PLANES_BASE.find(item => item.id === plan?.id) || PLANES_BASE[0];
-  const modulos = { ...base.modulos, ...(plan?.modulos || {}) };
-  MODULOS_PLAN.filter(item => item.obligatorio).forEach(item => { modulos[item.key] = true; });
+  const modulosIncluidos = normalizarModulosContratados(
+    plan?.modulosIncluidos || inferirModulosContratados(plan?.modulos || base.modulos)
+  );
+  const maxModulosElegibles = Math.max(1, Math.min(
+    MODULOS_COMERCIALES.length,
+    Number(plan?.maxModulosElegibles ?? base.maxModulosElegibles)
+  ));
+  const modulos = expandirModulosContratados(modulosIncluidos);
   return {
     ...base, ...plan,
     id: plan?.id || base.id,
     nombre: plan?.nombre || base.nombre,
     maxUsuarios: Math.max(1, Number(plan?.maxUsuarios ?? base.maxUsuarios)),
+    maxOTMensuales: Math.max(1, Number(plan?.maxOTMensuales ?? base.maxOTMensuales)),
     maxSucursales: Math.max(1, Number(plan?.maxSucursales ?? base.maxSucursales)),
     maxStorageGB: Math.max(1, Number(plan?.maxStorageGB ?? base.maxStorageGB)),
+    maxModulosElegibles,
     precioMensualNeto: Math.max(0, Math.round(Number(plan?.precioMensualNeto ?? base.precioMensualNeto))),
     precioAnualNeto: Math.max(0, Math.round(Number(plan?.precioAnualNeto ?? base.precioAnualNeto))),
     moneda: plan?.moneda === "USD" ? "USD" : "CLP",
     diasPrueba: Math.max(0, Math.min(90, Math.round(Number(plan?.diasPrueba ?? base.diasPrueba)))),
     activo: plan?.activo !== false,
+    modulosIncluidos,
     modulos
   };
 }
@@ -301,13 +305,14 @@ function obtenerPlanesDisponibles() {
     return normalizarPlan(guardado || base);
   });
   const personalizados = planes
-    .filter(plan => !PLANES_BASE.some(base => base.id === plan.id))
+    .filter(plan => !PLANES_BASE.some(base => base.id === plan.id) && !MAPA_PLANES_ANTERIORES[plan.id])
     .map(normalizarPlan);
   return [...baseCombinados, ...personalizados];
 }
 
 function obtenerPlan(planId) {
-  return obtenerPlanesDisponibles().find(plan => plan.id === planId) || normalizarPlan(PLANES_BASE[0]);
+  const idNormalizado = normalizarPlanId(planId);
+  return obtenerPlanesDisponibles().find(plan => plan.id === idNormalizado) || normalizarPlan(PLANES_BASE[0]);
 }
 
 window.abrirModalEmpresa = function () {
@@ -380,7 +385,7 @@ window.abrirModalEmpresa = function () {
           <label for="wizEmpresaPlan">Plan</label>
           <select id="wizEmpresaPlan">
             ${obtenerPlanesDisponibles().filter(plan => plan.activo).map(plan =>
-              `<option value="${escaparHtml(plan.id)}" ${plan.id === configuracionSistema.planPredeterminado ? "selected" : ""}>${escaparHtml(plan.nombre)}</option>`
+              `<option value="${escaparHtml(plan.id)}" ${plan.id === normalizarPlanId(configuracionSistema.planPredeterminado) ? "selected" : ""}>${escaparHtml(plan.nombre)}</option>`
             ).join("")}
           </select>
         `,
@@ -394,17 +399,29 @@ window.abrirModalEmpresa = function () {
           const plan = obtenerPlan(datos.plan);
           return `
           <div class="modulos-grid">
-            ${MODULOS_PLAN.map(modulo => crearSwitchModulo(
+            ${MODULOS_COMERCIALES.map(modulo => crearSwitchModulo(
               modulo.key, modulo.nombre,
-              modulo.obligatorio || plan.modulos[modulo.key] === true,
-              modulo.obligatorio
+              plan.modulosIncluidos.includes(modulo.key)
             )).join("")}
           </div>
-          <p class="wizard-helper">Puedes personalizar los módulos opcionales sin modificar el plan original.</p>
+          <p class="wizard-helper">Referencia del plan: ${plan.maxModulosElegibles} módulo(s). Puedes seleccionar libremente más o menos módulos; se mostrará solo una advertencia.</p>
         `;},
-        collect: () => ({
-          modulos: obtenerModulosSeleccionados()
-        })
+        collect: datos => {
+          const plan = obtenerPlan(datos.plan);
+          const modulosContratados = obtenerModulosSeleccionados();
+          const validacion = validarSeleccionModulos(modulosContratados, plan.maxModulosElegibles);
+          if (validacion.excedeReferencia) {
+            window.OverTrackUI.mostrarMensaje({
+              titulo: "Selección sobre la referencia",
+              mensaje: `Seleccionaste ${validacion.seleccion.length} módulos. La referencia del plan ${plan.nombre} es ${plan.maxModulosElegibles}, pero podrás continuar por decisión del Super Admin.`,
+              tipo: "advertencia"
+            });
+          }
+          return {
+            modulosContratados: validacion.seleccion,
+            modulos: expandirModulosContratados(validacion.seleccion)
+          };
+        }
       },
       {
         titulo: "Administrador",
@@ -454,9 +471,8 @@ window.abrirModalEmpresa = function () {
           <div class="resumen-modulos">
             <strong>Módulos activos:</strong>
             <p>
-              ${Object.entries(datos.modulos || {})
-                .filter(([, activo]) => activo)
-                .map(([nombre]) => nombre)
+              ${(datos.modulosContratados || [])
+                .map(key => MODULOS_COMERCIALES.find(modulo => modulo.key === key)?.nombre || key)
                 .join(", ")}
             </p>
           </div>
@@ -468,38 +484,26 @@ window.abrirModalEmpresa = function () {
 };
 
 
-function crearSwitchModulo(key, label, activoInicial, obligatorio = false) {
+function crearSwitchModulo(key, label, activoInicial) {
   return `
     <label class="modulo-switch-card">
       <div>
         <strong>${label}</strong>
-        ${obligatorio ? '<small class="required-module">Obligatorio</small>' : ""}
+        <small class="required-module">Módulo comercial</small>
       </div>
 
       <input
         type="checkbox"
-        data-modulo="${key}"
+        data-modulo-comercial="${key}"
         ${activoInicial ? "checked" : ""}
-        ${obligatorio ? "disabled" : ""}
       >
     </label>
   `;
 }
 
 function obtenerModulosSeleccionados() {
-  const modulos = {};
-
-  document
-    .querySelectorAll("[data-modulo]")
-    .forEach(input => {
-      modulos[input.dataset.modulo] = input.checked;
-    });
-
-  MODULOS_PLAN.filter(modulo => modulo.obligatorio).forEach(modulo => {
-    modulos[modulo.key] = true;
-  });
-
-  return modulos;
+  return [...document.querySelectorAll("[data-modulo-comercial]:checked")]
+    .map(input => input.dataset.moduloComercial);
 }
 
 
@@ -555,6 +559,7 @@ function obtenerLimitesPlan(plan) {
   const configurado = obtenerPlan(plan);
   return {
     maxUsuarios: configurado.maxUsuarios,
+    maxOTMensuales: configurado.maxOTMensuales,
     maxSucursales: configurado.maxSucursales,
     maxStorageGB: configurado.maxStorageGB
   };
@@ -681,6 +686,8 @@ function mostrarResultadoCreacionEmpresa({
 
 async function crearEmpresaDesdeWizard(datos) {
   try {
+    const planSeleccionado = obtenerPlan(datos.plan);
+    const modulosContratados = normalizarModulosContratados(datos.modulosContratados || []);
     const nuevaEmpresa = {
       nombre: datos.nombre,
       rut: datos.rut,
@@ -701,9 +708,12 @@ async function crearEmpresaDesdeWizard(datos) {
 
       activa: true,
 
-      maxUsuarios: datos.plan === "enterprise" ? 200 : datos.plan === "professional" ? 50 : 10,
-      maxSucursales: datos.plan === "enterprise" ? 20 : datos.plan === "professional" ? 5 : 1,
-      maxStorageGB: datos.plan === "enterprise" ? 100 : datos.plan === "professional" ? 25 : 5,
+      maxUsuarios: planSeleccionado.maxUsuarios,
+      maxOTMensuales: planSeleccionado.maxOTMensuales,
+      maxSucursales: planSeleccionado.maxSucursales,
+      maxStorageGB: planSeleccionado.maxStorageGB,
+      modulosContratados,
+      modulos: expandirModulosContratados(modulosContratados),
 
       observaciones: "",
 
@@ -768,6 +778,7 @@ function contenidoEmpresas(limite = 0) {
           <span>RUT: ${escaparHtml(emp.rut || "-")}</span>
           <span>Plan: ${escaparHtml(emp.plan || "-")}</span>
           <span>Usuarios máx: ${escaparHtml(emp.maxUsuarios || "-")}</span>
+          <span>OT/mes: ${escaparHtml(emp.maxOTMensuales || "-")}</span>
           <span>Sucursales máx: ${escaparHtml(emp.maxSucursales || "-")}</span>
           <span>Storage: ${escaparHtml(emp.maxStorageGB || "-")} GB</span>
           <span>Suscripción: ${escaparHtml(nombreEstadoSuscripcion(suscripcion.estado))}</span>
@@ -1070,10 +1081,9 @@ window.abrirConfiguracionEmpresa = function (empresaId) {
 
   const planActual = obtenerPlan(empresa.plan);
   const suscripcionActual = normalizarSuscripcion(empresa);
-  const modulosActuales = { ...planActual.modulos, ...(empresa.modulos || {}) };
-  MODULOS_PLAN.filter(modulo => modulo.obligatorio).forEach(modulo => {
-    modulosActuales[modulo.key] = true;
-  });
+  const modulosContratadosActuales = normalizarModulosContratados(
+    empresa.modulosContratados || inferirModulosContratados(empresa.modulos || planActual.modulos)
+  );
 
   const overlay = document.createElement("div");
   overlay.className = "plan-editor-overlay company-editor-overlay";
@@ -1103,9 +1113,10 @@ window.abrirConfiguracionEmpresa = function (empresaId) {
       </div>
       <div class="plan-form-grid">
         <label>Plan<select id="empresaPlan">${obtenerPlanesDisponibles().map(plan =>
-          `<option value="${escaparHtml(plan.id)}" ${plan.id === empresa.plan ? "selected" : ""}>${escaparHtml(plan.nombre)}${plan.activo ? "" : " (inactivo)"}</option>`
+          `<option value="${escaparHtml(plan.id)}" ${plan.id === normalizarPlanId(empresa.plan) ? "selected" : ""}>${escaparHtml(plan.nombre)}${plan.activo ? "" : " (inactivo)"}</option>`
         ).join("")}</select></label>
         <label>Máximo de usuarios<input id="empresaMaxUsuarios" type="number" min="1" required value="${Number(empresa.maxUsuarios || planActual.maxUsuarios)}"></label>
+        <label>OT mensuales<input id="empresaMaxOTMensuales" type="number" min="1" required value="${Number(empresa.maxOTMensuales || planActual.maxOTMensuales)}"></label>
         <label>Máximo de sucursales<input id="empresaMaxSucursales" type="number" min="1" required value="${Number(empresa.maxSucursales || planActual.maxSucursales)}"></label>
         <label>Almacenamiento contratado (GB)<input id="empresaMaxStorage" type="number" min="1" required value="${Number(empresa.maxStorageGB || planActual.maxStorageGB)}"></label>
       </div>
@@ -1145,21 +1156,10 @@ window.abrirConfiguracionEmpresa = function (empresaId) {
         <div class="company-payment-history" id="historialPagosEmpresa"><p class="company-payment-empty">Cargando historial...</p></div>
       </section>
 
-      <fieldset class="plan-modules"><legend>Módulos de esta empresa</legend><div class="plan-modules-grid" id="empresaModulosGrid">
-        ${MODULOS_PLAN.map(modulo => `<label class="plan-module-option ${modulo.obligatorio ? "required" : ""}"><input type="checkbox" data-empresa-modulo="${modulo.key}" ${(modulo.obligatorio || modulosActuales[modulo.key]) ? "checked" : ""} ${modulo.obligatorio ? "disabled" : ""}><span>${modulo.nombre}${modulo.obligatorio ? " · Obligatorio" : ""}</span></label>`).join("")}
-      </div></fieldset>
-      <section class="company-flow-preview" aria-labelledby="tituloVistaFlujoEmpresa">
-        <div class="company-flow-preview-header">
-          <div>
-            <h3 id="tituloVistaFlujoEmpresa">Vista previa del flujo</h3>
-            <p>Así funcionará el recorrido de las órdenes de trabajo para esta empresa.</p>
-          </div>
-          <span class="company-flow-live">Vista en tiempo real</span>
-        </div>
-        <div class="company-flow-track" id="vistaPreviaFlujoEmpresa"></div>
-        <p class="company-flow-summary" id="resumenFlujoEmpresa"></p>
-      </section>
-      <p class="company-editor-note">Aplicar valores del plan reemplaza límites y módulos del formulario. Los cambios solo se guardan al presionar “Guardar empresa”.</p>
+      <fieldset class="plan-modules"><legend>Módulos flexibles de esta empresa</legend><div class="plan-modules-grid" id="empresaModulosGrid">
+        ${MODULOS_COMERCIALES.map(modulo => `<label class="plan-module-option"><input type="checkbox" data-empresa-modulo-comercial="${modulo.key}" ${modulosContratadosActuales.includes(modulo.key) ? "checked" : ""}><span>${modulo.nombre}</span></label>`).join("")}
+      </div><p class="company-editor-note" id="empresaResumenModulos"></p></fieldset>
+      <p class="company-editor-note">El núcleo de OT, checklist, evidencias, comentarios, seguridad y auditoría permanece siempre activo. Aplicar el plan reemplaza los límites y la selección flexible del formulario.</p>
       <div class="plan-editor-actions"><button type="button" class="btn-secondary company-cancel">Cancelar</button><button type="submit" class="btn-primary">Guardar empresa</button></div>
     </form>`;
 
@@ -1170,14 +1170,14 @@ window.abrirConfiguracionEmpresa = function (empresaId) {
   overlay.addEventListener("click", event => { if (event.target === overlay) cerrar(); });
   overlay.querySelector("#btnAplicarPlanEmpresa").addEventListener("click", () => aplicarPlanEnEditorEmpresa(overlay));
   overlay.querySelector("#btnRegistrarPago").addEventListener("click", () => registrarPagoEmpresa(overlay, empresaId));
-  overlay.querySelectorAll("[data-empresa-modulo]").forEach(input => {
-    input.addEventListener("change", () => actualizarVistaPreviaFlujoEmpresa(overlay));
+  overlay.querySelectorAll("[data-empresa-modulo-comercial]").forEach(input => {
+    input.addEventListener("change", () => actualizarResumenModulosEmpresa(overlay));
   });
   overlay.querySelector("#formEmpresaGlobal").addEventListener("submit", async event => {
     event.preventDefault();
     await guardarConfiguracionEmpresa(overlay, empresaId);
   });
-  actualizarVistaPreviaFlujoEmpresa(overlay);
+  actualizarResumenModulosEmpresa(overlay);
   cargarHistorialPagosEmpresa(overlay, empresaId);
 };
 
@@ -1285,26 +1285,39 @@ async function registrarPagoEmpresa(overlay, empresaId) {
 function aplicarPlanEnEditorEmpresa(overlay) {
   const plan = obtenerPlan(overlay.querySelector("#empresaPlan").value);
   overlay.querySelector("#empresaMaxUsuarios").value = plan.maxUsuarios;
+  overlay.querySelector("#empresaMaxOTMensuales").value = plan.maxOTMensuales;
   overlay.querySelector("#empresaMaxSucursales").value = plan.maxSucursales;
   overlay.querySelector("#empresaMaxStorage").value = plan.maxStorageGB;
-  overlay.querySelectorAll("[data-empresa-modulo]").forEach(input => {
-    const obligatorio = MODULOS_PLAN.find(modulo => modulo.key === input.dataset.empresaModulo)?.obligatorio;
-    input.checked = obligatorio || plan.modulos[input.dataset.empresaModulo] === true;
+  overlay.querySelectorAll("[data-empresa-modulo-comercial]").forEach(input => {
+    input.checked = plan.modulosIncluidos.includes(input.dataset.empresaModuloComercial);
   });
-  actualizarVistaPreviaFlujoEmpresa(overlay);
+  actualizarResumenModulosEmpresa(overlay);
+}
+
+function actualizarResumenModulosEmpresa(overlay) {
+  const plan = obtenerPlan(overlay.querySelector("#empresaPlan").value);
+  const seleccion = [...overlay.querySelectorAll("[data-empresa-modulo-comercial]:checked")]
+    .map(input => input.dataset.empresaModuloComercial);
+  const resumen = overlay.querySelector("#empresaResumenModulos");
+  if (resumen) {
+    resumen.textContent = `${seleccion.length} módulo(s) seleccionados. Referencia del plan ${plan.nombre}: ${plan.maxModulosElegibles}. La selección es libre para el Super Admin.`;
+    resumen.classList.toggle("limit-exceeded", seleccion.length > plan.maxModulosElegibles);
+  }
 }
 
 async function guardarConfiguracionEmpresa(overlay, empresaId) {
-  const modulos = {};
-  overlay.querySelectorAll("[data-empresa-modulo]").forEach(input => {
-    modulos[input.dataset.empresaModulo] = input.checked;
-  });
-  MODULOS_PLAN.filter(modulo => modulo.obligatorio).forEach(modulo => { modulos[modulo.key] = true; });
-
-  if (!tieneEtapaOperativaActiva(modulos)) {
-    await advertirFlujoSinEtapas();
-    return;
+  const planSeleccionado = obtenerPlan(overlay.querySelector("#empresaPlan").value);
+  const seleccion = [...overlay.querySelectorAll("[data-empresa-modulo-comercial]:checked")]
+    .map(input => input.dataset.empresaModuloComercial);
+  const validacionModulos = validarSeleccionModulos(seleccion, planSeleccionado.maxModulosElegibles);
+  if (validacionModulos.excedeReferencia) {
+    await window.OverTrackUI.mostrarMensaje({
+      titulo: "Selección sobre la referencia",
+      mensaje: `Seleccionaste ${validacionModulos.seleccion.length} módulos y la referencia del plan ${planSeleccionado.nombre} es ${planSeleccionado.maxModulosElegibles}. Se guardará igualmente por decisión del Super Admin.`,
+      tipo: "advertencia"
+    });
   }
+  const modulos = expandirModulosContratados(validacionModulos.seleccion);
 
   const datos = {
     nombre: overlay.querySelector("#empresaNombre").value.trim(),
@@ -1319,6 +1332,7 @@ async function guardarConfiguracionEmpresa(overlay, empresaId) {
     estado: overlay.querySelector("#empresaActiva").checked ? "activa" : "inactiva",
     plan: overlay.querySelector("#empresaPlan").value,
     maxUsuarios: Math.max(1, Number(overlay.querySelector("#empresaMaxUsuarios").value)),
+    maxOTMensuales: Math.max(1, Number(overlay.querySelector("#empresaMaxOTMensuales").value)),
     maxSucursales: Math.max(1, Number(overlay.querySelector("#empresaMaxSucursales").value)),
     maxStorageGB: Math.max(1, Number(overlay.querySelector("#empresaMaxStorage").value)),
     suscripcion: {
@@ -1333,6 +1347,7 @@ async function guardarConfiguracionEmpresa(overlay, empresaId) {
       fechaActualizacion: new Date().toISOString(),
       actualizadoPor: usuarioActivo.uid
     },
+    modulosContratados: validacionModulos.seleccion,
     modulos,
     fechaActualizacion: serverTimestamp(),
     actualizadoPor: usuarioActivo.uid
@@ -1374,9 +1389,10 @@ function renderVistaPlanes() {
         </div>
         <ul>
           <li><strong>${plan.maxUsuarios}</strong> usuarios</li>
+          <li><strong>${plan.maxOTMensuales}</strong> OT mensuales</li>
           <li><strong>${plan.maxSucursales}</strong> sucursales</li>
           <li><strong>${plan.maxStorageGB} GB</strong> de almacenamiento</li>
-          <li><strong>${Object.values(plan.modulos).filter(Boolean).length}</strong> módulos incluidos</li>
+          <li><strong>${plan.maxModulosElegibles}</strong> módulos como referencia comercial</li>
         </ul>
         <div class="plan-actions"><button class="btn-primary" onclick="abrirEditorPlan('${plan.id}')">Editar plan</button></div>
       </article>`).join("")}</section>
@@ -1399,8 +1415,10 @@ window.abrirEditorPlan = function (planId = "") {
         <label>Código interno<input id="planId" required pattern="[a-z0-9_-]+" ${nuevo ? "" : "disabled"} value="${escaparHtml(plan.id)}"><small>Minúsculas, números, guion o guion bajo.</small></label>
         <label class="plan-wide">Descripción<textarea id="planDescripcion" rows="3">${escaparHtml(plan.descripcion || "")}</textarea></label>
         <label>Máximo de usuarios<input id="planUsuarios" type="number" min="1" required value="${plan.maxUsuarios}"></label>
+        <label>OT mensuales<input id="planOTMensuales" type="number" min="1" required value="${plan.maxOTMensuales}"></label>
         <label>Máximo de sucursales<input id="planSucursales" type="number" min="1" required value="${plan.maxSucursales}"></label>
         <label>Almacenamiento (GB)<input id="planStorage" type="number" min="1" required value="${plan.maxStorageGB}"></label>
+        <label>Referencia de módulos<input id="planMaxModulos" type="number" min="1" max="${MODULOS_COMERCIALES.length}" required value="${plan.maxModulosElegibles}"><small>No bloquea la selección del Super Admin.</small></label>
         <label>Precio mensual neto<input id="planPrecioMensual" type="number" min="0" step="1" value="${plan.precioMensualNeto}"><small>0 = por definir.</small></label>
         <label>Precio anual neto<input id="planPrecioAnual" type="number" min="0" step="1" value="${plan.precioAnualNeto}"><small>0 = por definir.</small></label>
         <label>Moneda<select id="planMoneda"><option value="CLP" ${plan.moneda === "CLP" ? "selected" : ""}>CLP</option><option value="USD" ${plan.moneda === "USD" ? "selected" : ""}>USD</option></select></label>
@@ -1408,9 +1426,9 @@ window.abrirEditorPlan = function (planId = "") {
         <label class="plan-check"><input id="planActivo" type="checkbox" ${plan.activo ? "checked" : ""}> Plan activo</label>
         <label class="plan-check"><input id="planDestacado" type="checkbox" ${plan.destacado ? "checked" : ""}> Plan destacado</label>
       </div>
-      <fieldset class="plan-modules"><legend>Módulos incluidos</legend><div class="plan-modules-grid">
-        ${MODULOS_PLAN.map(modulo => `<label class="plan-module-option ${modulo.obligatorio ? "required" : ""}"><input type="checkbox" data-plan-modulo="${modulo.key}" ${(modulo.obligatorio || plan.modulos[modulo.key]) ? "checked" : ""} ${modulo.obligatorio ? "disabled" : ""}><span>${modulo.nombre}${modulo.obligatorio ? " · Obligatorio" : ""}</span></label>`).join("")}
-      </div></fieldset>
+      <fieldset class="plan-modules"><legend>Selección predeterminada de módulos</legend><div class="plan-modules-grid">
+        ${MODULOS_COMERCIALES.map(modulo => `<label class="plan-module-option"><input type="checkbox" data-plan-modulo-comercial="${modulo.key}" ${plan.modulosIncluidos.includes(modulo.key) ? "checked" : ""}><span>${modulo.nombre}</span></label>`).join("")}
+      </div><p class="company-editor-note">Esta es la selección predeterminada. El Super Admin podrá personalizar libremente los módulos de cada empresa.</p></fieldset>
       <div class="plan-editor-actions"><button type="button" class="btn-secondary plan-cancel">Cancelar</button><button type="submit" class="btn-primary">Guardar plan</button></div>
     </form>`;
   document.body.appendChild(overlay);
@@ -1434,27 +1452,34 @@ async function guardarPlanDesdeEditor(overlay, planIdOriginal) {
     await window.OverTrackUI.mostrarMensaje({ titulo: "Plan duplicado", mensaje: "Ya existe un plan con ese código.", tipo: "advertencia" });
     return;
   }
-  const modulos = {};
-  overlay.querySelectorAll("[data-plan-modulo]").forEach(input => { modulos[input.dataset.planModulo] = input.checked; });
-  MODULOS_PLAN.filter(modulo => modulo.obligatorio).forEach(modulo => { modulos[modulo.key] = true; });
-  if (!tieneEtapaOperativaActiva(modulos)) {
-    await advertirFlujoSinEtapas();
-    return;
+  const modulosIncluidos = [...overlay.querySelectorAll("[data-plan-modulo-comercial]:checked")]
+    .map(input => input.dataset.planModuloComercial);
+  const maxModulosElegibles = Math.max(1, Number(overlay.querySelector("#planMaxModulos").value));
+  const validacionModulos = validarSeleccionModulos(modulosIncluidos, maxModulosElegibles);
+  if (validacionModulos.excedeReferencia) {
+    await window.OverTrackUI.mostrarMensaje({
+      titulo: "Selección sobre la referencia",
+      mensaje: `La selección predeterminada tiene ${validacionModulos.seleccion.length} módulos y la referencia indicada es ${maxModulosElegibles}. El plan se guardará igualmente.`,
+      tipo: "advertencia"
+    });
   }
   const plan = normalizarPlan({
     id,
     nombre: overlay.querySelector("#planNombre").value.trim(),
     descripcion: overlay.querySelector("#planDescripcion").value.trim(),
     maxUsuarios: overlay.querySelector("#planUsuarios").value,
+    maxOTMensuales: overlay.querySelector("#planOTMensuales").value,
     maxSucursales: overlay.querySelector("#planSucursales").value,
     maxStorageGB: overlay.querySelector("#planStorage").value,
+    maxModulosElegibles,
     precioMensualNeto: overlay.querySelector("#planPrecioMensual").value,
     precioAnualNeto: overlay.querySelector("#planPrecioAnual").value,
     moneda: overlay.querySelector("#planMoneda").value,
     diasPrueba: overlay.querySelector("#planDiasPrueba").value,
     activo: overlay.querySelector("#planActivo").checked,
     destacado: overlay.querySelector("#planDestacado").checked,
-    modulos
+    modulosIncluidos: validacionModulos.seleccion,
+    modulos: expandirModulosContratados(validacionModulos.seleccion)
   });
   if (!plan.nombre) { await window.OverTrackUI.mostrarMensaje({ titulo: "Dato obligatorio", mensaje: "El nombre del plan es obligatorio.", tipo: "advertencia" }); return; }
   try {
@@ -1462,14 +1487,17 @@ async function guardarPlanDesdeEditor(overlay, planIdOriginal) {
       nombre: plan.nombre,
       descripcion: plan.descripcion,
       maxUsuarios: plan.maxUsuarios,
+      maxOTMensuales: plan.maxOTMensuales,
       maxSucursales: plan.maxSucursales,
       maxStorageGB: plan.maxStorageGB,
+      maxModulosElegibles: plan.maxModulosElegibles,
       precioMensualNeto: plan.precioMensualNeto,
       precioAnualNeto: plan.precioAnualNeto,
       moneda: plan.moneda,
       diasPrueba: plan.diasPrueba,
       activo: plan.activo,
       destacado: plan.destacado,
+      modulosIncluidos: plan.modulosIncluidos,
       modulos: plan.modulos,
       fechaActualizacion: serverTimestamp(),
       actualizadoPor: usuarioActivo.uid
@@ -1486,7 +1514,7 @@ async function guardarPlanDesdeEditor(overlay, planIdOriginal) {
 
 function renderVistaConfiguracion() {
   cabecera("Configuración", "Parámetros generales y valores predeterminados de Vectaria.");
-  const planPredeterminadoExiste = obtenerPlanesDisponibles().some(plan => plan.id === configuracionSistema.planPredeterminado);
+  const planPredeterminadoExiste = obtenerPlanesDisponibles().some(plan => plan.id === normalizarPlanId(configuracionSistema.planPredeterminado));
   const comercial = { ...CONFIGURACION_BASE.datosComerciales, ...(configuracionSistema.datosComerciales || {}) };
   document.getElementById("contenidoVista").innerHTML = `
     <section class="card global-config-card">
@@ -1511,8 +1539,8 @@ function renderVistaConfiguracion() {
           <div class="global-form-grid">
             <label>País predeterminado<input id="configPaisPredeterminado" maxlength="80" value="${escaparHtml(configuracionSistema.paisPredeterminado)}"></label>
             <label>Plan predeterminado<select id="configPlanPredeterminado">${obtenerPlanesDisponibles().map(plan =>
-              `<option value="${escaparHtml(plan.id)}" ${plan.id === configuracionSistema.planPredeterminado ? "selected" : ""}>${escaparHtml(plan.nombre)}${plan.activo ? "" : " (inactivo)"}</option>`
-            ).join("")}${planPredeterminadoExiste ? "" : `<option selected value="professional">Professional</option>`}</select></label>
+              `<option value="${escaparHtml(plan.id)}" ${plan.id === normalizarPlanId(configuracionSistema.planPredeterminado) ? "selected" : ""}>${escaparHtml(plan.nombre)}${plan.activo ? "" : " (inactivo)"}</option>`
+            ).join("")}${planPredeterminadoExiste ? "" : `<option selected value="profesional">Profesional</option>`}</select></label>
             <label>Color primario<div class="global-color-field"><input id="configColorPrimarioPicker" type="color" value="${escaparHtml(configuracionSistema.colorPrimarioPredeterminado)}"><input id="configColorPrimario" maxlength="7" value="${escaparHtml(configuracionSistema.colorPrimarioPredeterminado)}"></div></label>
             <label>Color secundario<div class="global-color-field"><input id="configColorSecundarioPicker" type="color" value="${escaparHtml(configuracionSistema.colorSecundarioPredeterminado)}"><input id="configColorSecundario" maxlength="7" value="${escaparHtml(configuracionSistema.colorSecundarioPredeterminado)}"></div></label>
           </div>
@@ -1716,9 +1744,13 @@ function configurarMenuMovil() {
   });
 }
 
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
   configurarMenuMovil();
-  cargarDatosGlobales();
+  try {
+    await cargarDatosGlobales();
+  } finally {
+    window.OverTrackUI?.finalizarCargaPagina?.();
+  }
 });
 
 

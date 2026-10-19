@@ -24,7 +24,13 @@ El cliente conserva la titularidad y control de sus datos y autoriza su tratamie
 
 ## 6. Disponibilidad y soporte
 
-Vectaria realizará esfuerzos razonables para mantener el servicio disponible y seguro. Puede haber interrupciones por mantenimiento, proveedores, conectividad, fuerza mayor o seguridad. No se promete disponibilidad ni tiempos de respuesta hasta contar con un acuerdo escrito. Canal: **[CORREO/TELÉFONO]**. Horario: **[HORARIO]**.
+Vectaria realizará esfuerzos razonables para mantener el servicio disponible y seguro, pero durante su etapa inicial no garantiza un funcionamiento ininterrumpido ni un porcentaje mínimo de disponibilidad. Puede haber interrupciones por mantenimiento informado, proveedores externos, conectividad del cliente, fuerza mayor, actualizaciones o medidas de seguridad. Durante esta etapa no se contemplan compensaciones automáticas por interrupciones.
+
+El horario de referencia para soporte será de lunes a viernes, entre las 08:30 y las 18:00 horas de Chile continental, excluidos fines de semana y festivos nacionales. El canal oficial será el correo que Vectaria informe antes del lanzamiento. No se ofrece actualmente atención continua ni soporte obligatorio fuera de ese horario.
+
+Los plazos máximos de primera respuesta serán: dos días hábiles para incidentes críticos, tres días hábiles para problemas importantes, cinco días hábiles para solicitudes normales y diez días hábiles para solicitudes de mejora. Estos plazos corresponden a la confirmación, revisión inicial y comunicación de próximos pasos; no constituyen una garantía de resolución definitiva.
+
+Los mantenimientos programados se comunicarán, cuando sea posible, con al menos 48 horas de anticipación y se realizarán preferentemente fuera del horario laboral. Las intervenciones urgentes por seguridad o continuidad podrán ejecutarse sin aviso previo, informándose tan pronto como resulte razonablemente posible.
 
 ## 7. Respaldo y órdenes cerradas
 
@@ -32,9 +38,11 @@ Las órdenes cerradas se bloquean para preservar su integridad, pero pueden cons
 
 ## 8. Vigencia, suspensión y cancelación
 
-La suscripción será mensual o anual. Vectaria podrá suspender por incumplimiento grave, riesgo de seguridad, uso ilícito o falta de pago conforme a las condiciones comerciales.
+La suscripción será mensual o anual según lo indicado en la propuesta. No habrá cobro ni renovación automática mientras Vectaria no disponga de un sistema de pagos que lo permita y el cliente no lo haya aceptado expresamente. Vectaria podrá suspender por incumplimiento grave, riesgo de seguridad, uso ilícito o falta de pago conforme a las condiciones comerciales.
 
-Al cancelar, se bloquea la operación, se habilitan 30 días para exportar y luego la empresa queda pendiente de eliminación manual. La eliminación solo puede ejecutarla el superadministrador. El cliente debe descargar y verificar su respaldo. La reactivación deberá acordarse y registrarse.
+El cliente podrá solicitar la cancelación con 30 días de anticipación. Mantendrá acceso hasta finalizar el periodo pagado y, posteriormente, dispondrá de 30 días de acceso limitado para exportar su información. Luego la empresa quedará pendiente de eliminación manual. La eliminación solo podrá ejecutarla el superadministrador, con confirmación y registro de auditoría. El cliente debe descargar y verificar su respaldo. La reactivación deberá acordarse y registrarse.
+
+Los pagos correspondientes a periodos ya iniciados no serán reembolsables. Procederá la devolución cuando exista un cobro duplicado, un error atribuible a Vectaria, imposibilidad de activar el servicio por responsabilidad de Vectaria o una obligación legal. Los servicios de implementación, migración y capacitación ya ejecutados no serán reembolsables. Si Vectaria termina anticipadamente un plan anual sin incumplimiento del cliente, devolverá proporcionalmente el periodo pagado no utilizado, sujeto al documento tributario correspondiente.
 
 ## 9. Confidencialidad y datos personales
 

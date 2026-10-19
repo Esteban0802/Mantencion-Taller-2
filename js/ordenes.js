@@ -1,6 +1,6 @@
 import { protegerPagina, cerrarSesion, reautenticarAccionCritica } from "./session.js?v=20261017-1";
 import { db } from "./firebase-config.js";
-import { obtenerModulosEmpresa, moduloActivo } from "./modulos.js";
+import { obtenerModulosEmpresa, moduloActivo } from "./modulos.js?v=20261018-2";
 import { asegurarResumenesOT } from "./modulos/core/resumenOT.js";
 import { puedeVerOrdenesServicio, puedeCrearOT, puedeAbrirOT, puedeEntrarPanelEmpresa } from "./permisos.js?v=20261014-1";
 import {
@@ -14,7 +14,7 @@ import {
   writeBatch
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-const usuario = protegerPagina(["super_admin", "admin_empresa", "admin_sucursal", "jefe_taller", "supervisor", "tecnico", "planificador"]);
+const usuario = protegerPagina(["admin_empresa", "admin_sucursal", "jefe_taller", "supervisor", "tecnico", "planificador"]);
 if (!usuario) throw new Error("Acceso no autorizado");
 
 const POR_PAGINA = 20;
@@ -157,6 +157,7 @@ async function escucharOrdenes() {
     if (!usuario.sucursalId) {
       document.getElementById("estadoCargaOrdenes").textContent =
         "Usuario sin sucursal asignada";
+      window.OverTrackUI?.finalizarCargaPagina?.();
       return;
     }
     restricciones.push(where("sucursalId", "==", usuario.sucursalId));
@@ -181,9 +182,11 @@ async function escucharOrdenes() {
       .map(item => ({ id: item.id, ...item.data() }))
       .sort((a, b) => marcaTiempo(b) - marcaTiempo(a));
     aplicarFiltros();
+    window.OverTrackUI?.finalizarCargaPagina?.();
   }, error => {
     console.error("No fue posible cargar las órdenes:", error);
     document.getElementById("estadoCargaOrdenes").textContent = "No se pudo cargar";
+    window.OverTrackUI?.finalizarCargaPagina?.();
   });
 }
 
@@ -241,7 +244,7 @@ function configurarInterfaz() {
   const rolesModulosOperativos = ["super_admin", "admin_empresa", "admin_sucursal", "jefe_taller", "planificador"];
   document.getElementById("menuInventarioOrdenes").style.display = moduloActivo(empresaActual, "inventario") && rolesModulosOperativos.includes(usuario.rol) ? "" : "none";
   document.getElementById("menuSheqOrdenes").style.display = moduloActivo(empresaActual, "sheq") && rolesModulosOperativos.includes(usuario.rol) ? "" : "none";
-  document.getElementById("menuProgramacionOrdenes").style.display = moduloActivo(empresaActual, "programacion") && ["super_admin", "admin_empresa", "admin_sucursal", "planificador", "supervisor", "tecnico"].includes(usuario.rol) ? "" : "none";
+  document.getElementById("menuProgramacionOrdenes").style.display = moduloActivo(empresaActual, "programacion") && ["super_admin", "admin_empresa", "admin_sucursal", "jefe_taller", "planificador", "supervisor", "tecnico"].includes(usuario.rol) ? "" : "none";
 
   document.getElementById("buscarOrdenes").addEventListener("input", () => { pagina = 1; aplicarFiltros(); });
   document.getElementById("estadoOrdenes").addEventListener("change", () => { pagina = 1; aplicarFiltros(); });
@@ -287,11 +290,15 @@ window.volverPanelEmpresa = volverPanelEmpresa;
 
 window.addEventListener("DOMContentLoaded", async () => {
   try {
-    if (!await cargarEmpresa()) return;
+    if (!await cargarEmpresa()) {
+      window.OverTrackUI?.finalizarCargaPagina?.();
+      return;
+    }
     configurarInterfaz();
     escucharOrdenes();
   } catch (error) {
     console.error("No fue posible iniciar el archivo de órdenes:", error);
     alert("No fue posible cargar esta sección.");
+    window.OverTrackUI?.finalizarCargaPagina?.();
   }
 });

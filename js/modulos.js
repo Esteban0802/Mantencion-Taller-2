@@ -1,3 +1,8 @@
+import {
+  MODULOS_COMERCIALES,
+  expandirModulosContratados
+} from "./planes-flexibles.js?v=20261018-3";
+
 const MODULOS_PREDETERMINADOS = {
   dashboard: true,
   usuarios: true,
@@ -30,10 +35,24 @@ const MODULOS_PREDETERMINADOS = {
  * combinados con los valores predeterminados.
  */
 export function obtenerModulosEmpresa(empresa) {
+  // En empresas configuradas con planes flexibles, esta lista es la fuente
+  // definitiva. Así, un indicador legado como `modulos.sheq: true` no puede
+  // volver a habilitar un módulo que el Super Admin ya retiró del contrato.
+  if (Array.isArray(empresa?.modulosContratados)) {
+    return {
+      ...MODULOS_PREDETERMINADOS,
+      ...expandirModulosContratados(empresa.modulosContratados)
+    };
+  }
+
   return {
     ...MODULOS_PREDETERMINADOS,
     ...(empresa?.modulos || {})
   };
+}
+
+export function esModuloComercial(nombreModulo) {
+  return MODULOS_COMERCIALES.some(modulo => modulo.flags.includes(nombreModulo));
 }
 
 /**

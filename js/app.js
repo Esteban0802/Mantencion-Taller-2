@@ -1,6 +1,7 @@
 import { protegerPagina, cerrarSesion as cerrarSesionGlobal } from "./session.js?v=20261017-1";
 
 import { db, auth, storage } from "./firebase-config.js";
+import { obtenerModulosEmpresa } from "./modulos.js?v=20261018-2";
 
 
 import {
@@ -132,7 +133,6 @@ import {
 
 
 const usuario = protegerPagina([
-  "super_admin",
   "admin_empresa",
   "admin_sucursal",
   "jefe_taller",
@@ -588,12 +588,16 @@ async function cargarConfiguracionAprobaciones() {
   try {
     const empresaSnap = await getDoc(doc(db, "empresas", empresaId));
     const modulosEmpresa = empresaSnap.exists()
-      ? empresaSnap.data()?.modulos || {}
+      ? obtenerModulosEmpresa(empresaSnap.data())
       : {};
 
-    // Las OT nuevas ya no dependen de un módulo global de la empresa.
-    // El valor histórico solo se conserva para OT antiguas sin configuración por etapa.
-    aprobacionesActivas = true;
+    // El plan habilita la capacidad de usar aprobaciones. Si está disponible,
+    // el Jefe de Taller decide en qué etapas se aplican dentro de cada OT.
+    const otTieneAprobacionesConfiguradas = Object.values(
+      ot?.aprobacionesPorEtapa || {}
+    ).some(Boolean);
+    aprobacionesActivas =
+      modulosEmpresa.aprobaciones !== false || otTieneAprobacionesConfiguradas;
     aprobacionesLegadoActivas = modulosEmpresa.aprobaciones !== false;
     reportesPDFActivos = modulosEmpresa.reportesPDF !== false;
     ganttActivo = modulosEmpresa.gantt !== false;
@@ -1615,6 +1619,7 @@ window.onload = async () => {
     cambiarTab("crear");
     renderUsuarioActivo();
     aplicarPermisosRol();
+    window.OverTrackUI?.finalizarCargaPagina?.();
     return;
   }
 
@@ -1626,6 +1631,7 @@ window.onload = async () => {
       await notificarFlujo("La orden de trabajo ya no existe o no está disponible.", "OT no disponible", "error");
       localStorage.removeItem("otActiva");
       cambiarTab("crear");
+      window.OverTrackUI?.finalizarCargaPagina?.();
       return;
     }
 
@@ -1647,6 +1653,7 @@ window.onload = async () => {
   } catch (error) {
     console.error("Error cargando OT:", error);
     await notificarFlujo("No fue posible cargar la orden de trabajo.", "Error de carga", "error");
+    window.OverTrackUI?.finalizarCargaPagina?.();
     return;
   }
 
@@ -1761,6 +1768,7 @@ configurarInterfazGantt();
 configurarInterfazRepuestos();
 configurarInterfazEtapas();
 renderUsuarioActivo();
+window.OverTrackUI?.finalizarCargaPagina?.();
 };
 
 

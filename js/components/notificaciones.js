@@ -326,15 +326,36 @@
     }
   }
 
+  let cargaInicialPagina = null;
+
+  function finalizarCargaPagina() {
+    if (!cargaInicialPagina) return;
+    finalizarCarga(cargaInicialPagina);
+    cargaInicialPagina = null;
+  }
+
   document.addEventListener("click", evento => {
     const enlace = evento.target.closest("a[href]");
-    if (!enlace || evento.defaultPrevented || enlace.target === "_blank" || enlace.hasAttribute("download")) return;
-    const destino = enlace.getAttribute("href") || "";
-    if (!destino || destino.startsWith("#") || destino.startsWith("javascript:")) return;
-    iniciarCarga("Abriendo la sección…");
+    if (enlace && !evento.defaultPrevented && enlace.target !== "_blank" && !enlace.hasAttribute("download")) {
+      const destino = enlace.getAttribute("href") || "";
+      if (destino && !destino.startsWith("#") && !destino.startsWith("javascript:")) {
+        iniciarCarga("Abriendo la sección…");
+        return;
+      }
+    }
+
+    const opcionSidebar = evento.target.closest(".sidebar li:not(.active)");
+    if (opcionSidebar && !evento.defaultPrevented) iniciarCarga("Abriendo la sección…");
   });
 
-  window.addEventListener("pageshow", () => finalizarCarga());
+  window.addEventListener("pageshow", evento => {
+    if (evento.persisted) finalizarCarga();
+  });
+
+  if (!document.body?.classList.contains("login-overtrack")) {
+    cargaInicialPagina = iniciarCarga("Cargando información…");
+    window.setTimeout(finalizarCargaPagina, 12000);
+  }
 
   window.OverTrackUI = Object.freeze({
     mostrarMensaje,
@@ -342,6 +363,7 @@
     solicitarTexto,
     iniciarCarga,
     finalizarCarga,
+    finalizarCargaPagina,
     ejecutarConCarga
   });
 })();

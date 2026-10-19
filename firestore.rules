@@ -110,42 +110,46 @@ service cloud.firestore {
     }
 
     function canReadBranchData(data) {
-      return isSuperAdmin() ||
-        (isCompanyWideAdmin() && sameCompany(data)) ||
+      return (isCompanyWideAdmin() && sameCompany(data)) ||
         (isBranchRole() && sameBranch(data));
     }
 
     function canReadSheq(data) {
-      return isSuperAdmin() || (
+      return (
         sameCompany(data) &&
-        hasRole(['admin_empresa', 'admin_sucursal', 'jefe_taller', 'planificador', 'sheq'])
+        hasRole(['admin_empresa', 'admin_sucursal', 'jefe_taller', 'planificador', 'sheq']) &&
+        moduloEtapaActivo(empresaDeOT(data), 'sheq')
       );
     }
 
     function canManageSheq(data) {
-      return isSuperAdmin() || (
+      return (
         sameCompany(data) &&
         hasRole(['sheq']) &&
-        canWriteCompany(data)
+        canWriteCompany(data) &&
+        moduloEtapaActivo(empresaDeOT(data), 'sheq')
       );
     }
 
     function canManageProgramming(data) {
-      return isSuperAdmin() || (
-        hasRole(['planificador']) && sameCompany(data)
+      return (
+        hasRole(['planificador']) && sameCompany(data) &&
+        moduloEtapaActivo(empresaDeOT(data), 'programacion')
       );
     }
 
     function canReadProgrammingDraft(data) {
-      return isSuperAdmin() || (
-        sameCompany(data) && hasRole(['planificador', 'bodeguero'])
+      return (
+        sameCompany(data) && hasRole(['planificador', 'bodeguero']) &&
+        moduloEtapaActivo(empresaDeOT(data), 'programacion')
       );
     }
 
     function canReadPublishedProgramming(data) {
       return sameCompany(data) &&
         data.estado == 'publicada' &&
-        hasRole(['admin_empresa', 'admin_sucursal', 'jefe_taller', 'sheq']);
+        hasRole(['admin_empresa', 'admin_sucursal', 'jefe_taller', 'sheq']) &&
+        moduloEtapaActivo(empresaDeOT(data), 'programacion');
     }
 
     function empresaDeOT(data) {
@@ -570,7 +574,7 @@ service cloud.firestore {
     match /otsResumen/{otId} {
       allow read: if canReadBranchData(resource.data);
 
-      allow create: if isSuperAdmin() || (
+      allow create: if (
         activeUser() &&
         sameCompany(request.resource.data) &&
         canWriteCompany(request.resource.data) &&
@@ -580,7 +584,7 @@ service cloud.firestore {
         )
       );
 
-      allow update: if isSuperAdmin() || (
+      allow update: if (
         activeUser() &&
         canWriteCompany(resource.data) &&
         sameCompany(resource.data) &&
@@ -593,7 +597,7 @@ service cloud.firestore {
         )
       );
 
-      allow delete: if isSuperAdmin() || (
+      allow delete: if (
         activeUser() && sameCompany(resource.data) && canWriteCompany(resource.data) &&
         (
           isCompanyWideAdmin() ||
@@ -604,47 +608,43 @@ service cloud.firestore {
 
     // Colecciones futuras del modelo multiempresa.
     match /clientes/{documentId} {
-      allow read: if isSuperAdmin() || sameCompany(resource.data);
-      allow create: if isSuperAdmin() ||
-        (isCompanyAdmin() && sameCompany(request.resource.data) && canWriteCompany(request.resource.data));
-      allow update: if isSuperAdmin() || (
+      allow read: if sameCompany(resource.data);
+      allow create: if isCompanyAdmin() && sameCompany(request.resource.data) && canWriteCompany(request.resource.data);
+      allow update: if (
         isCompanyAdmin() &&
         canWriteCompany(resource.data) &&
         sameCompany(resource.data) &&
         sameCompany(request.resource.data)
       );
-      allow delete: if isSuperAdmin() ||
-        (hasRole(['admin_empresa']) && sameCompany(resource.data) && canWriteCompany(resource.data));
+      allow delete: if hasRole(['admin_empresa']) && sameCompany(resource.data) && canWriteCompany(resource.data);
     }
 
     match /equipos/{documentId} {
-      allow read: if isSuperAdmin() || sameCompany(resource.data);
-      allow create: if isSuperAdmin() ||
-        (isCompanyAdmin() && sameCompany(request.resource.data) && canWriteCompany(request.resource.data));
-      allow update: if isSuperAdmin() || (
+      allow read: if sameCompany(resource.data);
+      allow create: if isCompanyAdmin() && sameCompany(request.resource.data) && canWriteCompany(request.resource.data);
+      allow update: if (
         isCompanyAdmin() &&
         canWriteCompany(resource.data) &&
         sameCompany(resource.data) &&
         sameCompany(request.resource.data)
       );
-      allow delete: if isSuperAdmin() ||
-        (hasRole(['admin_empresa']) && sameCompany(resource.data) && canWriteCompany(resource.data));
+      allow delete: if hasRole(['admin_empresa']) && sameCompany(resource.data) && canWriteCompany(resource.data);
     }
 
     match /plantillasMantenimiento/{plantillaId} {
-      allow read: if isSuperAdmin() || sameCompany(resource.data);
-      allow create: if isSuperAdmin() || (
+      allow read: if sameCompany(resource.data);
+      allow create: if (
         hasRole(['admin_empresa']) && sameCompany(request.resource.data) &&
         canWriteCompany(request.resource.data) &&
         request.resource.data.creadoPor == request.auth.uid
       );
-      allow update: if isSuperAdmin() || (
+      allow update: if (
         hasRole(['admin_empresa']) && sameCompany(resource.data) &&
         canWriteCompany(resource.data) &&
         sameCompany(request.resource.data) &&
         request.resource.data.empresaId == resource.data.empresaId
       );
-      allow delete: if isSuperAdmin() || (
+      allow delete: if (
         hasRole(['admin_empresa']) && sameCompany(resource.data) &&
         canWriteCompany(resource.data)
       );
@@ -656,7 +656,7 @@ service cloud.firestore {
       allow read: if canReadBranchData(resource.data) &&
         moduloEtapaActivo(empresaDeOT(resource.data), 'inventario');
 
-      allow create: if isSuperAdmin() || (
+      allow create: if (
         activeUser() &&
         canWriteCompany(request.resource.data) &&
         canReadBranchData(request.resource.data) &&
@@ -664,7 +664,7 @@ service cloud.firestore {
         moduloEtapaActivo(empresaDeOT(request.resource.data), 'inventario')
       );
 
-      allow update: if isSuperAdmin() || (
+      allow update: if (
         activeUser() &&
         canWriteCompany(resource.data) &&
         canReadBranchData(resource.data) &&
@@ -675,10 +675,11 @@ service cloud.firestore {
         moduloEtapaActivo(empresaDeOT(request.resource.data), 'inventario')
       );
 
-      allow delete: if isSuperAdmin() || (
+      allow delete: if (
         hasRole(['jefe_taller']) &&
         canWriteCompany(resource.data) &&
-        canReadBranchData(resource.data)
+        canReadBranchData(resource.data) &&
+        moduloEtapaActivo(empresaDeOT(resource.data), 'inventario')
       );
     }
 
@@ -686,7 +687,7 @@ service cloud.firestore {
       allow read: if canReadBranchData(resource.data) &&
         moduloEtapaActivo(empresaDeOT(resource.data), 'inventario');
 
-      allow create: if isSuperAdmin() || (
+      allow create: if (
         activeUser() &&
         canWriteCompany(request.resource.data) &&
         canReadBranchData(request.resource.data) &&
@@ -696,7 +697,7 @@ service cloud.firestore {
         moduloEtapaActivo(empresaDeOT(request.resource.data), 'inventario')
       );
 
-      allow update: if isSuperAdmin() || (
+      allow update: if (
         validInventoryItemUpdateScope() && (
           (
             profile().rol in ['jefe_taller', 'planificador'] &&
@@ -709,7 +710,7 @@ service cloud.firestore {
         )
       );
 
-      allow delete: if isSuperAdmin() || (
+      allow delete: if (
         activeUser() &&
         canWriteCompany(resource.data) &&
         canReadBranchData(resource.data) &&
@@ -725,14 +726,14 @@ service cloud.firestore {
       // Planificación y Bodega. Los demás roles consumen copias publicadas.
       allow read: if canReadProgrammingDraft(resource.data);
 
-      allow create: if isSuperAdmin() || (
+      allow create: if (
         hasRole(['planificador']) &&
         sameCompany(request.resource.data) &&
         canWriteCompany(request.resource.data) &&
         moduloEtapaActivo(empresaDeOT(request.resource.data), 'programacion')
       );
 
-      allow update: if isSuperAdmin() || (
+      allow update: if (
         hasRole(['planificador']) &&
         sameCompany(resource.data) &&
         sameCompany(request.resource.data) &&
@@ -753,10 +754,11 @@ service cloud.firestore {
         !('vehiculoNombre' in request.resource.data)
       );
 
-      allow delete: if isSuperAdmin() || (
+      allow delete: if (
         hasRole(['planificador']) &&
         sameCompany(resource.data) &&
-        canWriteCompany(resource.data)
+        canWriteCompany(resource.data) &&
+        moduloEtapaActivo(empresaDeOT(resource.data), 'programacion')
       );
     }
 
@@ -764,33 +766,36 @@ service cloud.firestore {
       allow read: if canReadProgrammingDraft(resource.data) ||
         canReadPublishedProgramming(resource.data);
 
-      allow create: if isSuperAdmin() || (
+      allow create: if (
         hasRole(['planificador']) &&
         sameCompany(request.resource.data) &&
         canWriteCompany(request.resource.data) &&
         moduloEtapaActivo(empresaDeOT(request.resource.data), 'programacion')
       );
 
-      allow update: if isSuperAdmin() || (
+      allow update: if (
         hasRole(['planificador']) &&
         sameCompany(resource.data) &&
         sameCompany(request.resource.data) &&
         request.resource.data.empresaId == resource.data.empresaId &&
-        canWriteCompany(resource.data)
+        canWriteCompany(resource.data) &&
+        moduloEtapaActivo(empresaDeOT(resource.data), 'programacion')
       );
 
-      allow delete: if isSuperAdmin() || (
-        hasRole(['planificador']) && sameCompany(resource.data)
+      allow delete: if (
+        hasRole(['planificador']) && sameCompany(resource.data) &&
+        moduloEtapaActivo(empresaDeOT(resource.data), 'programacion')
       );
     }
 
     match /programacionHistorial/{historialId} {
       allow read: if canManageProgramming(resource.data);
-      allow create: if isSuperAdmin() || (
+      allow create: if (
         hasRole(['planificador']) &&
         sameCompany(request.resource.data) &&
         canWriteCompany(request.resource.data) &&
-        request.resource.data.realizadoPor == request.auth.uid
+        request.resource.data.realizadoPor == request.auth.uid &&
+        moduloEtapaActivo(empresaDeOT(request.resource.data), 'programacion')
       );
       allow update, delete: if false;
     }
@@ -798,41 +803,48 @@ service cloud.firestore {
     match /programacionAusencias/{ausenciaId} {
       allow read: if canManageProgramming(resource.data) || (
         activeUser() && sameCompany(resource.data) &&
-        resource.data.usuarioId == request.auth.uid
+        resource.data.usuarioId == request.auth.uid &&
+        moduloEtapaActivo(empresaDeOT(resource.data), 'programacion')
       );
-      allow create: if isSuperAdmin() || (
+      allow create: if (
         hasRole(['planificador']) &&
         sameCompany(request.resource.data) &&
         canWriteCompany(request.resource.data) &&
-        request.resource.data.creadoPor == request.auth.uid
+        request.resource.data.creadoPor == request.auth.uid &&
+        moduloEtapaActivo(empresaDeOT(request.resource.data), 'programacion')
       );
-      allow update: if isSuperAdmin() || (
+      allow update: if (
         hasRole(['planificador']) &&
         sameCompany(resource.data) &&
         sameCompany(request.resource.data) &&
         request.resource.data.empresaId == resource.data.empresaId &&
-        canWriteCompany(resource.data)
+        canWriteCompany(resource.data) &&
+        moduloEtapaActivo(empresaDeOT(resource.data), 'programacion')
       );
-      allow delete: if isSuperAdmin() || (
-        hasRole(['planificador']) && sameCompany(resource.data) && canWriteCompany(resource.data)
+      allow delete: if (
+        hasRole(['planificador']) && sameCompany(resource.data) && canWriteCompany(resource.data) &&
+        moduloEtapaActivo(empresaDeOT(resource.data), 'programacion')
       );
     }
 
     match /programacionConfirmaciones/{confirmacionId} {
       allow read: if canManageProgramming(resource.data) || (
         activeUser() && sameCompany(resource.data) &&
-        resource.data.usuarioId == request.auth.uid
+        resource.data.usuarioId == request.auth.uid &&
+        moduloEtapaActivo(empresaDeOT(resource.data), 'programacion')
       );
       allow create: if activeUser() &&
         sameCompany(request.resource.data) &&
         request.resource.data.usuarioId == request.auth.uid &&
-        request.resource.data.empresaId == profile().empresaId;
+        request.resource.data.empresaId == profile().empresaId &&
+        moduloEtapaActivo(empresaDeOT(request.resource.data), 'programacion');
       allow update: if activeUser() &&
         sameCompany(resource.data) && sameCompany(request.resource.data) &&
         resource.data.usuarioId == request.auth.uid &&
         request.resource.data.usuarioId == request.auth.uid &&
         request.resource.data.empresaId == resource.data.empresaId &&
-        request.resource.data.semanaInicio == resource.data.semanaInicio;
+        request.resource.data.semanaInicio == resource.data.semanaInicio &&
+        moduloEtapaActivo(empresaDeOT(resource.data), 'programacion');
       allow delete: if false;
     }
 
@@ -841,7 +853,8 @@ service cloud.firestore {
     match /programacionPublicadaUsuarios/{publicacionId} {
       allow read: if activeUser() && sameCompany(resource.data) &&
         resource.data.estado == 'publicada' &&
-        resource.data.usuarioId == request.auth.uid;
+        resource.data.usuarioId == request.auth.uid &&
+        moduloEtapaActivo(empresaDeOT(resource.data), 'programacion');
       allow create, update, delete: if false;
     }
 

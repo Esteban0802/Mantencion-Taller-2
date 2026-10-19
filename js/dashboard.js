@@ -3,7 +3,7 @@ import { protegerPagina, cerrarSesion } from "./session.js?v=20261017-1";
 import {
   obtenerModulosEmpresa,
   moduloActivo
-} from "./modulos.js";
+} from "./modulos.js?v=20261018-2";
 
 
 import {
@@ -19,7 +19,6 @@ import {
 
 
 const usuario = protegerPagina([
-  "super_admin",
   "admin_empresa",
   "admin_sucursal",
   "jefe_taller",
@@ -159,7 +158,10 @@ window.onload = async () => {
   const empresaCargada =
     await cargarConfiguracionEmpresaDashboard();
 
-  if (!empresaCargada) return;
+  if (!empresaCargada) {
+    window.OverTrackUI?.finalizarCargaPagina?.();
+    return;
+  }
 
   aplicarModulosDashboard();
   configurarNavegacionPorPermisos();
@@ -174,6 +176,7 @@ window.onload = async () => {
     escucharOTsTiempoReal();
   } else {
     mostrarDashboardSinOrdenes();
+    window.OverTrackUI?.finalizarCargaPagina?.();
   }
 };
 
@@ -194,7 +197,9 @@ function iniciarInventarioAlertasTiempoReal() {
   inventarioAlertasCargado = false;
   inventarioPorOSDashboard = new Map();
 
-  if (!etapaDashboardActiva("inventario") || !empresaActualDashboard?.id) return;
+  if (!moduloActivo(empresaActualDashboard, "inventario") ||
+      !moduloActivo(empresaActualDashboard, "alertas") ||
+      !empresaActualDashboard?.id) return;
 
   const restricciones = [where("empresaId", "==", empresaActualDashboard.id)];
   if (!['super_admin', 'admin_empresa'].includes(usuario?.rol) && usuario?.sucursalId) {
@@ -378,6 +383,9 @@ function aplicarModulosDashboard() {
       empresaActualDashboard
     );
 
+  const tieneAnalitica = moduloActivo(empresaActualDashboard, "analitica");
+  const tieneAlertas = moduloActivo(empresaActualDashboard, "alertas");
+
   mostrarElemento(
     "panelHeroDashboard",
     tieneDashboard
@@ -391,8 +399,18 @@ function aplicarModulosDashboard() {
 
   mostrarElemento(
     "panelEstadoTaller",
-    tieneDashboard && tieneOrdenes,
+    tieneDashboard && tieneOrdenes && (tieneAnalitica || tieneAlertas),
     "grid"
+  );
+
+  mostrarElemento(
+    "panelAnaliticaEstado",
+    tieneDashboard && tieneOrdenes && tieneAnalitica
+  );
+
+  mostrarElemento(
+    "panelAlertasTaller",
+    tieneDashboard && tieneOrdenes && tieneAlertas
   );
 
   mostrarElemento(
@@ -407,7 +425,7 @@ function aplicarModulosDashboard() {
 
   mostrarElemento(
     "panelGraficos",
-    tieneDashboard && tieneOrdenes,
+    tieneDashboard && tieneOrdenes && tieneAnalitica,
     "grid"
   );
 
@@ -490,7 +508,7 @@ function configurarNavegacionPorPermisos() {
 
   if (menuProgramacion) {
     menuProgramacion.style.display = moduloActivo(empresaActualDashboard, "programacion") &&
-      (rol === "super_admin" || esAdministradorConsulta || esPlanificador || esTrabajador)
+      (rol === "super_admin" || esAdministradorConsulta || esPlanificador || esJefeTaller || esTrabajador)
       ? ""
       : "none";
   }
@@ -522,17 +540,20 @@ function renderizarDashboardOperacional(lista = listaOTs) {
   const tieneReportes =
     moduloActivo(empresaActualDashboard, "reportesPDF");
 
+  const tieneAnalitica = moduloActivo(empresaActualDashboard, "analitica");
+  const tieneAlertas = moduloActivo(empresaActualDashboard, "alertas");
+
   if (tieneOrdenes) {
     renderTabla(obtenerOTsRecientes(lista));
   }
 
   if (tieneDashboard && tieneOrdenes) {
     calcularKPIs(lista);
-    renderEstadoTaller(lista);
-    renderAlertasDashboard(lista);
+    if (tieneAnalitica) renderEstadoTaller(lista);
+    if (tieneAlertas) renderAlertasDashboard(lista);
   }
 
-  if (tieneDashboard && tieneOrdenes) {
+  if (tieneDashboard && tieneOrdenes && tieneAnalitica) {
     renderGraficos(lista);
   } else {
     destruirGraficosDashboard();
@@ -687,10 +708,12 @@ async function escucharOTsTiempoReal() {
     listaFiltrada = [...listaOTs];
 
     renderizarDashboardOperacional(listaFiltrada);
+    window.OverTrackUI?.finalizarCargaPagina?.();
 
   }, (error) => {
     console.error("Error escuchando OTs:", error);
     actualizarEstadoCargaDashboard(false, true);
+    window.OverTrackUI?.finalizarCargaPagina?.();
   });
 }
 
@@ -814,11 +837,7 @@ function renderTabla(lista = listaOTs) {
 
       </div>
 
-      <div class="mini-gantt">
-
-        ${renderMiniGantt(o)}
-
-      </div>
+      ${moduloActivo(empresaActualDashboard, "gantt") ? `<div class="mini-gantt">${renderMiniGantt(o)}</div>` : ""}
 
       <div class="ot-card-footer">
 

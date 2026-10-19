@@ -24,6 +24,16 @@ service firebase.storage {
       return !('activa' in empresa) || empresa.activa != false;
     }
 
+    function companyModuleActive(empresaId, moduleName) {
+      let empresa = firestore.get(
+        /databases/(default)/documents/empresas/$(empresaId)
+      ).data;
+      return !('modulos' in empresa) ||
+        !(empresa.modulos is map) ||
+        !(moduleName in empresa.modulos) ||
+        empresa.modulos[moduleName] != false;
+    }
+
     function isSuperAdmin() {
       return activeUser() && profile().rol == 'super_admin';
     }
@@ -42,15 +52,12 @@ service firebase.storage {
 
     function canAccessOT(otId) {
       return activeUser() && (
-        isSuperAdmin() ||
-        (
-          profile().empresaId == ot(otId).empresaId && (
-            profile().rol == 'admin_empresa' ||
-            (
-              profile().sucursalId is string &&
-              profile().sucursalId != '' &&
-              profile().sucursalId == ot(otId).sucursalId
-            )
+        profile().empresaId == ot(otId).empresaId && (
+          profile().rol == 'admin_empresa' ||
+          (
+            profile().sucursalId is string &&
+            profile().sucursalId != '' &&
+            profile().sucursalId == ot(otId).sucursalId
           )
         )
       );
@@ -58,7 +65,7 @@ service firebase.storage {
 
     function canManageOT(otId) {
       return canAccessOT(otId) && (
-        isSuperAdmin() || profile().rol in ['jefe_taller', 'supervisor', 'tecnico']
+        profile().rol in ['jefe_taller', 'supervisor', 'tecnico']
       );
     }
 
@@ -80,34 +87,33 @@ service firebase.storage {
 
     function canReadSheq(empresaId) {
       return activeUser() && (
-        isSuperAdmin() ||
-        (profile().empresaId == empresaId && profile().rol in ['admin_empresa', 'admin_sucursal', 'jefe_taller', 'planificador', 'sheq'])
+        profile().empresaId == empresaId &&
+          profile().rol in ['admin_empresa', 'admin_sucursal', 'jefe_taller', 'planificador', 'sheq'] &&
+          companyModuleActive(empresaId, 'sheq')
       );
     }
 
     function canManageSheq(empresaId) {
       return activeUser() && (
-        isSuperAdmin() ||
-        (profile().empresaId == empresaId && profile().rol == 'sheq')
+        profile().empresaId == empresaId && profile().rol == 'sheq' &&
+          companyModuleActive(empresaId, 'sheq')
       );
     }
 
     function canReadInventory(empresaId, sucursalId) {
       return activeUser() && (
-        isSuperAdmin() ||
-        (profile().empresaId == empresaId && (
+        profile().empresaId == empresaId && companyModuleActive(empresaId, 'inventario') && (
           profile().rol == 'admin_empresa' ||
           (profile().sucursalId == sucursalId && profile().rol in ['admin_sucursal', 'jefe_taller', 'planificador', 'bodeguero'])
-        ))
+        )
       );
     }
 
     function canManageInventory(empresaId, sucursalId) {
       return activeUser() && (
-        isSuperAdmin() ||
-        (profile().empresaId == empresaId && (
+        profile().empresaId == empresaId && companyModuleActive(empresaId, 'inventario') && (
           (profile().sucursalId == sucursalId && profile().rol in ['jefe_taller', 'planificador'])
-        ))
+        )
       );
     }
 
@@ -167,27 +173,29 @@ service firebase.storage {
     }
 
     match /empresas/{empresaId}/plantillas/{allPaths=**} {
-      allow read: if canReadCompanyBranding(empresaId);
-      allow create, update: if canManageCompanyBranding(empresaId) &&
-        (isSuperAdmin() || companyOperational(empresaId)) && validChecklistTemplate();
-      allow delete: if canManageCompanyBranding(empresaId) &&
-        (isSuperAdmin() || companyOperational(empresaId));
+      allow read: if activeUser() && profile().empresaId == empresaId;
+      allow create, update: if activeUser() &&
+        profile().rol == 'admin_empresa' && profile().empresaId == empresaId &&
+        companyOperational(empresaId) && validChecklistTemplate();
+      allow delete: if activeUser() &&
+        profile().rol == 'admin_empresa' && profile().empresaId == empresaId &&
+        companyOperational(empresaId);
     }
 
     match /empresas/{empresaId}/sheq/{allPaths=**} {
       allow read: if canReadSheq(empresaId);
       allow create, update: if canManageSheq(empresaId) &&
-        (isSuperAdmin() || companyOperational(empresaId)) && validSheqDocument();
+        companyOperational(empresaId) && validSheqDocument();
       allow delete: if canManageSheq(empresaId) &&
-        (isSuperAdmin() || companyOperational(empresaId));
+        companyOperational(empresaId);
     }
 
     match /empresas/{empresaId}/inventario/{sucursalId}/{allPaths=**} {
       allow read: if canReadInventory(empresaId, sucursalId);
       allow create, update: if canManageInventory(empresaId, sucursalId) &&
-        (isSuperAdmin() || companyOperational(empresaId)) && validOperationalDocument();
+        companyOperational(empresaId) && validOperationalDocument();
       allow delete: if canManageInventory(empresaId, sucursalId) &&
-        (isSuperAdmin() || companyOperational(empresaId));
+        companyOperational(empresaId);
     }
 
     match /{allPaths=**} {

@@ -34,6 +34,59 @@ const ESTADOS_EMPRESA_SOLO_LECTURA = new Set([
   "pendiente_eliminacion",
   "cancelada"
 ]);
+const MODULOS_COMERCIALES = {
+  inventario_repuestos: ["inventario", "repuestos"],
+  programacion: ["programacion"],
+  gantt: ["gantt", "reportesPDF"],
+  sheq: ["sheq"],
+  analitica: ["analitica", "alertas"],
+  aprobaciones: ["aprobaciones"]
+};
+const MODULOS_NUCLEO = [
+  "dashboard", "usuarios", "sucursales", "ordenesServicio", "checklists",
+  "ingreso", "evaluacion", "mantencion", "pruebas", "despacho",
+  "evidencias", "comentarios", "clientes", "equipos"
+];
+const PLANES_FLEXIBLES_BASE = {
+  esencial: {
+    nombre: "Esencial", maxUsuarios: 25, maxOTMensuales: 75,
+    maxSucursales: 1, maxStorageGB: 25, maxModulosElegibles: 2,
+    diasPrueba: 14, activo: true,
+    modulosIncluidos: ["inventario_repuestos", "gantt"]
+  },
+  profesional: {
+    nombre: "Profesional", maxUsuarios: 60, maxOTMensuales: 180,
+    maxSucursales: 2, maxStorageGB: 75, maxModulosElegibles: 5,
+    diasPrueba: 14, activo: true,
+    modulosIncluidos: ["inventario_repuestos", "programacion", "gantt", "sheq", "aprobaciones"]
+  },
+  operacion: {
+    nombre: "Operación", maxUsuarios: 100, maxOTMensuales: 300,
+    maxSucursales: 3, maxStorageGB: 150, maxModulosElegibles: 6,
+    diasPrueba: 14, activo: true, modulosIncluidos: Object.keys(MODULOS_COMERCIALES)
+  },
+  corporativo: {
+    nombre: "Corporativo", maxUsuarios: 250, maxOTMensuales: 1000,
+    maxSucursales: 10, maxStorageGB: 500, maxModulosElegibles: 6,
+    diasPrueba: 14, activo: true, modulosIncluidos: Object.keys(MODULOS_COMERCIALES)
+  }
+};
+
+function normalizarModulosContratados(valor) {
+  const permitidos = new Set(Object.keys(MODULOS_COMERCIALES));
+  return [...new Set(Array.isArray(valor) ? valor : [])].filter(key => permitidos.has(key));
+}
+
+function expandirModulosContratados(seleccion) {
+  const contratados = normalizarModulosContratados(seleccion);
+  const modulos = {};
+  MODULOS_NUCLEO.forEach(key => { modulos[key] = true; });
+  Object.entries(MODULOS_COMERCIALES).forEach(([key, flags]) => {
+    flags.forEach(flag => { modulos[flag] = contratados.includes(key); });
+  });
+  modulos.ia = false;
+  return modulos;
+}
 
 function texto(valor, maximo = 180) {
   return String(valor || "").trim().slice(0, maximo);
@@ -1047,10 +1100,15 @@ exports.crearEmpresaConAdministrador = onCall(CALLABLE_OPTIONS, async request =>
     db.collection("planes").doc(planId).get(),
     db.collection("configuracionGlobal").doc("sistema").get()
   ]);
-  if (!planSnap.exists || planSnap.data().activo === false) {
+  const plan = planSnap.exists ? planSnap.data() : PLANES_FLEXIBLES_BASE[planId];
+  if (!plan || plan.activo === false) {
     throw new HttpsError("failed-precondition", "El plan seleccionado no está disponible.");
   }
-  const plan = planSnap.data();
+  const modulosContratados = normalizarModulosContratados(
+    datos.modulosContratados || plan.modulosIncluidos || []
+  );
+  const maxModulosElegibles = Math.max(1, Number(plan.maxModulosElegibles || 1));
+  const modulos = expandirModulosContratados(modulosContratados);
   const config = configSnap.exists ? configSnap.data() : {};
   const empresaRef = db.collection("empresas").doc();
   const temporal = passwordTemporal();
@@ -1088,9 +1146,12 @@ exports.crearEmpresaConAdministrador = onCall(CALLABLE_OPTIONS, async request =>
         actualizadoPor: solicitante.uid
       },
       maxUsuarios: Number(plan.maxUsuarios || 0),
+      maxOTMensuales: Number(plan.maxOTMensuales || 0),
       maxSucursales: Number(plan.maxSucursales || 0),
       maxStorageGB: Number(plan.maxStorageGB || 0),
-      modulos: datos.modulos && typeof datos.modulos === "object" ? datos.modulos : {},
+      maxModulosElegibles,
+      modulosContratados,
+      modulos,
       creadoPor: solicitante.uid,
       creadoPorNombre: solicitante.nombreCompleto || solicitante.nombre || "Super Administrador",
       fechaCreacion: FieldValue.serverTimestamp(),
@@ -1313,8 +1374,7 @@ exports.generarExportacionEmpresa = onCall({
   const solicitante = await obtenerSolicitante(request);
   const empresaId = texto(request.data?.empresaId, 128);
   if (!empresaId) throw new HttpsError("invalid-argument", "Falta la empresa que deseas exportar.");
-  if (solicitante.rol !== "super_admin" &&
-      !(solicitante.rol === "admin_empresa" && solicitante.empresaId === empresaId)) {
+  if (!(solicitante.rol === "admin_empresa" && solicitante.empresaId === empresaId)) {
     throw new HttpsError("permission-denied", "Solo el administrador de empresa puede generar este respaldo.");
   }
 
@@ -1443,8 +1503,7 @@ exports.publicarProgramacion = onCall(CALLABLE_OPTIONS, async request => {
   if (!empresaId || !/^\d{4}-\d{2}-\d{2}$/.test(semanaInicio)) {
     throw new HttpsError("invalid-argument", "Empresa y semana son obligatorias.");
   }
-  if (solicitante.rol !== "super_admin" &&
-      !(solicitante.empresaId === empresaId && solicitante.rol === "planificador")) {
+  if (!(solicitante.empresaId === empresaId && solicitante.rol === "planificador")) {
     throw new HttpsError("permission-denied", "No puedes publicar esta programación.");
   }
   const empresaSnap = await exigirEmpresaOperativa(empresaId, solicitante);

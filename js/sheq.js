@@ -1,6 +1,6 @@
 import { db, storage } from "./firebase-config.js";
 import { protegerPagina, cerrarSesion, reautenticarAccionCritica } from "./session.js?v=20261017-1";
-import { moduloActivo } from "./modulos.js";
+import { moduloActivo } from "./modulos.js?v=20261018-2";
 import { evaluarCuotaStorage, mensajeCuotaStorage } from "./storage-quota.js";
 import { optimizarFotoParaCarga } from "./modulos/core/imagenes.js";
 import { validarFirmaArchivo } from "./file-validation.js";
@@ -21,12 +21,12 @@ function tipoDocumentoSheq(archivo) {
   return { jpg:"image/jpeg", jpeg:"image/jpeg", png:"image/png", webp:"image/webp", heic:"image/heic", heif:"image/heif", avif:"image/avif", pdf:"application/pdf", doc:"application/msword", docx:"application/vnd.openxmlformats-officedocument.wordprocessingml.document" }[extension] || "";
 }
 
-const usuario = protegerPagina(["super_admin", "admin_empresa", "admin_sucursal", "jefe_taller", "planificador", "sheq"]);
+const usuario = protegerPagina(["admin_empresa", "admin_sucursal", "jefe_taller", "planificador", "sheq"]);
 if (!usuario) throw new Error("Acceso no autorizado");
 
 const $ = id => document.getElementById(id);
 const escapar = valor => String(valor ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#039;");
-const rolesEdicion = ["super_admin", "sheq"];
+const rolesEdicion = ["sheq"];
 const puedeEditar = rolesEdicion.includes(usuario.rol);
 let empresa = null, empresaId = "", sucursales = [], usuarios = [], contratos = [], vehiculos = [], documentos = [];
 
@@ -800,5 +800,5 @@ function enlazarEventosMatriz() {
   });
 }
 
-async function iniciar(){try{if(!await cargarBase())return;$("usuarioNombre").textContent=usuario.nombre||usuario.email||"Usuario";$("usuarioRol").textContent=usuario.rol;const soloSheq=usuario.rol==="sheq";$("menuDashboardSheq").style.display=soloSheq?"none":"";$("menuOrdenesSheq").style.display=soloSheq?"none":"";$("menuInventarioSheq").style.display=!soloSheq&&moduloActivo(empresa,"inventario")&&["super_admin","admin_empresa","admin_sucursal","jefe_taller","planificador"].includes(usuario.rol)?"":"none";$("menuPanelEmpresaSheq").style.display=["super_admin","admin_empresa","admin_sucursal"].includes(usuario.rol)?"":"none";$("menuPanelEmpresaSheq").onclick=()=>location.href=`empresa-admin.html?id=${empresaId}`;$("menuProgramacionSheq").style.display=moduloActivo(empresa,"programacion")&&["super_admin","admin_empresa","admin_sucursal","planificador","sheq"].includes(usuario.rol)?"":"none";if(!puedeEditar)[$("btnNuevoContrato"),$("btnNuevoVehiculo"),$("btnNuevoDocumento")].forEach(b=>b.hidden=true);enlazarEventos();enlazarEventosMatriz();renderTodo();}catch(error){console.error(error);await mensaje("No se pudo abrir SHEQ",error.message||"Intenta nuevamente.","error");}}
+async function iniciar(){try{if(!await cargarBase())return;$("usuarioNombre").textContent=usuario.nombre||usuario.email||"Usuario";$("usuarioRol").textContent=usuario.rol;const soloSheq=usuario.rol==="sheq";$("menuDashboardSheq").style.display=soloSheq?"none":"";$("menuNuevaOTSheq").style.display=usuario.rol==="jefe_taller"?"":"none";$("menuOrdenesSheq").style.display=soloSheq?"none":"";$("menuInventarioSheq").style.display=!soloSheq&&moduloActivo(empresa,"inventario")&&["super_admin","admin_empresa","admin_sucursal","jefe_taller","planificador"].includes(usuario.rol)?"":"none";$("menuPanelEmpresaSheq").style.display=["super_admin","admin_empresa","admin_sucursal"].includes(usuario.rol)?"":"none";$("menuPanelEmpresaSheq").onclick=()=>location.href=`empresa-admin.html?id=${empresaId}`;$("menuProgramacionSheq").style.display=moduloActivo(empresa,"programacion")&&["super_admin","admin_empresa","admin_sucursal","jefe_taller","planificador","sheq"].includes(usuario.rol)?"":"none";if(!puedeEditar)[$("btnNuevoContrato"),$("btnNuevoVehiculo"),$("btnNuevoDocumento")].forEach(b=>b.hidden=true);enlazarEventos();enlazarEventosMatriz();renderTodo();}catch(error){console.error(error);await mensaje("No se pudo abrir SHEQ",error.message||"Intenta nuevamente.","error");}finally{window.OverTrackUI?.finalizarCargaPagina?.();}}
 iniciar();

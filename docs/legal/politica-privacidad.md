@@ -47,11 +47,15 @@ Mientras la suscripción esté activa, los datos se conservan para prestar el se
 6. Finalizados los 30 días, la empresa queda pendiente de eliminación.
 7. La eliminación no es automática: la ejecuta manualmente el superadministrador con confirmación y auditoría.
 
-La eliminación comprende registros, archivos y cuentas asociadas, salvo conservación exigida por ley, defensa de derechos o limitación técnica documentada. Debe confirmarse con el proveedor el plazo de desaparición desde respaldos internos.
+La eliminación comprende registros, archivos y cuentas asociadas, salvo conservación exigida por ley, defensa de derechos o limitación técnica documentada. Las facturas, contratos y antecedentes tributarios podrán conservarse durante el plazo legal aplicable, separados de los datos operativos del cliente.
+
+Las copias internas de seguridad se eliminarán o sobrescribirán conforme al ciclo técnico de cada proveedor. Antes del lanzamiento deberá verificarse y documentarse el plazo real de desaparición desde los respaldos de Firebase y Google Cloud; Vectaria no prometerá una eliminación inmediata mientras esa configuración no haya sido confirmada.
 
 ## 8. Derechos
 
-Las personas podrán solicitar información, acceso, rectificación, eliminación, oposición, bloqueo y, cuando corresponda, portabilidad, escribiendo a **[CORREO DE PRIVACIDAD]**. Cuando Vectaria actúe como encargado, remitirá la solicitud al cliente o colaborará con él.
+Las personas podrán solicitar información, acceso, rectificación, eliminación, oposición, bloqueo y, cuando corresponda, portabilidad, escribiendo a **[CORREO DE PRIVACIDAD POR DEFINIR ANTES DEL LANZAMIENTO]**. Cuando Vectaria actúe como encargado, remitirá la solicitud al cliente o colaborará con él.
+
+Vectaria o el responsable correspondiente acusará recibo y responderá las solicitudes dentro de 30 días corridos desde su ingreso. El plazo podrá prorrogarse una sola vez por hasta otros 30 días corridos cuando resulte necesario, informándolo al solicitante. Se conservará evidencia de la solicitud, su fecha, la respuesta y el medio utilizado. Las solicitudes de bloqueo temporal se gestionarán conforme al plazo especial establecido por la legislación vigente.
 
 ## 9. Responsabilidades del cliente
 
