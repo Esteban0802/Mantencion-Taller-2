@@ -62,6 +62,24 @@ test("la vigencia se calcula por fecha aunque el registro antiguo figure pendien
   assert.equal(estado.texto, "Vigente");
 });
 
+test("un documento nuevo pendiente no acredita hasta ser validado", () => {
+  const estado = estadoDocumentoAcreditacion({ estado: "pendiente", validacionExplicita: true, fechaVencimiento: "2027-02-01" }, hoy);
+  assert.equal(estado.key, "vencido");
+  assert.equal(estado.texto, "Pendiente de validación");
+});
+
+test("un examen observado muestra aptitud con restricciones", () => {
+  const estado = estadoDocumentoAcreditacion({ estado: "observado", validacionExplicita: true, fechaVencimiento: "2027-02-01" }, hoy);
+  assert.equal(estado.key, "proximo");
+  assert.equal(estado.texto, "Apto con restricciones");
+});
+
+test("un documento rechazado no acredita aunque conserve vigencia", () => {
+  const estado = estadoDocumentoAcreditacion({ estado: "rechazado", validacionExplicita: true, fechaVencimiento: "2027-02-01" }, hoy);
+  assert.equal(estado.key, "vencido");
+  assert.equal(estado.texto, "No acreditado");
+});
+
 test("prefiere un documento vigente sobre una copia histórica vencida", () => {
   const documentos = [
     { entidadTipo: "persona", entidadId: "persona-a", tipoDocumento: "Examen ocupacional", estado: "aprobado", fechaVencimiento: "2026-01-01" },

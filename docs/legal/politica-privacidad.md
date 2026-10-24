@@ -21,15 +21,21 @@ La empresa cliente determina qué usuarios, clientes, equipos, fotografías, com
 
 El cliente debe evitar incorporar datos sensibles o información personal innecesaria.
 
+En el módulo SHEQ, los antecedentes de salud ocupacional deben limitarse a información necesaria para la acreditación: tipo de examen, vigencia, fechas, aptitud y restricciones operativas. No deben incorporarse diagnósticos, tratamientos, fichas clínicas ni resultados médicos detallados, salvo que exista una necesidad legal o contractual documentada y se hayan definido controles reforzados para ese tratamiento.
+
 ## 4. Finalidades y base
 
 Los datos se usan para autenticar usuarios, administrar permisos, gestionar y respaldar órdenes de trabajo, operar módulos, prestar soporte, mantener seguridad, administrar la suscripción y cumplir obligaciones legales. Vectaria no venderá los datos operativos ni los usará para publicidad dirigida.
 
 El tratamiento podrá fundarse en la ejecución del contrato, consentimiento, obligaciones legales e interés legítimo asociado a seguridad y continuidad. El cliente debe contar con una base lícita para los datos que incorpora e informar a sus trabajadores y terceros.
 
-## 5. Proveedores
+## 5. Proveedores y transferencias internacionales
 
-Vectaria utiliza actualmente Firebase y Google Cloud para autenticación, base de datos, almacenamiento y funciones. Antes de publicar esta política debe completarse la nómina de proveedores, finalidades y países o regiones de tratamiento.
+Vectaria utiliza servicios de Google Firebase y Google Cloud para autenticación, base de datos, almacenamiento de archivos, funciones de servidor y publicación de la aplicación. Firebase Authentication procesa datos desde centros de datos ubicados en Estados Unidos. Las funciones del servidor de Vectaria están configuradas actualmente en `us-central1`, Estados Unidos.
+
+La ubicación específica de la base de datos Firestore y del bucket de Cloud Storage deberá confirmarse desde la consola del proyecto antes del lanzamiento. Firebase Hosting utiliza infraestructura global. Algunos datos pueden ser tratados en países donde Google o sus subencargados mantienen instalaciones, conforme a las condiciones contractuales y compromisos de ubicación aplicables a cada servicio.
+
+La nómina operativa, finalidades, ubicaciones verificadas y pendientes se mantiene en el Registro de proveedores tecnológicos de Vectaria. Ese registro se revisará antes de incorporar plataformas de pago, correo, analítica, soporte u otros terceros que puedan acceder a datos personales.
 
 ## 6. Seguridad
 

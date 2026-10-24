@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { readFileSync } from "node:fs";
 
 import {
   etiquetaRolProgramacion,
@@ -31,4 +32,27 @@ test("los selectores solo ofrecen usuarios activos del grupo solicitado", () => 
 
   assert.deepEqual(usuariosDisponiblesPorGrupo(usuarios, "tecnico").map(item => item.id), ["t1"]);
   assert.deepEqual(usuariosDisponiblesPorGrupo(usuarios, "supervisor").map(item => item.id), ["s1", "j1"]);
+});
+
+test("la cobertura semanal conserva solo los tres indicadores solicitados", () => {
+  const source = readFileSync(new URL("../js/programacion.js", import.meta.url), "utf8");
+  assert.match(source, /Sin programación/);
+  assert.match(source, /Ausentes esta semana/);
+  assert.match(source, /Lecturas confirmadas/);
+  assert.doesNotMatch(source, /<span>Sobrecargados<\/span>/);
+  assert.doesNotMatch(source, /<span>Días libres disponibles<\/span>/);
+});
+
+test("la vista de correo distingue trabajo, ausencia y día libre", () => {
+  const source = readFileSync(new URL("../js/programacion.js", import.meta.url), "utf8");
+  assert.match(source, /usuarioAusenteEnFecha\(persona\.id, iso\)/);
+  assert.match(source, /correo-ausencia/);
+  assert.match(source, /Día libre/);
+});
+
+test("las ausencias pueden abrirse desde el calendario y actualizarse", () => {
+  const source = readFileSync(new URL("../js/programacion.js", import.meta.url), "utf8");
+  assert.match(source, /data-ausencia-id/);
+  assert.match(source, /abrirEdicionAusenciaProgramacion/);
+  assert.match(source, /updateDoc\(doc\(db, "programacionAusencias", ausenciaId\)/);
 });

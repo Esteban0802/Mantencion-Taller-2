@@ -69,6 +69,7 @@ function versionDocumento(item, motivo) {
     fechaEmision: fechaISO(item.fechaEmision),
     fechaVencimiento: fechaISO(item.fechaVencimiento),
     estado: item.estado || "aprobado",
+    validacionExplicita: item.validacionExplicita === true,
     observaciones: item.observaciones || "",
     archivoUrl: item.archivoUrl || "",
     archivoRuta: item.archivoRuta || "",
@@ -600,7 +601,7 @@ function crearFilaDocumento(item = null) {
   const fila = document.createElement("article");
   fila.className = "sheq-documento-fila";
   fila.dataset.documentoId = item?.id || "";
-  fila.innerHTML = `<div class="sheq-documento-fila-numero" aria-hidden="true"></div><label class="sheq-documento-nombre-campo">Documento<input class="documento-nombre" maxlength="120" placeholder="Nombre del documento" required ${item?.requisito || item?.catalogo ? "readonly" : ""} value="${escapar(item?.tipoDocumento || "")}"></label><label class="sheq-fecha-inicio-campo">Fecha de inicio<input class="documento-inicio" type="date" value="${escapar(fechaISO(item?.fechaEmision))}"></label><label class="sheq-fecha-final-campo">Fecha final<input class="documento-final" type="date" value="${escapar(fechaISO(item?.fechaVencimiento))}"></label><label class="sheq-archivo-campo">Adjuntar documento<span class="sheq-archivo-control"><input class="documento-archivo" type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.heif,.avif,.doc,.docx,application/pdf,image/jpeg,image/png,image/webp,image/heic,image/heif,image/avif,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" ${item?.requisito ? "required" : ""}><span class="sheq-archivo-boton">Seleccionar archivo</span><span class="sheq-archivo-nombre">Ningún archivo seleccionado</span></span><small>${item?.archivoUrl ? "Se conservará el archivo actual si no adjuntas otro." : "PDF, foto móvil o documento Word (máx. 20 MB)."}</small></label>${item?.id ? "" : '<button type="button" class="sheq-quitar-documento" aria-label="Quitar documento">Quitar</button>'}`;
+  fila.innerHTML = `<div class="sheq-documento-fila-numero" aria-hidden="true"></div><label class="sheq-documento-nombre-campo">Documento<input class="documento-nombre" maxlength="120" placeholder="Nombre del documento" required ${item?.requisito || item?.catalogo ? "readonly" : ""} value="${escapar(item?.tipoDocumento || "")}"></label><label class="sheq-fecha-inicio-campo">Fecha de inicio<input class="documento-inicio" type="date" value="${escapar(fechaISO(item?.fechaEmision))}"></label><label class="sheq-fecha-final-campo">Fecha final<input class="documento-final" type="date" value="${escapar(fechaISO(item?.fechaVencimiento))}"></label><label class="sheq-validacion-campo">Validación<select class="documento-validacion"><option value="pendiente" ${(item?.estado || "aprobado") === "pendiente" ? "selected" : ""}>Pendiente</option><option value="aprobado" ${(item?.estado || "aprobado") === "aprobado" ? "selected" : ""}>Aprobado / Apto</option><option value="observado" ${item?.estado === "observado" ? "selected" : ""}>Observado / Apto con restricciones</option><option value="rechazado" ${item?.estado === "rechazado" ? "selected" : ""}>Rechazado / No acreditado</option></select></label><label class="sheq-archivo-campo">Adjuntar documento<span class="sheq-archivo-control"><input class="documento-archivo" type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.heif,.avif,.doc,.docx,application/pdf,image/jpeg,image/png,image/webp,image/heic,image/heif,image/avif,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" ${item?.requisito ? "required" : ""}><span class="sheq-archivo-boton">Seleccionar archivo</span><span class="sheq-archivo-nombre">Ningún archivo seleccionado</span></span><small>${item?.archivoUrl ? "Se conservará el archivo actual si no adjuntas otro." : "PDF, foto móvil o documento Word (máx. 20 MB)."}</small></label>${item?.id ? "" : '<button type="button" class="sheq-quitar-documento" aria-label="Quitar documento">Quitar</button>'}`;
   fila.querySelector(".documento-archivo").addEventListener("change", evento => {
     const nombre = evento.target.files[0]?.name || "Ningún archivo seleccionado";
     fila.querySelector(".sheq-archivo-nombre").textContent = nombre;
@@ -658,6 +659,7 @@ async function guardarDocumento(e){
     for(const [indice,fila] of filas.entries()){
       const id=fila.dataset.documentoId||"",anterior=id?documentos.find(d=>d.id===id):null;
       const tipoDocumento=fila.querySelector(".documento-nombre").value.trim();
+      const estado=fila.querySelector(".documento-validacion").value;
       const archivo=fila.querySelector(".documento-archivo").files[0];
       const fechaInicio=fila.querySelector(".documento-inicio").value,fechaFinal=fila.querySelector(".documento-final").value;
       if(!tipoDocumento)throw new Error(`Debes escribir el nombre del documento ${indice+1}.`);
@@ -683,7 +685,7 @@ async function guardarDocumento(e){
         await uploadBytes(storageRef,archivoCarga,{contentType:tipoCarga});
         archivoUrl=await getDownloadURL(storageRef);
       }
-      preparados.push({id,anterior,datos:{empresaId,entidadTipo,entidadId,tipoDocumento,contratoId:anterior?.contratoId||$("formDocumento").dataset.contratoId||"",fechaEmision:fechaInicio,fechaVencimiento:fechaFinal,estado:"aprobado",observaciones:$("documentoObservaciones").value.trim(),archivoUrl,archivoRuta,historial:anterior?[...(anterior.historial||[]),versionDocumento(anterior,motivo)]:[],actualizadoPor:usuario.uid,fechaActualizacion:serverTimestamp()}});
+      preparados.push({id,anterior,datos:{empresaId,entidadTipo,entidadId,tipoDocumento,contratoId:anterior?.contratoId||$("formDocumento").dataset.contratoId||"",fechaEmision:fechaInicio,fechaVencimiento:fechaFinal,estado,validacionExplicita:true,observaciones:$("documentoObservaciones").value.trim(),archivoUrl,archivoRuta,historial:anterior?[...(anterior.historial||[]),versionDocumento(anterior,motivo)]:[],actualizadoPor:usuario.uid,fechaActualizacion:serverTimestamp()}});
     }
     const batch=writeBatch(db);
     for(const preparado of preparados){

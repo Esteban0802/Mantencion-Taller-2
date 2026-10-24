@@ -10,7 +10,9 @@ test("el menú de empresa oculta la operación al Super Admin", async () => {
   for (const id of ["menuSistemaOperacional", "menuProgramacionEmpresa", "menuSheqEmpresa"]) {
     assert.match(codigo, new RegExp(`"${id}"`));
   }
+  assert.match(codigo, /elemento\.hidden = esSuperAdmin/);
   assert.match(codigo, /elemento\.style\.display = esSuperAdmin \? "none" : ""/);
+  assert.match(codigo, /aplicarModulosEnInterfaz\(empresaActual\);\s*configurarMenuSegunRol\(\);/);
   assert.match(codigo, /usuarioActivo\.rol === "admin_empresa" \? `/);
 });
 

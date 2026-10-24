@@ -344,8 +344,8 @@
       }
     }
 
-    const opcionSidebar = evento.target.closest(".sidebar li:not(.active)");
-    if (opcionSidebar && !evento.defaultPrevented) iniciarCarga("Abriendo la sección…");
+    // Los controles internos del sidebar cambian vistas en la misma página.
+    // No se inicia una carga global porque no hay navegación que la finalice.
   });
 
   window.addEventListener("pageshow", evento => {

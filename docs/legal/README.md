@@ -12,6 +12,7 @@ Documentos de trabajo para revisión profesional antes de su publicación o inco
 1. `politica-privacidad.md`
 2. `terminos-servicio.md`
 3. `condiciones-comerciales.md`
+4. `proveedores-tecnologicos.md`
 
 ## Datos pendientes
 
@@ -20,6 +21,6 @@ Documentos de trabajo para revisión profesional antes de su publicación o inco
 - Correo de privacidad y soporte; teléfono comercial.
 - Planes, precios, impuestos y reajustes.
 - Horarios, tiempos de respuesta y niveles de servicio.
-- Nómina definitiva de proveedores tecnológicos y ubicación del tratamiento.
+- Confirmación en consola de las ubicaciones de Firestore y Cloud Storage, respaldos, PITR y ciclos de eliminación.
 
 Estos borradores no sustituyen el asesoramiento de un abogado ni de un contador.

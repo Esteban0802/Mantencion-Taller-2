@@ -25,6 +25,11 @@ function diasHasta(valor, hoy = new Date()) {
 }
 
 export function estadoDocumentoAcreditacion(documento, hoy = new Date()) {
+  if (documento?.validacionExplicita === true) {
+    if (documento.estado === "pendiente") return { key: "vencido", texto: "Pendiente de validación", dias: null };
+    if (documento.estado === "rechazado") return { key: "vencido", texto: "No acreditado", dias: null };
+    if (documento.estado === "observado") return { key: "proximo", texto: "Apto con restricciones", dias: diasHasta(documento?.fechaVencimiento, hoy) };
+  }
   const dias = diasHasta(documento?.fechaVencimiento, hoy);
   if (dias !== null && dias < 0) return { key: "vencido", texto: "Vencido", dias };
   if (dias !== null && dias <= 15) return { key: "critico", texto: `Vence en ${dias} días`, dias };

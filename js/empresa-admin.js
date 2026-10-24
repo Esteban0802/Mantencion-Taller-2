@@ -266,7 +266,10 @@ function configurarMenuSegunRol() {
     "menuSheqEmpresa"
   ].forEach(id => {
     const elemento = document.getElementById(id);
-    if (elemento) elemento.style.display = esSuperAdmin ? "none" : "";
+    if (!elemento) return;
+    elemento.hidden = esSuperAdmin;
+    elemento.style.display = esSuperAdmin ? "none" : "";
+    elemento.setAttribute("aria-hidden", String(esSuperAdmin));
   });
 
   if (!menuModulos) return;
@@ -914,6 +917,7 @@ async function guardarModulosEmpresa() {
     window.modulosEmpresaActual = modulosActualizados;
 
     aplicarModulosEnInterfaz(empresaActual);
+    configurarMenuSegunRol();
 
     renderKPIsEmpresa();
 

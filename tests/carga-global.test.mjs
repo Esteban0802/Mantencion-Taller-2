@@ -12,8 +12,13 @@ test("todas las pantallas principales cargan el indicador global", async () => {
 
   for (const pagina of paginas) {
     const html = await leer(pagina);
-    assert.match(html, /js\/components\/notificaciones\.js\?v=20261018-2/, pagina);
+    assert.match(html, /js\/components\/notificaciones\.js\?v=20261022-3/, pagina);
   }
+});
+
+test("los botones internos del sidebar no dejan una carga global bloqueada", async () => {
+  const codigo = await leer("js/components/notificaciones.js");
+  assert.doesNotMatch(codigo, /closest\("\.sidebar li:not\(\.active\)"\)/);
 });
 
 test("cada módulo principal finaliza su carga inicial", async () => {

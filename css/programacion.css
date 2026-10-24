@@ -107,11 +107,27 @@
 .programacion-page .asignacion-dato:last-child{border-bottom:0}
 .programacion-page .asignacion-dato strong{color:#23445f;font-size:.72rem;text-transform:uppercase;letter-spacing:.02em}
 .programacion-page .asignacion-dato span{min-width:0;color:#4d6173;overflow-wrap:anywhere}
+.programacion-page .programacion-tabla-wrap.vista-personal{overflow-x:visible}
+.programacion-page .programacion-cuadro.vista-personal{width:100%;min-width:0}
 @media(max-width:800px){
   .programacion-page .form-programacion{grid-template-columns:minmax(0,1fr)}
   .programacion-page .campo-ancho{grid-column:auto}
   .programacion-page .fila-modalidad-asignacion{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
   .programacion-page .fila-modalidad-asignacion .campo{grid-column:1/-1}
+}
+
+@media(max-width:600px){
+  .programacion-page .programacion-cuadro.vista-personal{grid-template-columns:72px minmax(0,1fr)!important}
+  .programacion-page .programacion-cuadro.vista-personal .programacion-celda{min-width:0;padding:7px}
+  .programacion-page .programacion-cuadro.vista-personal .programacion-dia{padding:7px 5px}
+  .programacion-page .programacion-cuadro.vista-personal .programacion-dia strong{font-size:.75rem}
+  .programacion-page .programacion-cuadro.vista-personal .programacion-dia span{font-size:.68rem}
+  .programacion-page .programacion-cuadro.vista-personal .encabezado-persona{padding:8px}
+  .programacion-page .programacion-cuadro.vista-personal .encabezado-persona-nombre>strong{white-space:normal;overflow:visible;text-overflow:clip}
+  .programacion-page .programacion-cuadro.vista-personal .bloque-asignacion{width:100%;box-sizing:border-box;padding:9px}
+  .programacion-page .programacion-cuadro.vista-personal .asignacion-dato{grid-template-columns:60px minmax(0,1fr);gap:5px;font-size:.7rem}
+  .programacion-page .programacion-cuadro.vista-personal .asignacion-dato strong{font-size:.64rem}
+  .programacion-page .programacion-cuadro.vista-personal .asignacion-os-item{grid-template-columns:28px minmax(0,1fr)}
 }
 
 /* Navegación de la vista previa individual por grupo y persona. */
@@ -148,12 +164,13 @@
 .programacion-page .correo-emergencia-aviso{margin-top:13px;padding:9px 11px;border:1px solid rgba(255,220,145,.45);border-radius:8px;background:rgba(239,165,29,.16);color:#ffe8b1;font-size:.8rem;font-weight:700}
 
 /* Cobertura, ausencias, inventario, historial y confirmación. */
-.programacion-page .programacion-cobertura{display:grid;grid-template-columns:repeat(5,minmax(130px,1fr));gap:10px;margin:0 0 14px}
+.programacion-page .programacion-cobertura{display:grid;grid-template-columns:repeat(3,minmax(130px,1fr));gap:10px;margin:0 0 14px}
 .programacion-page .programacion-cobertura[hidden]{display:none}
 .programacion-page .programacion-cobertura article{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 14px;border:1px solid #d8e4ee;border-radius:11px;background:#fff;color:#597087}
 .programacion-page .programacion-cobertura article strong{color:#112c47;font-size:1.25rem}.programacion-page .programacion-cobertura article span{font-size:.76rem;font-weight:700}.programacion-page .programacion-cobertura article.advertencia{border-color:#efc46f;background:#fff8e8}.programacion-page .programacion-cobertura article.advertencia strong{color:#a76400}
 .programacion-page .confirmacion-programacion{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:0 0 14px;padding:14px 16px;border:1px solid #c9dbea;border-radius:12px;background:#f7fbff}.programacion-page .confirmacion-programacion[hidden]{display:none}.programacion-page .confirmacion-programacion>div{display:flex;flex-direction:column;gap:3px}.programacion-page .confirmacion-programacion span{color:#64788c;font-size:.8rem}.programacion-page .confirmacion-programacion.confirmada{border-color:#a9d7b1;background:#effaf1}.programacion-page .confirmacion-ok{color:#277b37!important;font-weight:800}
-.programacion-page .programacion-celda.persona-ausente{background:#f5f7fa}.programacion-page .ausencia-programacion-badge{display:flex;flex-direction:column;gap:3px;margin-bottom:7px;padding:8px 9px;border:1px dashed #af7ac5;border-radius:8px;background:#f8effc;color:#704187;font-size:.73rem}.programacion-page .ausencia-programacion-badge span{color:#856397}
+.programacion-page .programacion-celda.persona-ausente{background:#f5f7fa}.programacion-page .ausencia-programacion-badge{display:flex;width:100%;flex-direction:column;gap:3px;margin-bottom:7px;padding:8px 9px;border:1px dashed #af7ac5;border-radius:8px;background:#f8effc;color:#704187;font:inherit;font-size:.73rem;text-align:left}.programacion-page button.ausencia-programacion-badge{cursor:pointer}.programacion-page button.ausencia-programacion-badge:hover{border-style:solid;background:#f2e2f8;box-shadow:0 0 0 2px rgba(175,122,197,.14)}.programacion-page .ausencia-programacion-badge span{color:#856397}
+.programacion-page .correo-dia.correo-ausencia{border-left:4px solid #a85cc5;background:#fbf5fd}.programacion-page .correo-dia.correo-dia-libre{border-left:4px solid #8da2b5;background:#f7fafc}.programacion-page .correo-dia p+p{margin-top:8px;padding-top:8px;border-top:1px solid #dce6ef}
 .programacion-page .alerta-inventario-programacion{display:grid;grid-template-columns:auto 1fr;gap:9px;padding:11px 13px;border:1px solid;border-radius:10px;font-size:.79rem;line-height:1.4}.programacion-page .alerta-inventario-programacion[hidden]{display:none}.programacion-page .alerta-inventario-programacion.pendiente{border-color:#efbd6c;background:#fff7e6;color:#845100}.programacion-page .alerta-inventario-programacion.completo{border-color:#9fd0a8;background:#effaf1;color:#286f35}
-.programacion-page .modal-operativo-programacion{width:min(820px,100%)}.programacion-page .lista-historial-programacion,.programacion-page .lista-ausencias-programacion{display:flex;flex-direction:column;gap:9px;margin-top:16px}.programacion-page .lista-historial-programacion article,.programacion-page .lista-ausencias-programacion article{display:flex;align-items:center;justify-content:space-between;gap:15px;padding:12px 14px;border:1px solid #dce6ef;border-radius:10px;background:#f9fbfd}.programacion-page .lista-historial-programacion article>div,.programacion-page .lista-ausencias-programacion article>div{display:flex;flex-direction:column;gap:3px}.programacion-page .lista-historial-programacion span,.programacion-page .lista-historial-programacion small,.programacion-page .lista-historial-programacion time,.programacion-page .lista-ausencias-programacion span,.programacion-page .lista-ausencias-programacion small{color:#677b8f;font-size:.76rem}.programacion-page .lista-historial-programacion article>div:last-child{text-align:right}.programacion-page .btn-eliminar-ausencia{border:1px solid #efb4bb;background:#fff5f6;color:#b42332}.programacion-page .form-ausencia-programacion{padding-bottom:16px;border-bottom:1px solid #e2eaf2}
+.programacion-page .modal-operativo-programacion{width:min(820px,100%)}.programacion-page .lista-historial-programacion,.programacion-page .lista-ausencias-programacion{display:flex;flex-direction:column;gap:9px;margin-top:16px}.programacion-page .lista-historial-programacion article,.programacion-page .lista-ausencias-programacion article{display:flex;align-items:center;justify-content:space-between;gap:15px;padding:12px 14px;border:1px solid #dce6ef;border-radius:10px;background:#f9fbfd}.programacion-page .lista-historial-programacion article>div,.programacion-page .lista-ausencias-programacion article>div{display:flex;flex-direction:column;gap:3px}.programacion-page .lista-historial-programacion span,.programacion-page .lista-historial-programacion small,.programacion-page .lista-historial-programacion time,.programacion-page .lista-ausencias-programacion span,.programacion-page .lista-ausencias-programacion small{color:#677b8f;font-size:.76rem}.programacion-page .lista-historial-programacion article>div:last-child{text-align:right}.programacion-page .acciones-ausencia-programacion{display:flex!important;flex-direction:row!important;gap:8px!important}.programacion-page .btn-editar-ausencia{border:1px solid #9fc5e8;background:#f2f8fd;color:#1261a6}.programacion-page .btn-eliminar-ausencia{border:1px solid #efb4bb;background:#fff5f6;color:#b42332}.programacion-page .form-ausencia-programacion{padding-bottom:16px;border-bottom:1px solid #e2eaf2}
 @media(max-width:1050px){.programacion-page .programacion-cobertura{grid-template-columns:repeat(3,minmax(130px,1fr))}}@media(max-width:650px){.programacion-page .programacion-cobertura{grid-template-columns:1fr 1fr}.programacion-page .confirmacion-programacion,.programacion-page .lista-historial-programacion article,.programacion-page .lista-ausencias-programacion article{align-items:stretch;flex-direction:column}.programacion-page .lista-historial-programacion article>div:last-child{text-align:left}}
