@@ -1,3 +1,4 @@
+import { uploadBytes, deleteObject } from "./storage-seguro.js";
 import { db, storage } from "./firebase-config.js";
 import { protegerPagina, cerrarSesion, reautenticarAccionCritica } from "./session.js?v=20261017-1";
 import { moduloActivo } from "./modulos.js?v=20261018-2";
@@ -6,7 +7,7 @@ import { optimizarFotoParaCarga } from "./modulos/core/imagenes.js";
 import { validarFirmaArchivo } from "./file-validation.js";
 import { estadoDocumentoAcreditacion, evaluarEntidadEnContrato, peorEvaluacion } from "./sheq-acreditacion.js?v=20261007-1";
 import { addDoc, collection, deleteDoc, deleteField, doc, getDoc, getDocs, query, serverTimestamp, setDoc, updateDoc, where, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-import { deleteObject, getDownloadURL, listAll, ref, uploadBytes } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
+import { getDownloadURL, listAll, ref } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 
 const TIPOS_DOCUMENTO_SHEQ = new Set([
   "image/jpeg", "image/png", "image/webp", "image/heic", "image/heif", "image/avif",
@@ -679,7 +680,7 @@ async function guardarDocumento(e){
         if(!cuota.permitido)throw new Error(aviso);
         if(aviso&&indice===filas.length-1)await mensaje("Uso de almacenamiento",aviso,"advertencia");
         const seguro=archivoCarga.name.replace(/[^a-zA-Z0-9._-]/g,"_");
-        archivoRuta=`empresas/${empresaId}/sheq/${entidadTipo}/${entidadId}/${Date.now()}_${indice}_${seguro}`;
+        archivoRuta=`empresas/${empresaId}/sheq/${entidadTipo}/${entidadId}/${Date.now()}_${crypto.randomUUID()}_${indice}_${seguro}`;
         nuevosArchivos.push(archivoRuta);
         const storageRef=ref(storage,archivoRuta);
         await uploadBytes(storageRef,archivoCarga,{contentType:tipoCarga});

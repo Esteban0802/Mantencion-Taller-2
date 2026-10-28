@@ -645,18 +645,36 @@ function asignacionesCelda(fecha, usuarioId) {
   );
 }
 
-function renderBloque(asignacion) {
+function nombresCompanerosAsignacion(asignacion, personaId) {
+  const participantes = [
+    ...(asignacion.usuarioIds || []).map(id => ({ id, rol: "Técnico" })),
+    ...(asignacion.supervisorIds || []).map(id => ({ id, rol: "Supervisor" })),
+    ...(asignacion.sheqIds || []).map(id => ({ id, rol: "SHEQ" }))
+  ];
+  const vistos = new Set();
+  return participantes
+    .filter(item => item.id && item.id !== personaId && !vistos.has(item.id) && vistos.add(item.id))
+    .map(item => {
+      const perfil = usuariosEmpresa.find(usuarioEmpresa => usuarioEmpresa.id === item.id);
+      return perfil ? `${nombreUsuario(perfil)} (${item.rol})` : "";
+    })
+    .filter(Boolean);
+}
+
+function renderBloque(asignacion, personaId = "") {
   const ordenes = ordenesServicioAsignacion(asignacion).filter(item => item.numero || item.equipo || item.actividad || item.observacion);
   const vehiculo = vehiculosSheq.find(item => item.id === asignacion.vehiculoId);
+  const companeros = nombresCompanerosAsignacion(asignacion, personaId);
   const filas = [
     ["Cliente", asignacion.cliente],
     ["Modalidad", [asignacion.contrato ? "Contrato" : "", asignacion.fixPrice ? "Fix Price" : ""].filter(Boolean).join(" · ")],
     ["Vehículo", asignacion.vehiculoNombre || (vehiculo ? nombreVehiculo(vehiculo) : "")],
+    ["Trabaja con", companeros.join(" · ")],
     ["Indicación", asignacion.observaciones]
   ].filter(([, valor]) => valor);
   return `
     <article class="bloque-asignacion ${escapar(asignacion.tipo || "terreno")}" data-asignacion-id="${escapar(asignacion.id)}"${PUEDE_EDITAR ? ' tabindex="0"' : ""}>
-      ${filas.map(([etiqueta, valor]) => `<div class="asignacion-dato"><strong>${etiqueta}</strong><span>${escapar(valor)}</span></div>`).join("")}
+      ${filas.map(([etiqueta, valor]) => `<div class="asignacion-dato${etiqueta === "Trabaja con" ? " asignacion-equipo" : ""}"><strong>${etiqueta}</strong><span>${escapar(valor)}</span></div>`).join("")}
       ${ordenes.length ? `<div class="asignacion-os-lista">${ordenes.map(item => `<div class="asignacion-os-item${item.cerrada ? " os-cerrada" : ""}"><strong>OS</strong><span>${escapar([item.numero, item.equipo, item.actividad, item.observacion ? `Obs: ${item.observacion}` : ""].filter(Boolean).join(" · "))}${item.cerrada ? ' · <b class="indicacion-cerrar-os">Cerrar OS</b>' : ""}</span></div>`).join("")}</div>` : ""}
     </article>
   `;
@@ -702,7 +720,7 @@ function renderCuadro() {
       const resumenAusencia = ausencia
         ? `${PUEDE_EDITAR ? `<button type="button" class="ausencia-programacion-badge" data-ausencia-id="${escapar(ausencia.id)}" aria-label="Editar ${escapar(ausencia.tipo || "ausencia")} de ${escapar(nombreUsuario(persona))}">` : '<div class="ausencia-programacion-badge">'}<strong>${escapar(ausencia.tipo || "Ausencia")}</strong>${ausencia.observacion ? `<span>${escapar(ausencia.observacion)}</span>` : ""}${PUEDE_EDITAR ? "</button>" : "</div>"}`
         : "";
-      html += `<div class="programacion-celda${claseEmergencia}${ausencia ? " persona-ausente" : ""}">${resumenAusencia}${bloques.length ? bloques.map(renderBloque).join("") : ausencia ? "" : '<div class="celda-vacia">Sin asignación</div>'}</div>`;
+      html += `<div class="programacion-celda${claseEmergencia}${ausencia ? " persona-ausente" : ""}">${resumenAusencia}${bloques.length ? bloques.map(asignacion => renderBloque(asignacion, persona.id)).join("") : ausencia ? "" : '<div class="celda-vacia">Sin asignación</div>'}</div>`;
     });
   });
 

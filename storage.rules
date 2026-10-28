@@ -21,7 +21,10 @@ service firebase.storage {
       let empresa = firestore.get(
         /databases/(default)/documents/empresas/$(empresaId)
       ).data;
-      return !('activa' in empresa) || empresa.activa != false;
+      return (!('activa' in empresa) || empresa.activa != false) &&
+        (!('suscripcion' in empresa) || (empresa.suscripcion is map &&
+          (!('estado' in empresa.suscripcion) || !(empresa.suscripcion.estado in
+            ['cancelacion_solicitada', 'periodo_exportacion', 'pendiente_eliminacion', 'cancelada']))));
     }
 
     function companyModuleActive(empresaId, moduleName) {
@@ -155,47 +158,33 @@ service firebase.storage {
     match /ots/{otId}/{allPaths=**} {
       allow read: if canAccessOT(otId);
 
-      allow create, update: if canManageOT(otId) &&
-        otOpen(otId) &&
-        validOperationalDocument();
-
-      allow delete: if canManageOT(otId) &&
-        otOpen(otId);
+      // El servidor valida usuario, OT y empresa antes de modificar archivos.
+      // Storage permite como máximo dos consultas a Firestore por solicitud.
+      allow create, update, delete: if false;
     }
 
     match /empresas/{empresaId}/informe/{fileName} {
       allow read: if canReadCompanyBranding(empresaId);
-      allow create, update: if canManageCompanyBranding(empresaId) &&
-        (isSuperAdmin() || companyOperational(empresaId)) &&
-        validBrandImage();
-      allow delete: if canManageCompanyBranding(empresaId) &&
-        (isSuperAdmin() || companyOperational(empresaId));
+      allow create, update: if false;
+      allow delete: if false;
     }
 
     match /empresas/{empresaId}/plantillas/{allPaths=**} {
       allow read: if activeUser() && profile().empresaId == empresaId;
-      allow create, update: if activeUser() &&
-        profile().rol == 'admin_empresa' && profile().empresaId == empresaId &&
-        companyOperational(empresaId) && validChecklistTemplate();
-      allow delete: if activeUser() &&
-        profile().rol == 'admin_empresa' && profile().empresaId == empresaId &&
-        companyOperational(empresaId);
+      allow create, update: if false;
+      allow delete: if false;
     }
 
     match /empresas/{empresaId}/sheq/{allPaths=**} {
       allow read: if canReadSheq(empresaId);
-      allow create, update: if canManageSheq(empresaId) &&
-        companyOperational(empresaId) && validSheqDocument();
-      allow delete: if canManageSheq(empresaId) &&
-        companyOperational(empresaId);
+      allow create, update: if false;
+      allow delete: if false;
     }
 
     match /empresas/{empresaId}/inventario/{sucursalId}/{allPaths=**} {
       allow read: if canReadInventory(empresaId, sucursalId);
-      allow create, update: if canManageInventory(empresaId, sucursalId) &&
-        companyOperational(empresaId) && validOperationalDocument();
-      allow delete: if canManageInventory(empresaId, sucursalId) &&
-        companyOperational(empresaId);
+      allow create, update: if false;
+      allow delete: if false;
     }
 
     match /{allPaths=**} {

@@ -1,3 +1,5 @@
+import { renderIndicadorAlmacenamiento } from "./storage-indicador.js";
+import { uploadBytes, deleteObject } from "./storage-seguro.js";
 import { renderVistaUsuariosEmpresa } from "./empresa/usuarios.js";
 import { renderVistaSucursalesEmpresa } from "./empresa/sucursales.js";
 import { app, db } from "./firebase-config.js";
@@ -9,6 +11,7 @@ import { validarFirmaArchivo } from "./file-validation.js";
 import {
   doc,
   getDoc,
+  onSnapshot,
   updateDoc,
   serverTimestamp,
   collection,
@@ -23,9 +26,7 @@ import {
 import {
   getStorage,
   ref as storageRef,
-  uploadBytes,
-  getDownloadURL,
-  deleteObject
+  getDownloadURL
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 
 import {
@@ -58,6 +59,7 @@ const usuarioActivo = protegerPagina([
 if (!usuarioActivo) throw new Error("Acceso no autorizado");
 
 let empresaActual = null;
+let detenerVisorAlmacenamiento = null;
 let empresaIdActual = null;
 let plantillasMantenimientoActuales = [];
 
@@ -167,6 +169,13 @@ async function cargarEmpresa() {
     aplicarModulosEnInterfaz(empresaActual);
 
     renderEmpresa();
+    detenerVisorAlmacenamiento?.();
+    detenerVisorAlmacenamiento = onSnapshot(refEmpresa, snapshot => {
+      if (!snapshot.exists()) return;
+      const datos = snapshot.data();
+      for (const clave of ["maxStorageGB", "storageUsadoBytes", "storageReservadoBytes", "storageArchivos", "storageCuotaVersion", "storageActualizadoEnMs"]) empresaActual[clave] = datos[clave];
+      document.querySelectorAll("[data-visor-almacenamiento]").forEach(elemento => { elemento.outerHTML = renderIndicadorAlmacenamiento(empresaActual); });
+    }, error => console.warn("No fue posible actualizar el visor de almacenamiento:", error.code));
 
   } catch (error) {
     console.error("Error cargando empresa:", error);
@@ -602,6 +611,7 @@ function renderVistaDashboardEmpresa() {
       <h2>Información General</h2>
     </div>
 
+    ${renderIndicadorAlmacenamiento(empresaActual)}
     <div class="empresa-datos-grid">
 
       <div class="dato-box">
@@ -969,6 +979,7 @@ async function recalcularAlmacenamientoEmpresa() {
     });
     empresaActual.storageUsadoBytes = Number(resultado.data?.totalBytes || 0);
     empresaActual.storageArchivos = Number(resultado.data?.totalArchivos || 0);
+    empresaActual.storageCuotaVersion = 1;
     window.empresaActualAdmin = empresaActual;
     renderVistaConfiguracionEmpresa();
   } catch (error) {
@@ -1056,10 +1067,6 @@ function renderVistaConfiguracionEmpresa() {
     .map(modulo => modulo.nombre);
   const etapasChecklistActivas = obtenerEtapasChecklistActivasEmpresa();
   const storageUsadoBytes = Math.max(0, Number(empresaActual.storageUsadoBytes || 0));
-  const storageMaxBytes = Math.max(0, Number(empresaActual.maxStorageGB || 0)) * 1024 * 1024 * 1024;
-  const storagePorcentaje = storageMaxBytes
-    ? Math.min(100, (storageUsadoBytes / storageMaxBytes) * 100)
-    : 0;
   const cancelacionActiva = empresaEnPeriodoDeSalida();
   const fechaLimiteCancelacion = empresaActual.cancelacion?.fechaLimiteExportacion
     ? new Date(empresaActual.cancelacion.fechaLimiteExportacion).toLocaleDateString("es-CL")
@@ -1209,14 +1216,11 @@ function renderVistaConfiguracionEmpresa() {
           <div><span>Usuarios</span><strong>${empresaActual.maxUsuarios || "-"}</strong></div>
           <div><span>Sucursales</span><strong>${empresaActual.maxSucursales || "-"}</strong></div>
           <div><span>Storage contratado</span><strong>${empresaActual.maxStorageGB || "-"} GB</strong></div>
-          <div><span>Storage utilizado</span><strong>${formatearAlmacenamiento(storageUsadoBytes)}</strong></div>
+          <div><span>Storage utilizado</span><strong>${empresaActual.storageCuotaVersion === 1 ? formatearAlmacenamiento(storageUsadoBytes) : "Pendiente de medir"}</strong></div>
           <div><span>Archivos</span><strong>${Number(empresaActual.storageArchivos || 0)}</strong></div>
         </div>
-        <div class="storage-usage" aria-label="Uso de almacenamiento">
-          <div class="storage-usage-bar"><span style="width:${storagePorcentaje.toFixed(2)}%"></span></div>
-          <small>${storagePorcentaje.toFixed(1)}% utilizado</small>
-        </div>
-        ${editable ? `<button type="button" class="btn-secondary" id="btnRecalcularStorage">Recalcular uso</button>` : ""}
+        ${renderIndicadorAlmacenamiento(empresaActual)}
+        ${editable && empresaActual.storageCuotaVersion !== 1 ? `<button type="button" class="btn-secondary" id="btnRecalcularStorage">Medir uso real y habilitar cargas</button>` : ""}
         <p class="config-helper">El plan y sus límites solo pueden modificarse desde el panel del superadministrador.</p>
       </section>
 
@@ -1452,10 +1456,10 @@ async function guardarPlantillaMantenimiento(evento) {
       checklists, etapasHabilitadas, totalActividades: total, archivoNombre: archivo.name,
       creadoPor: usuarioActivo.uid, fechaCreacion: serverTimestamp(), fechaActualizacion: serverTimestamp()
     });
-    const ruta = `empresas/${empresaActual.id}/plantillas/${documentoCreado.id}/${Date.now()}-${archivo.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+    const ruta = `empresas/${empresaActual.id}/plantillas/${documentoCreado.id}/${Date.now()}-${crypto.randomUUID()}-${archivo.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
     const referencia = storageRef(storage, ruta);
     referenciaArchivoCreado = referencia;
-    await uploadBytes(referencia, archivo, { contentType: archivo.type || "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    await uploadBytes(referencia, archivo, { contentType: tipoPlantilla });
     await updateDoc(documentoCreado, { archivoRuta: ruta, archivoUrl: await getDownloadURL(referencia) });
     evento.target.reset(); await cargarPlantillasMantenimiento();
     const avisoIgnoradas = ignoradas.length
@@ -1526,7 +1530,7 @@ async function subirImagenInforme(archivo, nombreBase) {
   if (mensajeCuota) alert(mensajeCuota);
 
   const extension = archivo.name.split(".").pop()?.toLowerCase() || "img";
-  const ruta = `empresas/${empresaActual.id}/informe/${nombreBase}.${extension}`;
+  const ruta = `empresas/${empresaActual.id}/informe/${nombreBase}-${crypto.randomUUID()}.${extension}`;
   const referencia = storageRef(storage, ruta);
   await uploadBytes(referencia, archivo, { contentType: archivo.type });
   return {

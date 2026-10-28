@@ -1,5 +1,12 @@
 import { readFile } from "node:fs/promises";
 import { after, before, beforeEach, test } from "node:test";
+import assert from "node:assert/strict";
+import { createRequire } from "node:module";
+
+const { subirArchivoEmpresa, eliminarArchivoEmpresa } = createRequire(import.meta.url)("../functions/archivos-empresa.js");
+const { subirArchivoOT, eliminarArchivoOT } = createRequire(import.meta.url)("../functions/archivos-ot.js");
+const { randomUUID } = createRequire(import.meta.url)("node:crypto");
+const { autorizarEtapasOT } = createRequire(import.meta.url)("../functions/comentarios-ot.js");
 
 import {
   assertFails,
@@ -14,6 +21,8 @@ import {
   getDoc,
   getDocs,
   query,
+  runTransaction,
+  Timestamp,
   serverTimestamp,
   setDoc,
   updateDoc,
@@ -22,8 +31,11 @@ import {
 import {
   deleteObject,
   getBytes,
+  getMetadata,
+  getDownloadURL,
   ref,
   uploadBytes,
+  updateMetadata,
 } from "firebase/storage";
 
 // Firebase CLI uses this isolated demo project when the emulator is started
@@ -154,6 +166,88 @@ function storageComo(uid) {
   return testEnv.authenticatedContext(uid).storage();
 }
 
+// Ejecuta el mismo servicio usado por la callable, con un adaptador del SDK
+// modular del emulador. Solo este contexto representa al backend de confianza.
+async function autorizarComentariosEnPrueba(uid, otId, cambios, alcance = {}) {
+  await testEnv.withSecurityRulesDisabled(async contexto => {
+    const firestore = contexto.firestore();
+    const perfil = (await getDoc(doc(firestore, "usuarios", uid))).data();
+    const referencia = ruta => ({
+      ruta,
+      collection: nombre => referencia(`${ruta}/${nombre}`),
+      doc: id => referencia(`${ruta}/${id}`)
+    });
+    const db = {
+      collection: nombre => referencia(nombre),
+      runTransaction: callback => runTransaction(firestore, transaccion => callback({
+        get: async ref => {
+          const snapshot = await transaccion.get(doc(firestore, ref.ruta));
+          return { exists: snapshot.exists(), data: () => snapshot.data() };
+        },
+        set: (ref, datos) => transaccion.set(doc(firestore, ref.ruta), datos)
+      }))
+    };
+    const snapshot = await getDoc(doc(firestore, "ots", otId));
+    await autorizarEtapasOT({
+      db, usuario: perfil, otId, etapas: { ...(snapshot.data() || {}), ...cambios },
+      ...alcance, venceEn: Timestamp.fromMillis(Date.now() + 300000),
+      evidencias: {
+        bucketName: ref(contexto.storage(), "archivo").bucket,
+        obtenerAutorArchivo: async ruta => (await getMetadata(ref(contexto.storage(), ruta))).customMetadata?.creadoPorUid || ""
+      }
+    });
+  });
+}
+
+// Usa el servicio real del servidor y un adaptador de Storage/Firestore con
+// acceso administrativo solo al proyecto demo del emulador.
+async function archivoEnServidorPrueba(uid, accion, datos) {
+  let resultado;
+  await testEnv.withSecurityRulesDisabled(async contexto => {
+    const firestore = contexto.firestore();
+    const usuario = (await getDoc(doc(firestore, "usuarios", uid))).data();
+    const referencia = ruta => ({ ruta, collection: nombre => referencia(ruta+"/"+nombre), doc: id => referencia(ruta+"/"+id), get: async () => {
+      const snapshot = await getDoc(doc(firestore, ruta)); return { exists: snapshot.exists(), data: () => snapshot.data() };
+    } });
+    const db = { collection: nombre => referencia(nombre), runTransaction: callback => runTransaction(firestore, tx => callback({
+      get: async ref => { const snapshot = await tx.get(doc(firestore, ref.ruta)); return { exists: snapshot.exists(), data: () => snapshot.data() }; },
+      set: (ref, valor) => tx.set(doc(firestore, ref.ruta), valor), update: (ref, valor) => tx.update(doc(firestore, ref.ruta), valor)
+    })) };
+    const storage = contexto.storage();
+    const bucket = {
+      name: ref(storage, "archivo").bucket,
+      file: (ruta, opciones = {}) => ({
+        getMetadata: async () => {
+          try {
+            const meta = await getMetadata(ref(storage, ruta));
+            const token = new URL(await getDownloadURL(ref(storage, ruta))).searchParams.get("token");
+            return [{ ...meta, metadata: { ...meta.customMetadata, firebaseStorageDownloadTokens: token } }];
+          } catch (error) { if (error.code === "storage/object-not-found") error.code = 404; throw error; }
+        },
+        save: async (bytes, opcionesCarga) => {
+          try {
+            await getMetadata(ref(storage, ruta));
+            if (opcionesCarga.preconditionOpts?.ifGenerationMatch === 0) throw Object.assign(new Error("Ya existe"), { code: 412 });
+          } catch (error) { if (error.code !== "storage/object-not-found") throw error; }
+          await uploadBytes(ref(storage, ruta), bytes, { contentType: opcionesCarga.metadata.contentType, customMetadata: opcionesCarga.metadata.metadata });
+        },
+        delete: async () => {
+          try {
+            if (opciones.generation && (await getMetadata(ref(storage, ruta))).generation !== opciones.generation) throw Object.assign(new Error("Cambió"), { code: 412 });
+            await deleteObject(ref(storage, ruta));
+          } catch (error) { if (error.code !== "storage/object-not-found") throw error; }
+        }
+      })
+    };
+    resultado = await ({ subir: subirArchivoOT, eliminar: eliminarArchivoOT, subirEmpresa: subirArchivoEmpresa, eliminarEmpresa: eliminarArchivoEmpresa }[accion])({ db, bucket, usuario, datos });
+  });
+  return resultado;
+}
+
+function datosArchivoPrueba(contentType = "image/jpeg", bytes = new Uint8Array([255, 216, 255])) {
+  return { otId: "ot-abierta-a", etapa: "ingreso", itemIndex: 0, nombre: "evidencia", subidaId: randomUUID(), contentType, base64: Buffer.from(bytes).toString("base64") };
+}
+
 async function sembrarDatos() {
   await testEnv.withSecurityRulesDisabled(async (context) => {
     const db = context.firestore();
@@ -178,7 +272,7 @@ async function sembrarDatos() {
     }
 
     await setDoc(doc(db, "empresas", "empresa-a"), {
-      nombre: "Empresa A",
+      nombre: "Empresa A", storageCuotaVersion: 1, storageUsadoBytes: 0, storageReservadoBytes: 0, storageArchivos: 0,
       correo: "contacto@empresa-a.cl",
       telefono: "+56 9 1111 1111",
       ciudad: "Santiago",
@@ -851,6 +945,9 @@ test("Jefe de Taller puede modificar la identificación de una OT", async () => 
 
 test("Supervisor puede registrar trabajo de una etapa y la deja iniciada", async () => {
   const db = firestoreComo("supervisor-a");
+  await autorizarComentariosEnPrueba("supervisor-a", "ot-abierta-a", {
+    ingreso: [{ item: "Recepción", ok: true }]
+  });
   await assertSucceeds(
     updateDoc(doc(db, "ots", "ot-abierta-a"), {
       ingreso: [{ item: "Recepción", ok: true }],
@@ -861,6 +958,9 @@ test("Supervisor puede registrar trabajo de una etapa y la deja iniciada", async
 
 test("Técnico puede registrar trabajo de una etapa y la deja iniciada", async () => {
   const db = firestoreComo("tecnico-a");
+  await autorizarComentariosEnPrueba("tecnico-a", "ot-abierta-a", {
+    evaluacion: [{ item: "Diagnóstico", ok: true }]
+  });
   await assertSucceeds(
     updateDoc(doc(db, "ots", "ot-abierta-a"), {
       evaluacion: [{ item: "Diagnóstico", ok: true }],
@@ -993,6 +1093,7 @@ test("Jefe de Taller puede cerrar un flujo reducido sin Pruebas ni Despacho", as
 
 test("Técnico no puede aprobar la Evaluación cuando Aprobaciones está habilitado", async () => {
   const db = firestoreComo("taller-a");
+  await autorizarComentariosEnPrueba("taller-a", "ot-flujo-a", { decisionEvaluacion: { resultado: "APROBADO" } });
   await assertFails(
     updateDoc(doc(db, "ots", "ot-flujo-a"), {
       evaluacionAprobada: true,
@@ -1004,6 +1105,7 @@ test("Técnico no puede aprobar la Evaluación cuando Aprobaciones está habilit
 
 test("Supervisor no puede aprobar la Evaluación cuando Aprobaciones está habilitado", async () => {
   const db = firestoreComo("supervisor-a");
+  await autorizarComentariosEnPrueba("supervisor-a", "ot-flujo-a", { decisionEvaluacion: { resultado: "APROBADO" } });
   await assertFails(
     updateDoc(doc(db, "ots", "ot-flujo-a"), {
       evaluacionAprobada: true,
@@ -1015,6 +1117,7 @@ test("Supervisor no puede aprobar la Evaluación cuando Aprobaciones está habil
 
 test("Jefe de Taller puede aprobar la Evaluación", async () => {
   const db = firestoreComo("jefe-a");
+  await autorizarComentariosEnPrueba("jefe-a", "ot-flujo-a", { decisionEvaluacion: { resultado: "APROBADO" } });
   await assertSucceeds(
     updateDoc(doc(db, "ots", "ot-flujo-a"), {
       evaluacionAprobada: true,
@@ -1044,6 +1147,7 @@ test("Técnico puede completar automáticamente una etapa sin aprobación config
   });
 
   const db = firestoreComo("taller-a");
+  await autorizarComentariosEnPrueba("taller-a", "ot-flujo-a", { decisionEvaluacion: { resultado: "NO REQUERIDA" } });
   await assertSucceeds(
     updateDoc(doc(db, "ots", "ot-flujo-a"), {
       evaluacionAprobada: true,
@@ -1097,6 +1201,7 @@ test("Jefe de Taller no puede retirar la aprobación de una etapa ya iniciada", 
 
 test("Técnico no puede aprobar Pruebas cuando Aprobaciones está habilitado", async () => {
   const db = firestoreComo("taller-a");
+  await autorizarComentariosEnPrueba("taller-a", "ot-flujo-a", { decisionPruebas: { resultado: "APROBADO" } });
   await assertFails(
     updateDoc(doc(db, "ots", "ot-flujo-a"), {
       pruebasAprobado: true,
@@ -1696,13 +1801,10 @@ test("Técnico no puede consultar documentos SHEQ", async () => {
 test("SHEQ puede subir, leer y eliminar archivos de acreditación", async () => {
   const storage = storageComo("sheq-a");
   await assertSucceeds(getBytes(ref(storage, "empresas/empresa-a/sheq/persona/taller-a/examen.pdf")));
-  const archivoNuevo = ref(storage, "empresas/empresa-a/sheq/vehiculo/vehiculo-a/soap.pdf");
-  await assertSucceeds(uploadBytes(
-    archivoNuevo,
-    new TextEncoder().encode("soap"),
-    { contentType: "application/pdf" },
-  ));
-  await assertSucceeds(deleteObject(archivoNuevo));
+  const ruta = "empresas/empresa-a/sheq/vehiculo/vehiculo-a/soap.pdf";
+  await archivoEnServidorPrueba("sheq-a", "subirEmpresa", { ruta, contentType: "application/pdf", base64: Buffer.from("%PDF-1.4").toString("base64") });
+  await assertSucceeds(getBytes(ref(storage, ruta)));
+  await archivoEnServidorPrueba("sheq-a", "eliminarEmpresa", { ruta });
 });
 
 test("Técnico no puede leer ni subir archivos SHEQ", async () => {
@@ -1756,7 +1858,7 @@ test("Taller no puede subir texto plano a una OT abierta", async () => {
     uploadBytes(
       ref(storage, "ots/ot-abierta-a/documentos/nuevo.txt"),
       new TextEncoder().encode("contenido"),
-      { contentType: "text/plain" },
+      { contentType: "text/plain", customMetadata: { creadoPorUid: "taller-a" } },
     ),
   );
 });
@@ -1766,26 +1868,18 @@ test("Supervisor no puede subir GIF como evidencia", async () => {
   await assertFails(uploadBytes(
     ref(storage, "ots/ot-abierta-a/ingreso/item_0/evidencia-supervisor.gif"),
     new Uint8Array([71, 73, 70]),
-    { contentType: "image/gif" },
+    { contentType: "image/gif", customMetadata: { creadoPorUid: "supervisor-a" } },
   ));
 });
 
 test("Supervisor puede subir una foto HEIC tomada desde un móvil", async () => {
-  const storage = storageComo("supervisor-a");
-  await assertSucceeds(uploadBytes(
-    ref(storage, "ots/ot-abierta-a/ingreso/item_0/evidencia-supervisor.heic"),
-    new Uint8Array([0, 0, 0, 24]),
-    { contentType: "image/heic" },
-  ));
+  const resultado = await archivoEnServidorPrueba("supervisor-a", "subir", { ...datosArchivoPrueba("image/heic", Buffer.from([0,0,0,24,102,116,121,112,104,101,105,99])), otId: "ot-abierta-a" });
+  assert.ok(resultado.url);
 });
 
 test("Técnico puede subir una foto AVIF tomada desde un móvil", async () => {
-  const storage = storageComo("tecnico-a");
-  await assertSucceeds(uploadBytes(
-    ref(storage, "ots/ot-abierta-a/ingreso/item_0/evidencia-tecnico.avif"),
-    new Uint8Array([0, 0, 0, 24]),
-    { contentType: "image/avif" },
-  ));
+  const resultado = await archivoEnServidorPrueba("tecnico-a", "subir", { ...datosArchivoPrueba("image/avif", Buffer.from([0,0,0,24,102,116,121,112,97,118,105,102])), otId: "ot-abierta-a" });
+  assert.ok(resultado.url);
 });
 
 test("Técnico no puede subir SVG como evidencia", async () => {
@@ -1793,35 +1887,23 @@ test("Técnico no puede subir SVG como evidencia", async () => {
   await assertFails(uploadBytes(
     ref(storage, "ots/ot-abierta-a/ingreso/item_0/evidencia-tecnico.svg"),
     new TextEncoder().encode('<svg xmlns="http://www.w3.org/2000/svg"></svg>'),
-    { contentType: "image/svg+xml" },
+    { contentType: "image/svg+xml", customMetadata: { creadoPorUid: "tecnico-a" } },
   ));
 });
 
 test("Técnico puede subir evidencia JPEG a una OT abierta de su sucursal", async () => {
-  const storage = storageComo("tecnico-a");
-  await assertSucceeds(uploadBytes(
-    ref(storage, "ots/ot-abierta-a/ingreso/item_0/evidencia-tecnico.jpg"),
-    new Uint8Array([255, 216, 255]),
-    { contentType: "image/jpeg" },
-  ));
+  const resultado = await archivoEnServidorPrueba("tecnico-a", "subir", { ...datosArchivoPrueba("image/jpeg", new Uint8Array([255,216,255])), otId: "ot-abierta-a" });
+  assert.ok(resultado.url);
 });
 
 test("Técnico puede subir un PDF como evidencia de una OT abierta", async () => {
-  const storage = storageComo("tecnico-a");
-  await assertSucceeds(uploadBytes(
-    ref(storage, "ots/ot-abierta-a/ingreso/item_0/evidencia-tecnico.pdf"),
-    new TextEncoder().encode("%PDF-1.4"),
-    { contentType: "application/pdf" },
-  ));
+  const resultado = await archivoEnServidorPrueba("tecnico-a", "subir", { ...datosArchivoPrueba("application/pdf", Buffer.from("%PDF-1.4")), otId: "ot-abierta-a" });
+  assert.ok(resultado.url);
 });
 
 test("Técnico puede subir evidencia a una OT antigua sin campo cerrada", async () => {
-  const storage = storageComo("tecnico-a");
-  await assertSucceeds(uploadBytes(
-    ref(storage, "ots/ot-antigua-sin-cierre/ingreso/item_0/evidencia-antigua.jpg"),
-    new Uint8Array([255, 216, 255]),
-    { contentType: "image/jpeg" },
-  ));
+  const resultado = await archivoEnServidorPrueba("tecnico-a", "subir", { ...datosArchivoPrueba("image/jpeg", new Uint8Array([255,216,255])), otId: "ot-antigua-sin-cierre" });
+  assert.ok(resultado.url);
 });
 
 test("durante cancelación se pueden descargar archivos, pero no subir ni eliminar", async () => {
@@ -1832,7 +1914,7 @@ test("durante cancelación se pueden descargar archivos, pero no subir ni elimin
   await assertFails(uploadBytes(
     ref(storage, "ots/ot-abierta-a/documentos/nuevo-cancelacion.txt"),
     new TextEncoder().encode("contenido"),
-    { contentType: "text/plain" },
+    { contentType: "text/plain", customMetadata: { creadoPorUid: "admin-a" } },
   ));
   await assertFails(deleteObject(existente));
 });
@@ -1843,7 +1925,7 @@ test("Taller no puede subir un archivo ejecutable a una OT", async () => {
     uploadBytes(
       ref(storage, "ots/ot-abierta-a/documentos/programa.exe"),
       new Uint8Array([77, 90]),
-      { contentType: "application/x-msdownload" },
+      { contentType: "application/x-msdownload", customMetadata: { creadoPorUid: "taller-a" } },
     ),
   );
 });
@@ -1854,7 +1936,7 @@ test("Taller no puede subir archivos a una OT cerrada", async () => {
     uploadBytes(
       ref(storage, "ots/ot-cerrada-a/documentos/nuevo.txt"),
       new TextEncoder().encode("contenido"),
-      { contentType: "text/plain" },
+      { contentType: "text/plain", customMetadata: { creadoPorUid: "taller-a" } },
     ),
   );
 });
@@ -1864,4 +1946,308 @@ test("Taller no puede borrar archivos de una OT cerrada", async () => {
   await assertFails(
     deleteObject(ref(storage, "ots/ot-cerrada-a/documentos/inexistente.txt")),
   );
+});
+
+const ubicacionesComentarios = {
+  ingreso: lista => ({ ingreso: [{ item: "Ítem", comentarios: lista }] }),
+  evaluacion: lista => ({ evaluacion: [{ item: "Ítem", comentarios: lista }] }),
+  overhaul: lista => ({ overhaul: [{ item: "Ítem", comentarios: lista }] }),
+  pruebasGeneral: lista => ({ pruebas: { general: [{ comentarios: lista }] } }),
+  pruebasMecanicas: lista => ({ pruebas: { mecanico: [{ comentarios: lista }] } }),
+  pruebasElectricas: lista => ({ pruebas: { electrico: [{ comentarios: lista }] } }),
+  despachoPreparacion: lista => ({ despacho: { comentariosPreparacion: lista } }),
+  despachoFinal: lista => ({ despacho: { comentariosFinal: lista } })
+};
+const marcasComentarios = { evaluacion: true, mantencion: true, pruebas: true, despacho: true };
+const comentarioAjeno = { texto: "Original", creadoPorUid: "supervisor-a", rol: "supervisor", fecha: "ayer" };
+
+for (const [ubicacion, datos] of Object.entries(ubicacionesComentarios)) {
+  test(`${ubicacion}: bloquea borrar, editar o suplantar comentarios ajenos`, async () => {
+    await testEnv.withSecurityRulesDisabled(contexto => updateDoc(doc(contexto.firestore(), "ots", "ot-abierta-a"), datos([comentarioAjeno])));
+    for (const uid of ["tecnico-a", "jefe-a"]) {
+      for (const lista of [[], [{ ...comentarioAjeno, texto: "Alterado" }], [{ ...comentarioAjeno, creadoPorUid: uid }]]) {
+        const cambios = { ...datos(lista), etapasConActividad: marcasComentarios };
+        await assertFails(updateDoc(doc(firestoreComo(uid), "ots", "ot-abierta-a"), cambios));
+        await assert.rejects(autorizarComentariosEnPrueba(uid, "ot-abierta-a", cambios));
+      }
+    }
+  });
+
+  test(`${ubicacion}: permite agregar, editar y eliminar el comentario propio`, async () => {
+    await testEnv.withSecurityRulesDisabled(contexto => updateDoc(doc(contexto.firestore(), "ots", "ot-abierta-a"), datos([comentarioAjeno])));
+    const propio = { texto: "Trabajo", creadoPorUid: "tecnico-a", rol: "tecnico", fecha: "hoy" };
+    for (const lista of [[comentarioAjeno, propio], [comentarioAjeno, { ...propio, texto: "Corregido" }], [comentarioAjeno]]) {
+      const cambios = { ...datos(lista), etapasConActividad: marcasComentarios };
+      await autorizarComentariosEnPrueba("tecnico-a", "ot-abierta-a", cambios);
+      await assertSucceeds(updateDoc(doc(firestoreComo("tecnico-a"), "ots", "ot-abierta-a"), cambios));
+    }
+  });
+}
+
+test("no permite falsificar autorizaciones ni utilizarlas desde otra cuenta", async () => {
+  const cambios = ubicacionesComentarios.ingreso([{ texto: "Trabajo", creadoPorUid: "tecnico-a", rol: "tecnico" }]);
+  const ruta = "ots/ot-abierta-a/validacionesComentarios/tecnico-a/versiones/nueva";
+  await assertFails(setDoc(doc(firestoreComo("tecnico-a"), ruta), { etapas: cambios, venceEn: Timestamp.fromMillis(Date.now() + 300000) }));
+  await autorizarComentariosEnPrueba("tecnico-a", "ot-abierta-a", cambios);
+  await assertFails(updateDoc(doc(firestoreComo("supervisor-a"), "ots", "ot-abierta-a"), { ...cambios, etapasConActividad: marcasComentarios }));
+  await assertFails(updateDoc(doc(firestoreComo("tecnico-a"), "ots", "ot-abierta-a"), { ingreso: [], etapasConActividad: marcasComentarios }));
+});
+
+test("rechaza autorizaciones vencidas y estados anteriores a un cambio concurrente", async () => {
+  const cambios = ubicacionesComentarios.ingreso([{ texto: "Trabajo", creadoPorUid: "tecnico-a", rol: "tecnico" }]);
+  await autorizarComentariosEnPrueba("tecnico-a", "ot-abierta-a", cambios);
+  await testEnv.withSecurityRulesDisabled(contexto => updateDoc(doc(contexto.firestore(), "ots", "ot-abierta-a"), ubicacionesComentarios.ingreso([comentarioAjeno])));
+  await assertFails(updateDoc(doc(firestoreComo("tecnico-a"), "ots", "ot-abierta-a"), { ...cambios, etapasConActividad: marcasComentarios }));
+  const actualizados = ubicacionesComentarios.ingreso([comentarioAjeno, { texto: "Trabajo", creadoPorUid: "tecnico-a", rol: "tecnico" }]);
+  await autorizarComentariosEnPrueba("tecnico-a", "ot-abierta-a", actualizados);
+  await testEnv.withSecurityRulesDisabled(contexto => updateDoc(doc(contexto.firestore(), "ots/ot-abierta-a/validacionesComentarios/tecnico-a/versiones/nueva"), { venceEn: Timestamp.fromMillis(0) }));
+  await assertFails(updateDoc(doc(firestoreComo("tecnico-a"), "ots", "ot-abierta-a"), { ...actualizados, etapasConActividad: marcasComentarios }));
+});
+
+test("el técnico puede responder al jefe y no puede reescribir la respuesta", async () => {
+  const observacion = { texto: "Corregir", creadoPorUid: "jefe-a", rol: "jefe_taller", atendido: false };
+  await testEnv.withSecurityRulesDisabled(contexto => updateDoc(doc(contexto.firestore(), "ots", "ot-abierta-a"), { ...ubicacionesComentarios.ingreso([observacion]), alertaJefe: true }));
+  const respuesta = { ...observacion, atendido: true, respuestaUsuario: "Corregido", atendidoPorUid: "tecnico-a", atendidoPor: "Técnico", fechaAtendido: "hoy" };
+  const cambios = { ...ubicacionesComentarios.ingreso([respuesta]), etapasConActividad: marcasComentarios, alertaJefe: false };
+  await autorizarComentariosEnPrueba("tecnico-a", "ot-abierta-a", cambios);
+  await assertSucceeds(updateDoc(doc(firestoreComo("tecnico-a"), "ots", "ot-abierta-a"), cambios));
+  await assert.rejects(autorizarComentariosEnPrueba("tecnico-a", "ot-abierta-a", ubicacionesComentarios.ingreso([{ ...respuesta, respuestaUsuario: "Otra" }])));
+});
+
+test("la creación con etapas requiere autorización y conserva el flujo de nuevas OT", async () => {
+  const nueva = { empresaId: "empresa-a", sucursalId: "sucursal-a", creadoPor: "jefe-a", estado: "INGRESO", cerrada: false, ingreso: [{ item: "Recepción", comentarios: [] }] };
+  const refNueva = doc(firestoreComo("jefe-a"), "ots", "ot-comentarios-nueva");
+  await assertFails(setDoc(refNueva, nueva));
+  await autorizarComentariosEnPrueba("jefe-a", "ot-comentarios-nueva", nueva, nueva);
+  await assertSucceeds(setDoc(refNueva, nueva));
+});
+
+test("la autorización de comentarios no concede aprobación ni permite ocultar observaciones", async () => {
+  const observacion = { texto: "Corregir", creadoPorUid: "jefe-a", rol: "jefe_taller", atendido: false };
+  await testEnv.withSecurityRulesDisabled(contexto => updateDoc(doc(contexto.firestore(), "ots", "ot-flujo-a"), {
+    ...ubicacionesComentarios.ingreso([observacion]), alertaJefe: true
+  }));
+  const cambios = ubicacionesComentarios.ingreso([observacion, { texto: "Trabajo", creadoPorUid: "tecnico-a", rol: "tecnico" }]);
+  await autorizarComentariosEnPrueba("tecnico-a", "ot-flujo-a", { ...cambios, decisionEvaluacion: "APROBADA" });
+  await assertFails(updateDoc(doc(firestoreComo("tecnico-a"), "ots", "ot-flujo-a"), {
+    ...cambios, etapasConActividad: marcasComentarios, decisionEvaluacion: "APROBADA", evaluacionAprobada: true
+  }));
+  await autorizarComentariosEnPrueba("tecnico-a", "ot-flujo-a", cambios);
+  await assertFails(updateDoc(doc(firestoreComo("tecnico-a"), "ots", "ot-flujo-a"), {
+    ...cambios, etapasConActividad: marcasComentarios, alertaJefe: false
+  }));
+  await assertSucceeds(updateDoc(doc(firestoreComo("tecnico-a"), "ots", "ot-flujo-a"), {
+    ...cambios, etapasConActividad: marcasComentarios
+  }));
+});
+
+function urlEvidenciaPrueba(ruta) {
+  const bucket = ref(storageComo("tecnico-a"), ruta).bucket;
+  return `https://firebasestorage.googleapis.com/v0/b/${bucket}/o/${encodeURIComponent(ruta)}?alt=media&token=prueba`;
+}
+
+async function sembrarArchivoEvidencia(ruta, uid = null) {
+  await testEnv.withSecurityRulesDisabled(contexto => uploadBytes(
+    ref(contexto.storage(), ruta), new Uint8Array([255, 216, 255]),
+    { contentType: "image/jpeg", ...(uid ? { customMetadata: { creadoPorUid: uid } } : {}) }
+  ));
+}
+
+test("cada rol operativo puede cargar y eliminar sus archivos mediante el servidor", async () => {
+  for (const uid of ["tecnico-a", "supervisor-a", "jefe-a"]) {
+    const datos = datosArchivoPrueba();
+    const resultado = await archivoEnServidorPrueba(uid, "subir", datos);
+    assert.equal((await getMetadata(ref(storageComo(uid), decodeURIComponent(new URL(resultado.url).pathname.split("/o/")[1])))).customMetadata.creadoPorUid, uid);
+    const repetido = await archivoEnServidorPrueba(uid, "subir", datos);
+    assert.equal(repetido.url, resultado.url);
+    await assertFails(updateMetadata(ref(storageComo(uid), decodeURIComponent(new URL(resultado.url).pathname.split("/o/")[1])), { customMetadata: { creadoPorUid: uid } }));
+    await assertFails(deleteObject(ref(storageComo(uid), decodeURIComponent(new URL(resultado.url).pathname.split("/o/")[1]))));
+    await archivoEnServidorPrueba(uid, "eliminar", { otId: datos.otId, url: resultado.url });
+  }
+});
+
+test("no permite subir sin autor ni atribuir una carga a otra cuenta", async () => {
+  const archivo = ref(storageComo("tecnico-a"), "ots/ot-abierta-a/ingreso/item_0/suplantado.jpg");
+  await assertFails(uploadBytes(archivo, new Uint8Array([255, 216, 255]), { contentType: "image/jpeg" }));
+  await assertFails(uploadBytes(archivo, new Uint8Array([255, 216, 255]), { contentType: "image/jpeg", customMetadata: { creadoPorUid: "supervisor-a" } }));
+});
+
+test("ni otros trabajadores ni el jefe pueden borrar, reemplazar o reclamar un archivo ajeno", async () => {
+  const ruta = "ots/ot-abierta-a/ingreso/item_0/autor-tecnico.jpg";
+  await sembrarArchivoEvidencia(ruta, "tecnico-a");
+  for (const uid of ["supervisor-a", "jefe-a"]) {
+    const archivo = ref(storageComo(uid), ruta);
+    await assertSucceeds(getBytes(archivo));
+    await assert.rejects(archivoEnServidorPrueba(uid, "eliminar", { otId: "ot-abierta-a", url: urlEvidenciaPrueba(ruta) }));
+    await assertFails(deleteObject(archivo));
+    await assertFails(uploadBytes(archivo, new Uint8Array([255, 216, 255]), { contentType: "image/jpeg", customMetadata: { creadoPorUid: uid } }));
+    await assertFails(updateMetadata(archivo, { customMetadata: { creadoPorUid: uid } }));
+    await assertFails(updateMetadata(archivo, { customMetadata: { creadoPorUid: "tecnico-a", otroCampo: "cambio" } }));
+  }
+});
+
+test("los archivos antiguos sin autor siguen legibles y no se pueden borrar ni reclamar", async () => {
+  const ruta = "ots/ot-abierta-a/ingreso/item_0/antiguo.jpg";
+  await sembrarArchivoEvidencia(ruta);
+  for (const uid of ["tecnico-a", "supervisor-a", "jefe-a"]) {
+    const archivo = ref(storageComo(uid), ruta);
+    await assertSucceeds(getBytes(archivo));
+    await assertFails(deleteObject(archivo));
+    await assertFails(updateMetadata(archivo, { customMetadata: { creadoPorUid: uid } }));
+    await assertFails(uploadBytes(archivo, new Uint8Array([255, 216, 255]), { contentType: "image/jpeg", customMetadata: { creadoPorUid: uid } }));
+  }
+});
+
+test("ser propietario no elimina las restricciones de estado, empresa o sucursal", async () => {
+  for (const [uid, otId] of [["taller-b", "ot-abierta-a"], ["taller-a2", "ot-abierta-a"], ["inactivo-a", "ot-abierta-a"], ["tecnico-a", "ot-cerrada-a"]]) {
+    const ruta = `ots/${otId}/ingreso/item_0/${uid}.jpg`;
+    await sembrarArchivoEvidencia(ruta, uid);
+    await assertFails(deleteObject(ref(storageComo(uid), ruta)));
+  }
+});
+
+const ubicacionesEvidencias = {
+  ingreso: fotos => ({ ingreso: [{ item: "Ítem", fotos }] }),
+  evaluacion: fotos => ({ evaluacion: [{ item: "Ítem", fotos }] }),
+  overhaul: fotos => ({ overhaul: [{ item: "Ítem", fotos }] }),
+  pruebasGeneral: fotos => ({ pruebas: { general: [{ fotos }] } }),
+  pruebasMecanicas: fotos => ({ pruebas: { mecanico: [{ fotos }] } }),
+  pruebasElectricas: fotos => ({ pruebas: { electrico: [{ fotos }] } }),
+  despachoPreparacion: fotos => ({ despacho: { preparacion: fotos.map(url => ({ nombre: "Archivo", url })) } }),
+  despachoFinal: fotos => ({ despacho: { final: fotos.map(url => ({ nombre: "Archivo", url })) } }),
+  decisionEvaluacion: fotos => ({ decisionEvaluacion: { documentos: fotos.map(url => ({ url })) } }),
+  decisionMantencion: fotos => ({ decisionMantencion: { documentos: fotos.map(url => ({ url })) } }),
+  decisionPruebas: fotos => ({ decisionPruebas: { documentos: fotos.map(url => ({ url })) } }),
+  decisionDespacho: fotos => ({ decisionDespacho: { documentos: fotos.map(url => ({ url })) } })
+};
+
+for (const [ubicacion, datos] of Object.entries(ubicacionesEvidencias)) {
+  test(`${ubicacion}: protege el enlace ajeno dentro de la OT y permite administrar propios`, async () => {
+    const rutaAjena = "ots/ot-abierta-a/ingreso/item_0/ajeno.jpg";
+    const rutaPropia = "ots/ot-abierta-a/ingreso/item_0/propio.jpg";
+    await sembrarArchivoEvidencia(rutaAjena, "supervisor-a");
+    await sembrarArchivoEvidencia(rutaPropia, "jefe-a");
+    const ajena = urlEvidenciaPrueba(rutaAjena);
+    const propia = urlEvidenciaPrueba(rutaPropia);
+    await testEnv.withSecurityRulesDisabled(contexto => updateDoc(doc(contexto.firestore(), "ots", "ot-abierta-a"), datos([ajena])));
+    for (const uid of ["jefe-a", "tecnico-a"]) {
+      await assert.rejects(autorizarComentariosEnPrueba(uid, "ot-abierta-a", datos([])));
+      await assert.rejects(autorizarComentariosEnPrueba(uid, "ot-abierta-a", Object.fromEntries(Object.keys(datos([])).map(campo => [campo, null]))));
+      await assertFails(updateDoc(doc(firestoreComo(uid), "ots", "ot-abierta-a"), { ...datos([]), etapasConActividad: marcasComentarios }));
+    }
+    for (const lista of [[ajena, propia], [ajena]]) {
+      const cambios = { ...datos(lista), etapasConActividad: marcasComentarios };
+      await autorizarComentariosEnPrueba("jefe-a", "ot-abierta-a", cambios);
+      await assertSucceeds(updateDoc(doc(firestoreComo("jefe-a"), "ots", "ot-abierta-a"), cambios));
+    }
+  });
+}
+
+test("no autoriza adjuntar archivos de otra OT ni quitar un archivo antiguo sin autor", async () => {
+  const ruta = "ots/ot-otra-sucursal-a/ingreso/item_0/propio.jpg";
+  await sembrarArchivoEvidencia(ruta, "tecnico-a");
+  await assert.rejects(autorizarComentariosEnPrueba("tecnico-a", "ot-abierta-a", ubicacionesEvidencias.ingreso([urlEvidenciaPrueba(ruta)])));
+  const antiguo = urlEvidenciaPrueba("ots/ot-abierta-a/documentos/existente.txt");
+  await testEnv.withSecurityRulesDisabled(contexto => updateDoc(doc(contexto.firestore(), "ots", "ot-abierta-a"), ubicacionesEvidencias.ingreso([antiguo])));
+  await assert.rejects(autorizarComentariosEnPrueba("tecnico-a", "ot-abierta-a", ubicacionesEvidencias.ingreso([])));
+  await autorizarComentariosEnPrueba("tecnico-a", "ot-abierta-a", ubicacionesEvidencias.ingreso([antiguo]));
+});
+
+for (const estado of ["cancelacion_solicitada", "periodo_exportacion", "pendiente_eliminacion", "cancelada"]) {
+  test(`${estado}: bloquea archivos propios de los tres roles y conserva descarga`, async () => {
+    for (const uid of ["tecnico-a", "supervisor-a", "jefe-a"]) {
+      const datos = datosArchivoPrueba();
+      const resultado = await archivoEnServidorPrueba(uid, "subir", datos);
+      await testEnv.withSecurityRulesDisabled(contexto => updateDoc(doc(contexto.firestore(), "empresas", "empresa-a"), { activa: true, suscripcion: { estado } }));
+      await assertSucceeds(getBytes(ref(storageComo(uid), decodeURIComponent(new URL(resultado.url).pathname.split("/o/")[1]))));
+      await assert.rejects(archivoEnServidorPrueba(uid, "subir", { ...datos, subidaId: randomUUID() }), { code: "failed-precondition" });
+      await assert.rejects(archivoEnServidorPrueba(uid, "eliminar", { otId: datos.otId, url: resultado.url }), { code: "failed-precondition" });
+      const existente = ref(storageComo(uid), decodeURIComponent(new URL(resultado.url).pathname.split("/o/")[1]));
+      await assertFails(uploadBytes(existente, new Uint8Array([255,216,255]), { contentType: "image/jpeg", customMetadata: { creadoPorUid: uid } }));
+      await assertFails(updateMetadata(existente, { customMetadata: { creadoPorUid: uid, alterado: "sí" } }));
+      await assertFails(deleteObject(existente));
+      await assertSucceeds(getBytes(existente));
+      await testEnv.withSecurityRulesDisabled(contexto => updateDoc(doc(contexto.firestore(), "empresas", "empresa-a"), { activa: true, suscripcion: { estado: "activa" } }));
+      await archivoEnServidorPrueba(uid, "eliminar", { otId: datos.otId, url: resultado.url });
+    }
+  });
+}
+
+test("activa=false bloquea archivos propios aunque la suscripción diga activa", async () => {
+  const datos = datosArchivoPrueba();
+  const resultado = await archivoEnServidorPrueba("tecnico-a", "subir", datos);
+  await testEnv.withSecurityRulesDisabled(contexto => updateDoc(doc(contexto.firestore(), "empresas", "empresa-a"), { activa: false, suscripcion: { estado: "activa" } }));
+  await assertSucceeds(getBytes(ref(storageComo("tecnico-a"), decodeURIComponent(new URL(resultado.url).pathname.split("/o/")[1]))));
+  await assert.rejects(archivoEnServidorPrueba("tecnico-a", "subir", { ...datos, subidaId: randomUUID() }), { code: "failed-precondition" });
+  await assert.rejects(archivoEnServidorPrueba("tecnico-a", "eliminar", { otId: datos.otId, url: resultado.url }), { code: "failed-precondition" });
+});
+
+const rutasCancelacion = [
+  { uid: "admin-a", ruta: "empresas/empresa-a/informe/cancelacion.png", contentType: "image/png" },
+  { uid: "super-admin", ruta: "empresas/empresa-a/informe/cancelacion-super.png", contentType: "image/png" },
+  { uid: "admin-a", ruta: "empresas/empresa-a/plantillas/cancelacion.xlsx", contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" },
+  { uid: "sheq-a", ruta: "empresas/empresa-a/sheq/persona/taller-a/cancelacion.pdf", contentType: "application/pdf" },
+  { uid: "jefe-a", ruta: "empresas/empresa-a/inventario/sucursal-a/item-a/cancelacion.pdf", contentType: "application/pdf" }
+];
+for (const estado of ["cancelacion_solicitada", "periodo_exportacion", "pendiente_eliminacion", "cancelada"]) {
+  test(`${estado}: protege también imagen de empresa, plantillas, SHEQ e inventario`, async () => {
+    // Primero comprobar que las mismas acciones están autorizadas en activo.
+    for (const caso of rutasCancelacion) {
+      const archivo = ref(storageComo(caso.uid), caso.ruta);
+      const bytes = caso.contentType === "image/png" ? Buffer.from([137,80,78,71,13,10,26,10]) : caso.contentType.includes("spreadsheet") ? Buffer.from([80,75,3,4,120,108,47]) : Buffer.from("%PDF-1.4");
+      await archivoEnServidorPrueba(caso.uid, "subirEmpresa", { ruta: caso.ruta, contentType: caso.contentType, base64: bytes.toString("base64") });
+      await assertSucceeds(getBytes(archivo));
+    }
+    await testEnv.withSecurityRulesDisabled(contexto => updateDoc(doc(contexto.firestore(), "empresas", "empresa-a"), { activa: true, suscripcion: { estado } }));
+    for (const caso of rutasCancelacion) {
+      const archivo = ref(storageComo(caso.uid), caso.ruta);
+      await assertSucceeds(getBytes(archivo));
+      await assertFails(uploadBytes(archivo, new Uint8Array([4,5,6]), { contentType: caso.contentType }));
+      await assertFails(uploadBytes(ref(storageComo(caso.uid), caso.ruta + ".nuevo"), new Uint8Array([1,2,3]), { contentType: caso.contentType }));
+      await assertFails(updateMetadata(archivo, { customMetadata: { comprobacion: "cancelada" } }));
+      await assertFails(deleteObject(archivo));
+    }
+  });
+}
+
+test("el servidor conserva las restricciones de empresa, sucursal, rol y cuenta", async () => {
+  for (const uid of ["taller-b", "taller-a2", "inactivo-a", "admin-a", "admin-sucursal-a", "super-admin", "planificador-a", "bodeguero-a", "sheq-a"]) {
+    await assert.rejects(archivoEnServidorPrueba(uid, "subir", datosArchivoPrueba()));
+  }
+  await assert.rejects(archivoEnServidorPrueba("tecnico-a", "subir", { ...datosArchivoPrueba(), otId: "ot-cerrada-a" }), { code: "failed-precondition" });
+});
+
+test("el servidor rechaza archivos con formato inválido aunque se evite la interfaz", async () => {
+  for (const tipo of ["text/plain", "image/gif", "image/svg+xml", "application/octet-stream", "image/jpeg"]) {
+    await assert.rejects(archivoEnServidorPrueba("tecnico-a", "subir", datosArchivoPrueba(tipo, Buffer.from("contenido inválido"))), { code: "invalid-argument" });
+  }
+});
+
+test("la cuota de empresa impide que dos cargas simultáneas ocupen el mismo espacio", async () => {
+  await testEnv.withSecurityRulesDisabled(async contexto => {
+    const db = contexto.firestore();
+    await setDoc(doc(db, "empresas", "empresa-cuota"), { activa: true, storageCuotaVersion: 1, maxStorageGB: 10 / 1024 ** 3, storageUsadoBytes: 0, storageReservadoBytes: 0, storageArchivos: 0 });
+    await setDoc(doc(db, "ots", "ot-cuota"), { empresaId: "empresa-cuota", sucursalId: "sucursal-a", cerrada: false, estado: "INGRESO" });
+    for (const uid of ["tecnico-a", "jefe-a"]) await updateDoc(doc(db, "usuarios", uid), { empresaId: "empresa-cuota" });
+  });
+  const actores = ["tecnico-a", "jefe-a"];
+  const resultados = await Promise.allSettled(actores.map(uid => archivoEnServidorPrueba(uid, "subir", { ...datosArchivoPrueba("image/jpeg", Buffer.from([255,216,255,0,0,0])), otId: "ot-cuota" })));
+  assert.equal(resultados.filter(r => r.status === "fulfilled").length, 1);
+  assert.equal(resultados.find(r => r.status === "rejected").reason.code, "resource-exhausted");
+  const db = firestoreComo("tecnico-a");
+  const estado = (await getDoc(doc(db, "empresas", "empresa-cuota"))).data();
+  assert.equal(estado.storageUsadoBytes, 6); assert.equal(estado.storageReservadoBytes, 0); assert.equal(estado.storageArchivos, 1);
+  const indice = resultados.findIndex(r => r.status === "fulfilled");
+  await archivoEnServidorPrueba(actores[indice], "eliminar", { otId: "ot-cuota", url: resultados[indice].value.url });
+  assert.equal((await getDoc(doc(db, "empresas", "empresa-cuota"))).data().storageUsadoBytes, 0);
+});
+
+test("un administrador de empresa no puede alterar el contador ni sus reservas", async () => {
+  const db = firestoreComo("admin-a");
+  for (const cambios of [{ storageUsadoBytes: 0 }, { storageReservadoBytes: 0 }, { storageCuotaVersion: 1 }]) {
+    // Elegir un valor diferente al inicial para comprobar realmente la prohibición.
+    const clave = Object.keys(cambios)[0];
+    await assertFails(updateDoc(doc(db, "empresas", "empresa-a"), { [clave]: 123 }));
+  }
+  await assertFails(setDoc(doc(db, "empresas/empresa-a/reservasAlmacenamiento/falsa"), { bytes: 0, estado: "confirmada" }));
 });

@@ -1,3 +1,4 @@
+import { puedeEliminarArchivoStorage, protegerBotonEliminarEvidencia } from "./core/autoriaEvidencias.js";
 // ==========================================
 // MÓDULO OVERHAUL / MANTENCIÓN — OVERTRACK
 // ==========================================
@@ -529,6 +530,7 @@ export function inicializarModuloOverhaul(servicios) {
 
       btn.onclick = () =>
         eliminarFotoOverhaul(i, index);
+      protegerBotonEliminarEvidencia(btn, foto);
 
       container.appendChild(vista);
       container.appendChild(btn);
@@ -556,6 +558,7 @@ export function inicializarModuloOverhaul(servicios) {
 
     const urlFoto =
       ot.overhaul[i].fotos[index];
+    if (!(await puedeEliminarArchivoStorage(urlFoto))) return;
 
     try {
       ot.overhaul[i].fotos.splice(
@@ -784,6 +787,7 @@ export function inicializarModuloOverhaul(servicios) {
     }
 
     const comentarioEliminado = ot.overhaul[i].comentarios[index];
+    if (!puedeEliminarComentario(comentarioEliminado)) return;
     const alertaJefeAnterior = ot.alertaJefe;
     ot.overhaul[i].comentarios.splice(
       index,

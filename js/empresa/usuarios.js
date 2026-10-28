@@ -366,6 +366,18 @@ async function cargarUsuariosEmpresa() {
   }
 }
 
+function puedeEliminarUsuarioEmpresa(usuario) {
+  if (!usuario || !auth.currentUser || auth.currentUser.uid === usuario.uid ||
+      usuario.rol === "super_admin" || !usuario.empresaId ||
+      usuario.empresaId !== window.empresaIdActualAdmin) return false;
+  if (usuarioActivo?.rol === "super_admin") return true;
+  if (usuarioActivo?.empresaId !== usuario.empresaId) return false;
+  if (usuarioActivo?.rol === "admin_empresa") return true;
+  return usuarioActivo?.rol === "admin_sucursal" && Boolean(usuarioActivo.sucursalId) &&
+    usuario.sucursalId === usuarioActivo.sucursalId &&
+    !["admin_empresa", "admin_sucursal"].includes(usuario.rol);
+}
+
 function renderTablaUsuariosEmpresa(lista) {
   const tbody = document.getElementById("tablaUsuariosEmpresa");
   if (!tbody) return;
@@ -389,6 +401,7 @@ function renderTablaUsuariosEmpresa(lista) {
     const requiereSucursal = ["admin_sucursal", "jefe_taller", "supervisor", "tecnico", "planificador", "bodeguero", "sheq"].includes(usuario.rol);
     const pendienteSucursal = requiereSucursal && !usuario.sucursalId;
     const puedeCambiarSucursal = ["super_admin", "admin_empresa"].includes(usuarioActivo?.rol) && requiereSucursal;
+    const puedeEliminar = puedeEliminarUsuarioEmpresa(usuario);
 
     return `
     <tr>
@@ -436,7 +449,7 @@ function renderTablaUsuariosEmpresa(lista) {
           >
             ${usuario.suspendidoPorSucursal ? "Acceso suspendido" : usuario.activo ? "Desactivar" : "Activar"}
           </button>
-          ${auth.currentUser?.uid !== usuario.uid ? `
+          ${puedeEliminar ? `
             <button class="btn-danger" onclick="eliminarUsuarioEmpresa('${usuario.uid}')">
               Eliminar
             </button>
@@ -636,14 +649,10 @@ window.cambiarEstadoUsuarioEmpresa = async function (uid, nuevoEstado) {
 
 window.eliminarUsuarioEmpresa = async function (uid) {
   const usuario = usuariosEmpresa.find(item => item.uid === uid);
-  if (!usuario || usuario.rol === "super_admin") return;
-  if (!usuario) {
-    alert("No se encontró el usuario seleccionado");
-    return;
-  }
-
-  if (auth.currentUser?.uid === uid) {
-    alert("No puedes eliminar tu propia cuenta");
+  if (!puedeEliminarUsuarioEmpresa(usuario)) {
+    alert(auth.currentUser?.uid === uid
+      ? "No puedes eliminar tu propia cuenta"
+      : "No puedes eliminar este usuario");
     return;
   }
 

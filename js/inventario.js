@@ -1,3 +1,4 @@
+import { uploadBytes, deleteObject } from "./storage-seguro.js";
 import { db, storage } from "./firebase-config.js";
 import { protegerPagina, cerrarSesion } from "./session.js?v=20261017-1";
 import { moduloActivo } from "./modulos.js?v=20261018-2";
@@ -9,7 +10,7 @@ import {
   getCountFromServer, limit, orderBy, query, serverTimestamp, setDoc,
   startAfter, updateDoc, where, writeBatch
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-import { deleteObject, getDownloadURL, ref, uploadBytes } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
+import { getDownloadURL, ref } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 
 const usuario = protegerPagina(["admin_empresa", "admin_sucursal", "jefe_taller", "planificador", "bodeguero"]);
 if (!usuario) throw new Error("Acceso no autorizado");

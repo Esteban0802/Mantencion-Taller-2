@@ -1,3 +1,4 @@
+import { puedeEliminarArchivoStorage, protegerBotonEliminarEvidencia } from "./core/autoriaEvidencias.js";
 // ==========================================
 // MÓDULO EVALUACIÓN — OVERTRACK
 // ==========================================
@@ -557,6 +558,7 @@ export function inicializarModuloEvaluacion(servicios) {
 
       btn.onclick = () =>
         eliminarFotoEvaluacion(i, index);
+      protegerBotonEliminarEvidencia(btn, foto);
 
 
       cont.appendChild(vista);
@@ -587,7 +589,7 @@ export function inicializarModuloEvaluacion(servicios) {
     const foto =
       ot.evaluacion?.[i]?.fotos?.[index];
 
-    if (!foto) return;
+    if (!foto || !(await puedeEliminarArchivoStorage(foto))) return;
 
 
     try {

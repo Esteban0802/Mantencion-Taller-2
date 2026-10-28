@@ -1,3 +1,4 @@
+import { puedeEliminarArchivoStorage, protegerBotonEliminarEvidencia } from "./core/autoriaEvidencias.js";
 import {
   capturarBorradoresFormulario,
   restaurarBorradoresFormulario
@@ -608,6 +609,7 @@ function mostrarFotosPrueba(tipo, index) {
         fotoIndex
       );
 
+    protegerBotonEliminarEvidencia(btn, foto);
     container.appendChild(vista);
     container.appendChild(btn);
 
@@ -637,7 +639,7 @@ async function eliminarFotoPrueba(
 
   const urlFoto = fotos[fotoIndex];
 
-  if (!urlFoto) return;
+  if (!urlFoto || !(await puedeEliminarArchivoStorage(urlFoto))) return;
 
   try {
     fotos.splice(fotoIndex, 1);
@@ -864,6 +866,7 @@ async function eliminarComentarioPrueba(
   }
 
   const comentarioEliminado = comentarios[comentarioIndex];
+  if (!puedeEliminarComentario(comentarioEliminado)) return;
   const alertaJefeAnterior = ot.alertaJefe;
   comentarios.splice(comentarioIndex, 1);
 

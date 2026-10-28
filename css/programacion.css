@@ -107,6 +107,9 @@
 .programacion-page .asignacion-dato:last-child{border-bottom:0}
 .programacion-page .asignacion-dato strong{color:#23445f;font-size:.72rem;text-transform:uppercase;letter-spacing:.02em}
 .programacion-page .asignacion-dato span{min-width:0;color:#4d6173;overflow-wrap:anywhere}
+.programacion-page .asignacion-dato.asignacion-equipo{margin:3px -4px;padding:7px 4px;border:1px solid rgba(20,117,201,.16);border-radius:7px;background:rgba(255,255,255,.58)}
+.programacion-page .asignacion-dato.asignacion-equipo strong{color:#0b65ad}
+.programacion-page .asignacion-dato.asignacion-equipo span{font-weight:700;color:#284d69}
 .programacion-page .programacion-tabla-wrap.vista-personal{overflow-x:visible}
 .programacion-page .programacion-cuadro.vista-personal{width:100%;min-width:0}
 @media(max-width:800px){

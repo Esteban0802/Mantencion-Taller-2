@@ -357,12 +357,14 @@ export async function responderComentarioJefe(
         atendido: comentario.atendido,
         respuestaUsuario: comentario.respuestaUsuario,
         atendidoPor: comentario.atendidoPor,
+        atendidoPorUid: comentario.atendidoPorUid,
         fechaAtendido: comentario.fechaAtendido,
         alertaJefe: obtenerOT()?.alertaJefe
     };
 
     try {
         comentario.atendido = true;
+        comentario.atendidoPorUid = usuario?.uid || "";
         comentario.respuestaUsuario =
             respuesta.trim();
 
@@ -379,6 +381,8 @@ export async function responderComentarioJefe(
             comentario.atendido = estadoAnterior.atendido;
             comentario.respuestaUsuario = estadoAnterior.respuestaUsuario;
             comentario.atendidoPor = estadoAnterior.atendidoPor;
+            if (estadoAnterior.atendidoPorUid === undefined) delete comentario.atendidoPorUid;
+            else comentario.atendidoPorUid = estadoAnterior.atendidoPorUid;
             comentario.fechaAtendido = estadoAnterior.fechaAtendido;
             const ot = obtenerOT();
             if (ot) ot.alertaJefe = estadoAnterior.alertaJefe;
@@ -528,6 +532,7 @@ export async function eliminarComentarioIngreso(
     }
 
     const comentarioEliminado = comentarios[comentarioIndex];
+    if (!puedeEliminarComentario?.(comentarioEliminado)) return;
     const alertaJefeAnterior = ot.alertaJefe;
     comentarios.splice(comentarioIndex, 1);
 
@@ -672,6 +677,7 @@ export async function eliminarComentarioEvaluacion(
     }
 
     const comentarioEliminado = comentarios[comentarioIndex];
+    if (!puedeEliminarComentario?.(comentarioEliminado)) return;
     const alertaJefeAnterior = ot.alertaJefe;
     comentarios.splice(comentarioIndex, 1);
 
@@ -879,12 +885,14 @@ export async function responderComentarioJefeDespacho(
         atendido: comentario.atendido,
         respuestaUsuario: comentario.respuestaUsuario,
         atendidoPor: comentario.atendidoPor,
+        atendidoPorUid: comentario.atendidoPorUid,
         fechaAtendido: comentario.fechaAtendido,
         alertaJefe: obtenerOT()?.alertaJefe
     };
 
     try {
         comentario.atendido = true;
+        comentario.atendidoPorUid = usuario?.uid || "";
         comentario.respuestaUsuario =
             respuesta.trim();
 
@@ -901,6 +909,8 @@ export async function responderComentarioJefeDespacho(
             comentario.atendido = estadoAnterior.atendido;
             comentario.respuestaUsuario = estadoAnterior.respuestaUsuario;
             comentario.atendidoPor = estadoAnterior.atendidoPor;
+            if (estadoAnterior.atendidoPorUid === undefined) delete comentario.atendidoPorUid;
+            else comentario.atendidoPorUid = estadoAnterior.atendidoPorUid;
             comentario.fechaAtendido = estadoAnterior.fechaAtendido;
             const ot = obtenerOT();
             if (ot) ot.alertaJefe = estadoAnterior.alertaJefe;
@@ -933,6 +943,7 @@ export async function eliminarComentarioDespacho(
     }
 
     const comentarioEliminado = lista[comentarioIndex];
+    if (!puedeEliminarComentario?.(comentarioEliminado)) return;
     const alertaJefeAnterior = ot?.alertaJefe;
     lista.splice(comentarioIndex, 1);
 

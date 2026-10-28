@@ -1,3 +1,4 @@
+import { puedeEliminarArchivoStorage, protegerBotonEliminarEvidencia } from "./core/autoriaEvidencias.js";
 // ==========================================
 // MÓDULO DESPACHO — OVERTRACK
 // ==========================================
@@ -224,6 +225,7 @@ export function inicializarModuloDespacho(servicios) {
         </div>
       `;
 
+      protegerBotonEliminarEvidencia(div.querySelector(".btn-doc-delete"), doc.url);
       cont.appendChild(div);
     });
   }
@@ -264,6 +266,7 @@ export function inicializarModuloDespacho(servicios) {
     }))) return;
 
     const documentoEliminado = documentos[index];
+    if (!(await puedeEliminarArchivoStorage(documentoEliminado.url))) return;
     documentos.splice(index, 1);
 
     const guardado = await guardarCambiosOT();

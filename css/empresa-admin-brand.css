@@ -1084,3 +1084,6 @@ body {
   .mobile-card-table .tabla-admin .tabla-vacia::before,
   .mobile-card-table .tabla-admin td[colspan]::before { content: none; }
 }
+
+.cuota-almacenamiento{padding:20px;margin:0 0 22px;border:1px solid #dbe6ef;border-radius:14px;background:#fff;color:#24425b}
+.cuota-encabezado{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}.cuota-encabezado h3{margin:0;font-size:1rem}.cuota-encabezado strong{font-size:.8rem;color:#267347}.cuota-almacenamiento p{margin:12px 0;font-size:.9rem}.cuota-almacenamiento small{color:#60788c}.cuota-almacenamiento progress{width:100%;height:14px;accent-color:#228156}.cuota-preventivo progress{accent-color:#bb8b0c}.cuota-critico progress{accent-color:#cf6716}.cuota-bloqueado progress{accent-color:#bd3443}.cuota-preventivo .cuota-encabezado strong{color:#8b6907}.cuota-critico .cuota-encabezado strong{color:#a64c0b}.cuota-bloqueado .cuota-encabezado strong{color:#b22938}

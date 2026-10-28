@@ -3,7 +3,11 @@ const { onObjectFinalized, onObjectDeleted } = require("firebase-functions/stora
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { initializeApp } = require("firebase-admin/app");
 const { getAuth } = require("firebase-admin/auth");
-const { getFirestore, FieldValue } = require("firebase-admin/firestore");
+const { getFirestore, FieldValue, Timestamp } = require("firebase-admin/firestore");
+const { autorizarEtapasOT } = require("./comentarios-ot");
+const archivosOT = require("./archivos-ot");
+const archivosEmpresa = require("./archivos-empresa");
+const { actualizarReserva } = require("./cuota-storage");
 const { getStorage } = require("firebase-admin/storage");
 const crypto = require("node:crypto");
 
@@ -538,6 +542,11 @@ async function empresaIdDesdeRutaStorage(ruta) {
 
 async function registrarCambioStorage(evento, signo) {
   const archivo = evento.data;
+  if (archivo.metadata?.cuotaReservaId && archivo.metadata?.cuotaEmpresaId) {
+    await actualizarReserva({ db, empresaId: archivo.metadata.cuotaEmpresaId,
+      id: archivo.metadata.cuotaReservaId, eliminar: signo < 0 });
+    return;
+  }
   const empresaId = await empresaIdDesdeRutaStorage(archivo.name);
   const bytes = Math.max(0, Number(archivo.size || 0));
   if (!empresaId || !bytes || !evento.id) return;
@@ -552,6 +561,13 @@ async function registrarCambioStorage(evento, signo) {
       transaction.get(eventoRef)
     ]);
     if (!empresaSnap.exists || eventoSnap.exists) return;
+
+    const corte = Number(empresaSnap.data().storageMedicionInicialEn || 0);
+    const fecha = Date.parse(signo > 0 ? archivo.timeCreated : evento.time);
+    if (corte && Number.isFinite(fecha) && fecha <= corte) {
+      transaction.set(eventoRef, { empresaId, tipo: "incluido_en_medicion_inicial", fecha: FieldValue.serverTimestamp() });
+      return;
+    }
 
     const usadoActual = Math.max(0, Number(empresaSnap.data().storageUsadoBytes || 0));
     const archivosActuales = Math.max(0, Number(empresaSnap.data().storageArchivos || 0));
@@ -580,6 +596,71 @@ exports.contabilizarArchivoEliminado = onObjectDeleted(
   { region: REGION, maxInstances: 5 },
   evento => registrarCambioStorage(evento, -1)
 );
+
+function operacionArchivoOT(operacion) {
+  return onCall({ ...CALLABLE_OPTIONS, timeoutSeconds: 120, memory: "512MiB", concurrency: 1 }, async request => {
+    const usuario = await obtenerSolicitante(request);
+    try {
+      return await operacion({ db, bucket, usuario, datos: request.data || {} });
+    } catch (error) {
+      const codigos = ["permission-denied", "failed-precondition", "invalid-argument", "not-found", "internal", "resource-exhausted"];
+      if (codigos.includes(error.code)) throw new HttpsError(error.code, error.message);
+      console.error("operacionArchivoOT", error.code || error.name);
+      throw new HttpsError("internal", "No fue posible completar la operación del archivo.");
+    }
+  });
+}
+
+exports.subirArchivoOT = operacionArchivoOT(archivosOT.subirArchivoOT);
+exports.eliminarArchivoOT = operacionArchivoOT(archivosOT.eliminarArchivoOT);
+exports.subirArchivoEmpresa = operacionArchivoOT(archivosEmpresa.subirArchivoEmpresa);
+exports.eliminarArchivoEmpresa = operacionArchivoOT(archivosEmpresa.eliminarArchivoEmpresa);
+
+exports.conciliarReservasAlmacenamiento = onSchedule({
+  schedule: "every 60 minutes", region: REGION, timeoutSeconds: 300, maxInstances: 1
+}, async () => {
+  const empresas = await db.collection("empresas").get();
+  for (const empresa of empresas.docs) {
+    const reservas = await empresa.ref.collection("reservasAlmacenamiento").where("estado", "==", "reservada").get();
+    for (const reserva of reservas.docs) {
+      if (Number(reserva.data().creadaEn) > Date.now() - 10 * 60 * 1000) continue;
+      try {
+        const [metadata] = await bucket.file(reserva.data().ruta).getMetadata();
+        await actualizarReserva({ db, empresaId: empresa.id, id: reserva.id,
+          eliminar: metadata.metadata?.cuotaReservaId !== reserva.id });
+      } catch (e) {
+        if (Number(e.code) === 404) await actualizarReserva({ db, empresaId: empresa.id, id: reserva.id, eliminar: true });
+        else console.error("conciliarReserva", empresa.id, e.code);
+      }
+    }
+  }
+});
+
+exports.validarComentariosOT = onCall(CALLABLE_OPTIONS, async request => {
+  const usuario = await obtenerSolicitante(request);
+  const otId = texto(request.data?.otId, 128);
+  if (!otId || otId.includes("/") || !request.data?.etapas || typeof request.data.etapas !== "object") {
+    throw new HttpsError("invalid-argument", "La OT y sus etapas son obligatorias.");
+  }
+  await exigirEmpresaOperativa(usuario.empresaId, usuario);
+  try {
+    await autorizarEtapasOT({
+      db, usuario, otId, etapas: request.data.etapas,
+      empresaId: request.data.empresaId, sucursalId: request.data.sucursalId,
+      venceEn: Timestamp.fromMillis(Date.now() + 5 * 60 * 1000),
+      evidencias: {
+        bucketName: bucket.name,
+        obtenerAutorArchivo: async ruta => {
+          const [metadata] = await bucket.file(ruta).getMetadata();
+          return metadata.metadata?.creadoPorUid || "";
+        }
+      }
+    });
+  } catch (error) {
+    throw new HttpsError("permission-denied", error.message);
+  }
+  return { ok: true };
+});
 
 exports.crearUsuarioEmpresa = onCall(CALLABLE_OPTIONS, async request => {
   const solicitante = await obtenerSolicitante(request);
@@ -859,6 +940,17 @@ exports.recalcularAlmacenamientoEmpresa = onCall(
       throw new HttpsError("not-found", "La empresa no existe.");
     }
 
+    if (empresaSnap.data().storageCuotaVersion === 1) {
+      return { totalBytes: Number(empresaSnap.data().storageUsadoBytes || 0), totalArchivos: Number(empresaSnap.data().storageArchivos || 0) };
+    }
+    const inicioMedicion = Date.now();
+    await db.runTransaction(async tx => {
+      const actual = await tx.get(empresaRef);
+      if (actual.data().storageCuotaVersion === 1 || Number(actual.data().storageRecalculando || 0) > Date.now() - 10 * 60 * 1000) {
+        throw new HttpsError("failed-precondition", "La medición ya está en curso. Espera un momento y actualiza el panel.");
+      }
+      tx.update(empresaRef, { storageRecalculando: inicioMedicion });
+    });
     const otsSnap = await db.collection("ots")
       .where("empresaId", "==", empresaId)
       .get();
@@ -883,6 +975,8 @@ exports.recalcularAlmacenamientoEmpresa = onCall(
     await empresaRef.update({
       storageUsadoBytes: totalBytes,
       storageArchivos: totalArchivos,
+      storageCuotaVersion: 1, storageReservadoBytes: 0, storageRecalculando: 0,
+      storageMedicionInicialEn: inicioMedicion, storageActualizadoEnMs: Date.now(),
       storageActualizadoEn: FieldValue.serverTimestamp(),
       storageRecalculadoPor: solicitante.uid
     });
@@ -1064,8 +1158,13 @@ exports.eliminarUsuarioEmpresa = onCall(CALLABLE_OPTIONS, async request => {
       !puedeAdministrarEmpresa(solicitante, objetivo.empresaId)) {
     throw new HttpsError("permission-denied", "No puedes eliminar este usuario.");
   }
-  if (solicitante.rol === "admin_sucursal") {
-    throw new HttpsError("permission-denied", "Solo un administrador de empresa puede eliminar usuarios.");
+  if (solicitante.rol === "admin_sucursal" &&
+      (!solicitante.sucursalId || objetivo.sucursalId !== solicitante.sucursalId ||
+       ["admin_empresa", "admin_sucursal"].includes(objetivo.rol))) {
+    throw new HttpsError(
+      "permission-denied",
+      "Solo puedes eliminar usuarios no administrativos de tu sucursal."
+    );
   }
   await exigirEmpresaOperativa(objetivo.empresaId, solicitante);
 
@@ -1148,6 +1247,7 @@ exports.crearEmpresaConAdministrador = onCall(CALLABLE_OPTIONS, async request =>
       maxUsuarios: Number(plan.maxUsuarios || 0),
       maxOTMensuales: Number(plan.maxOTMensuales || 0),
       maxSucursales: Number(plan.maxSucursales || 0),
+      storageCuotaVersion: 1, storageUsadoBytes: 0, storageReservadoBytes: 0, storageArchivos: 0,
       maxStorageGB: Number(plan.maxStorageGB || 0),
       maxModulosElegibles,
       modulosContratados,

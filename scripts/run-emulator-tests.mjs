@@ -23,12 +23,16 @@ const targets = {
     emulators: "hosting",
     command: "node --test tests/hosting-smoke.test.mjs",
   },
+  archivos: {
+    emulators: "auth,functions,firestore,storage",
+    command: "node --test tests/archivos-callable.test.mjs",
+  },
 };
 
 const selected = targets[process.argv[2]];
 
 if (!selected) {
-  console.error("Uso: node scripts/run-emulator-tests.mjs <rules|hosting>");
+  console.error("Uso: node scripts/run-emulator-tests.mjs <rules|hosting|archivos>");
   process.exit(1);
 }
 
@@ -54,6 +58,7 @@ const result = spawnSync(
       CI: "true",
       FIREBASE_CLI_DISABLE_UPDATE_CHECK: "true",
       NO_UPDATE_NOTIFIER: "1",
+      FUNCTIONS_DISCOVERY_TIMEOUT: process.env.FUNCTIONS_DISCOVERY_TIMEOUT || "60",
       XDG_CONFIG_HOME: configDirectory,
     },
     stdio: "inherit",

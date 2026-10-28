@@ -1,23 +1,21 @@
-import { auth, db, storage } from "../../firebase-config.js";
+import { app, auth, db } from "../../firebase-config.js";
 import { getOT } from "../contexto.js";
 import { evaluarCuotaStorage, mensajeCuotaStorage } from "../../storage-quota.js";
 import { medirAsync } from "./rendimiento.js";
 import { validarFirmaArchivo } from "../../file-validation.js";
+import { puedeEliminarArchivoStorage } from "./autoriaEvidencias.js";
 
-import {
-    ref,
-    uploadBytes,
-    getDownloadURL,
-    deleteObject
-} from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
+import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-functions.js";
 
 import {
     doc,
     getDoc
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-let bytesSubidosEnSesion = 0;
-const bytesPorUrlSesion = new Map();
+const funcionesArchivos = getFunctions(app, "us-central1");
+const subirArchivoSeguro = httpsCallable(funcionesArchivos, "subirArchivoOT", { timeout: 120000 });
+const eliminarArchivoSeguro = httpsCallable(funcionesArchivos, "eliminarArchivoOT", { timeout: 120000 });
+
 const CONTEXTO_CACHE_MS = 5 * 60 * 1000;
 let contextoCargaCache = null;
 let contextoCargaPendiente = null;
@@ -50,22 +48,22 @@ const TIPOS_EVIDENCIA_OT = new Set([
     "application/pdf"
 ]);
 
-function errorStorageReintentable(error) {
+function errorCargaReintentable(error) {
     return [
-        "storage/retry-limit-exceeded",
-        "storage/unknown",
-        "storage/server-file-wrong-size"
+        "functions/unavailable",
+        "functions/deadline-exceeded",
+        "functions/internal"
     ].includes(error?.code) || !navigator.onLine;
 }
 
-async function subirConReintentos(archivoRef, file, metadata, maximoIntentos = 3) {
+async function subirConReintentos(datos, maximoIntentos = 3) {
     let ultimoError = null;
     for (let intento = 1; intento <= maximoIntentos; intento++) {
         try {
-            return await uploadBytes(archivoRef, file, metadata);
+            return (await subirArchivoSeguro(datos)).data;
         } catch (error) {
             ultimoError = error;
-            if (intento === maximoIntentos || !errorStorageReintentable(error)) throw error;
+            if (intento === maximoIntentos || !errorCargaReintentable(error)) throw error;
             await new Promise(resolve => setTimeout(resolve, 500 * (2 ** (intento - 1))));
         }
     }
@@ -98,14 +96,11 @@ async function validarCuotaAntesDeSubir(file, otId, contexto = null) {
     }
     if (!empresaId) throw new Error("No fue posible identificar la empresa de la OT.");
 
-    let empresa = contexto?.empresa || null;
-    if (!empresa) {
-        const empresaSnap = await getDoc(doc(db, "empresas", empresaId));
-        if (!empresaSnap.exists()) throw new Error("No se encontró la empresa de la OT.");
-        empresa = empresaSnap.data();
-    }
+    const empresaSnap = await getDoc(doc(db, "empresas", empresaId));
+    if (!empresaSnap.exists()) throw new Error("No se encontró la empresa de la OT.");
+    const empresa = empresaSnap.data();
     const resultado = evaluarCuotaStorage({
-        usadoBytes: Number(empresa.storageUsadoBytes || 0) + bytesSubidosEnSesion,
+        usadoBytes: Number(empresa.storageUsadoBytes || 0) + Number(empresa.storageReservadoBytes || 0),
         maxStorageGB: empresa.maxStorageGB,
         nuevoBytes: file.size
     });
@@ -158,7 +153,10 @@ async function validarContextoCarga(otId, file) {
 
         const empresaSnap = await getDoc(doc(db, "empresas", orden.empresaId));
         if (!empresaSnap.exists()) throw new Error("No se encontró la empresa asociada a la OT.");
-        if (empresaSnap.data().activa === false) throw new Error("La empresa está inactiva y no permite nuevas cargas.");
+        if (empresaSnap.data().activa === false ||
+            ["cancelacion_solicitada", "periodo_exportacion", "pendiente_eliminacion", "cancelada"].includes(empresaSnap.data().suscripcion?.estado)) {
+            throw new Error("La empresa está inactiva o en cancelación. Solo permite consultar y descargar archivos.");
+        }
 
         const contexto = {
             rol: perfil.rol || "sin rol",
@@ -214,33 +212,18 @@ async function subirArchivoStorageInterno(file, etapa, itemIndex) {
     const contextoCarga = await validarContextoCarga(otId, file);
     await validarCuotaAntesDeSubir(file, otId, contextoCarga);
 
-    const nombreArchivo = `${Date.now()}_${file.name}`;
-
-    const ruta =
-        `ots/${otId}/${etapa}/item_${itemIndex}/${nombreArchivo}`;
-
-    const archivoRef = ref(storage, ruta);
-
-    try {
-        await subirConReintentos(archivoRef, file, { contentType });
-    } catch (error) {
-        if (error?.code === "storage/unauthorized") {
-            console.error("Contexto rechazado por Firebase Storage:", contextoCarga);
-            throw new Error(`Firebase rechazó la carga aunque los datos locales coinciden. Rol: ${contextoCarga.rol}; sucursal usuario: ${contextoCarga.sucursalUsuario}; sucursal OT: ${contextoCarga.sucursalOt}; archivo: ${contextoCarga.tipo}.`);
-        }
-        throw error;
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    let binario = "";
+    for (let indice = 0; indice < bytes.length; indice += 32768) {
+        binario += String.fromCharCode(...bytes.subarray(indice, indice + 32768));
     }
-
-    try {
-        const urlArchivo = await getDownloadURL(archivoRef);
-        const bytesArchivo = Math.max(0, Number(file.size || 0));
-        bytesSubidosEnSesion += bytesArchivo;
-        bytesPorUrlSesion.set(urlArchivo, bytesArchivo);
-        return urlArchivo;
-    } catch (error) {
-        await deleteObject(archivoRef).catch(() => {});
-        throw error;
-    }
+    const respuesta = await subirConReintentos({
+        otId, etapa, itemIndex, nombre: file.name, contentType,
+        subidaId: crypto.randomUUID(), base64: btoa(binario)
+    });
+    const urlArchivo = respuesta.url;
+    if (!urlArchivo) throw new Error("El servidor no devolvió el enlace del archivo.");
+    return urlArchivo;
 }
 
 export async function subirArchivoStorage(file, etapa, itemIndex) {
@@ -257,27 +240,26 @@ async function eliminarArchivoStorageInterno(urlArchivo) {
 
     if (!urlArchivo) return false;
 
-    const archivoRef = ref(storage, urlArchivo);
+    if (!(await puedeEliminarArchivoStorage(urlArchivo))) {
+        await alert("Solo puedes eliminar tus propias evidencias. Los archivos sin autor identificado están protegidos.");
+        return false;
+    }
+
+    const otId = localStorage.getItem("otActiva");
+    if (!otId) return false;
 
     for (let intento = 1; intento <= 3; intento++) {
         try {
-            await deleteObject(archivoRef);
-
-            const bytesArchivo = bytesPorUrlSesion.get(urlArchivo) || 0;
-            bytesSubidosEnSesion = Math.max(0, bytesSubidosEnSesion - bytesArchivo);
-            bytesPorUrlSesion.delete(urlArchivo);
+            await eliminarArchivoSeguro({ otId, url: urlArchivo });
 
             console.log("Archivo eliminado de Firebase Storage ✅");
             return true;
         } catch (error) {
             if (error?.code === "storage/object-not-found") {
-                const bytesArchivo = bytesPorUrlSesion.get(urlArchivo) || 0;
-                bytesSubidosEnSesion = Math.max(0, bytesSubidosEnSesion - bytesArchivo);
-                bytesPorUrlSesion.delete(urlArchivo);
                 return true;
             }
 
-            if (intento === 3) {
+            if (intento === 3 || ["functions/permission-denied", "functions/failed-precondition", "functions/invalid-argument"].includes(error?.code)) {
                 console.warn("No se pudo eliminar archivo de Storage:", error);
                 return false;
             }

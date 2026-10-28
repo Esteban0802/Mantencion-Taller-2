@@ -6,7 +6,7 @@
     "node": "22"
   },
   "scripts": {
-    "check": "node --check index.js",
+    "check": "node --check index.js && node --check comentarios-ot.js && node --check evidencias-ot.js && node --check archivos-ot.js && node --check cuota-storage.js && node --check archivos-empresa.js",
     "serve": "firebase emulators:start --only functions",
     "deploy": "firebase deploy --only functions"
   },

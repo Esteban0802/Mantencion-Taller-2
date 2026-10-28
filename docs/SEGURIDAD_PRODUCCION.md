@@ -2,6 +2,21 @@
 
 Este documento reúne las tareas de seguridad y continuidad necesarias para producción. Los respaldos, las alertas de costos y la política de conservación pueden configurarse antes de disponer del dominio definitivo. App Check y las restricciones web definitivas se activan después de conectar el dominio.
 
+## Pendiente de alta prioridad: control de costos de Firebase
+
+- Estado: pendiente; registrado el 27 de octubre de 2026 por solicitud del propietario.
+- Orden acordado: abordarlo al terminar el listado actual de la auditoría, antes de habilitar producción para clientes reales.
+- Revisar el gasto real por servicio y acordar un presupuesto mensual con el propietario.
+- Configurar presupuesto y alertas para el proyecto Vectaria, con destinatarios y umbrales acordados.
+- Evaluar límites de gasto para los servicios compatibles, considerando sus demoras y el impacto de una pausa.
+- Revisar instancias, concurrencia y tiempos de las funciones.
+- Definir límites de frecuencia para cargas, descargas y generación de respaldos.
+- Verificar App Check, permisos y restricciones de acceso para reducir abuso.
+- Definir responsables, seguimiento del gasto y un procedimiento de respuesta ante aumentos inesperados.
+
+La cuota por empresa y su visor no sustituyen estos controles de facturación.
+Este pendiente no configura servicios ni autoriza despliegues, cambios de facturación o pausas del servicio.
+
 ## 1. Firebase App Check
 
 1. Registrar la aplicación web `overtrack-42387` en App Check.

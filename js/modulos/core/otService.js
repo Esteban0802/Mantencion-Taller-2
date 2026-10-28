@@ -1,6 +1,7 @@
 import { db } from "../../firebase-config.js";
 import { guardarResumenOT } from "./resumenOT.js";
 import { iniciarMedicion } from "./rendimiento.js";
+import { autorizarComentariosOT } from "./comentariosSeguros.js?v=20261027-2";
 
 import {
     doc,
@@ -194,6 +195,8 @@ export async function guardarCambiosOT(
 
         const revisionLocal = Math.max(0, Number(ot.revision || 0));
         const nuevaRevision = revisionLocal + 1;
+
+        await autorizarComentariosOT(id, datosActualizar);
 
         await runTransaction(db, async transaction => {
             const referencia = doc(db, "ots", id);

@@ -380,6 +380,30 @@ service cloud.firestore {
         moduloEtapaActivo(empresaDeOT(resource.data), 'inventario');
     }
 
+    function etapasComentarios(data) {
+      return {
+        'ingreso': data.get('ingreso', null),
+        'evaluacion': data.get('evaluacion', null),
+        'overhaul': data.get('overhaul', null),
+        'pruebas': data.get('pruebas', null),
+        'despacho': data.get('despacho', null),
+        'decisionEvaluacion': data.get('decisionEvaluacion', null),
+        'decisionMantencion': data.get('decisionMantencion', null),
+        'decisionPruebas': data.get('decisionPruebas', null),
+        'decisionDespacho': data.get('decisionDespacho', null)
+      };
+    }
+
+    function comentariosAutorizados(otId, anterior) {
+      let antes = get(/databases/$(database)/documents/ots/$(otId)/validacionesComentarios/$(request.auth.uid)/versiones/anterior).data;
+      let despues = get(/databases/$(database)/documents/ots/$(otId)/validacionesComentarios/$(request.auth.uid)/versiones/nueva).data;
+      return antes.venceEn > request.time && despues.venceEn > request.time &&
+        antes.etapas == etapasComentarios(anterior) &&
+        despues.etapas == etapasComentarios(request.resource.data) &&
+        (anterior.get('alertaJefe', false) == request.resource.data.get('alertaJefe', false) ||
+          request.resource.data.alertaJefe == despues.alertaJefe);
+    }
+
     function actualizacionOTValida() {
       let empresa = empresaDeOT(request.resource.data);
       return (
@@ -400,8 +424,11 @@ service cloud.firestore {
             'overhaulRequerido', 'overhaulAprobado', 'pruebasAprobado',
             'despachoAprobado', 'decisionEvaluacion', 'decisionMantencion',
             'decisionPruebas', 'decisionDespacho', 'bitacora',
-            'etapasConActividad', 'revision', 'fechaActualizacion'
+            'etapasConActividad', 'revision', 'fechaActualizacion', 'alertaJefe'
           ])
+        ) && (
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['alertaJefe']) ||
+          request.resource.data.alertaJefe is bool
         ) && (
           request.resource.data.estado == resource.data.estado || (
             estadoOTValido(request.resource.data) &&
@@ -534,6 +561,8 @@ service cloud.firestore {
           hasRole(['jefe_taller']) &&
           request.resource.data.creadoPor == request.auth.uid &&
           request.resource.data.cerrada == false &&
+          (!request.resource.data.keys().hasAny(['ingreso', 'evaluacion', 'overhaul', 'pruebas', 'despacho', 'decisionEvaluacion', 'decisionMantencion', 'decisionPruebas', 'decisionDespacho']) ||
+            comentariosAutorizados(otId, {})) &&
           (
             (request.resource.data.estado in ['INGRESO', 'Ingreso'] &&
               moduloEtapaActivo(
@@ -552,6 +581,9 @@ service cloud.firestore {
 
       allow update: if (
         validWorkshopOtUpdateScope() &&
+        (!request.resource.data.diff(resource.data).affectedKeys()
+          .hasAny(['ingreso', 'evaluacion', 'overhaul', 'pruebas', 'despacho', 'alertaJefe', 'decisionEvaluacion', 'decisionMantencion', 'decisionPruebas', 'decisionDespacho']) ||
+          comentariosAutorizados(otId, resource.data)) &&
         resource.data.cerrada != true &&
         resource.data.estado != 'CERRADA' &&
           request.resource.data.cerrada == true ==

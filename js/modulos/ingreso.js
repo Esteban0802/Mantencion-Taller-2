@@ -1,3 +1,4 @@
+import { puedeEliminarArchivoStorage, protegerBotonEliminarEvidencia } from "./core/autoriaEvidencias.js";
 // ==========================================
 // MÓDULO INGRESO — OVERTRACK
 // ==========================================
@@ -446,6 +447,7 @@ function mostrarFotosIngreso(i) {
         btn.className = "btn-delete-img";
 
         btn.onclick = () => eliminarFotoIngreso(i, index);
+        protegerBotonEliminarEvidencia(btn, foto);
 
         cont.appendChild(vista);
         cont.appendChild(btn);
@@ -467,6 +469,7 @@ async function eliminarFotoIngreso(i, index) {
     if (!ot) return;
 
     const urlFoto = ot.ingreso[i].fotos[index];
+    if (!(await puedeEliminarArchivoStorage(urlFoto))) return;
 
     ot.ingreso[i].fotos.splice(index, 1);
 

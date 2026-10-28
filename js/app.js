@@ -14,27 +14,27 @@ import {
 
 import {
   inicializarModuloIngreso
-} from "./modulos/ingreso.js?v=20261007-3";
+} from "./modulos/ingreso.js?v=20261027-2";
 
 
 import {
   inicializarModuloEvaluacion
-} from "./modulos/evaluacion.js?v=20261007-3";
+} from "./modulos/evaluacion.js?v=20261027-2";
 
 
 import {
   inicializarModuloOverhaul
-} from "./modulos/overhaul.js?v=20261007-3";
+} from "./modulos/overhaul.js?v=20261027-2";
 
 
 import {
   inicializarModuloPruebas
-} from "./modulos/pruebas.js?v=20261007-3";
+} from "./modulos/pruebas.js?v=20261027-2";
 
 
 import {
   inicializarModuloDespacho
-} from "./modulos/despacho.js";
+} from "./modulos/despacho.js?v=20261027-2";
 
 
 import {
@@ -70,7 +70,7 @@ import {
 import {
     subirArchivoStorage,
     eliminarArchivoStorage
-} from "./modulos/core/storage.js?v=20261007-4";
+} from "./modulos/core/storage.js?v=20261027-4";
 
 
 import {
@@ -85,7 +85,7 @@ import {
     guardarCambiosOT,
     autoguardarCambiosOT,
     obtenerEstadoOT
-} from "./modulos/core/otService.js?v=20261007-2";
+} from "./modulos/core/otService.js?v=20261027-2";
 
 import { guardarResumenOT } from "./modulos/core/resumenOT.js";
 
@@ -98,7 +98,7 @@ import {
     renderComentariosItem,
     renderComentariosEvaluacion,
     renderComentariosDespacho
-} from "./modulos/comentarios.js";
+} from "./modulos/comentarios.js?v=20261027-1";
 
 
 import {
@@ -1187,6 +1187,8 @@ async function guardarDatosOS() {
       : doc(collection(db, "ots"));
 
     sessionStorage.setItem(claveCreacionPendiente, docRef.id);
+    const { autorizarComentariosOT } = await import("./modulos/core/comentariosSeguros.js?v=20261027-2");
+    await autorizarComentariosOT(docRef.id, nuevaOT);
     await setDoc(docRef, nuevaOT);
     await guardarResumenOT(docRef.id, nuevaOT, { actualizarFecha: false }).catch(error => {
       console.warn("La OT fue creada, pero su resumen se sincronizará más adelante.", error);

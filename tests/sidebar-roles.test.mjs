@@ -1,3 +1,4 @@
+import vm from "node:vm";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
@@ -48,4 +49,75 @@ test("el Administrador de Sucursal conserva su Panel Empresa", async () => {
 
   assert.match(inventario, /\["super_admin", "admin_empresa", "admin_sucursal"\]/);
   assert.match(programacion, /\["super_admin", "admin_empresa", "admin_sucursal"\]/);
+});
+
+test("el Administrador de Sucursal solo puede eliminar usuarios comunes de su sucursal", async () => {
+  const [usuarios, funciones] = await Promise.all([
+    leer("js/empresa/usuarios.js"),
+    leer("functions/index.js")
+  ]);
+
+  assert.match(usuarios, /const puedeEliminar = puedeEliminarUsuarioEmpresa\(usuario\)/);
+  assert.match(usuarios, /usuario\.sucursalId === usuarioActivo\.sucursalId/);
+  assert.match(funciones, /objetivo\.sucursalId !== solicitante\.sucursalId/);
+  assert.match(funciones, /\["admin_empresa", "admin_sucursal"\]\.includes\(objetivo\.rol\)/);
+  assert.match(funciones, /Solo puedes eliminar usuarios no administrativos de tu sucursal/);
+});
+
+test("los permisos de eliminación se verifican en interfaz y servidor", async () => {
+  const ui = await leer("js/empresa/usuarios.js");
+  const servidor = await leer("functions/index.js");
+  const helper = ui.match(/function puedeEliminarUsuarioEmpresa\(usuario\) \{[\s\S]*?\n\}/)[0];
+  const empresa = servidor.match(/function puedeAdministrarEmpresa\(solicitante, empresaId\) \{[\s\S]*?\n\}/)[0];
+  const handler = servidor.match(/exports.eliminarUsuarioEmpresa = onCall\(CALLABLE_OPTIONS, async request => \{([\s\S]*?)\n\}\);/)[1];
+  for (const rolAdmin of ["admin_sucursal", "admin_empresa"]) {
+    for (const rol of ["tecnico", "supervisor", "jefe_taller", "planificador", "bodeguero", "sheq", "admin_empresa", "admin_sucursal", "super_admin"]) {
+      for (const sucursalId of ["s1", "s2", undefined]) {
+        for (const empresaId of ["e1", "e2"]) {
+          for (const uid of ["otro", "yo"]) {
+            const solicitante = { uid: "yo", rol: rolAdmin, empresaId: "e1", sucursalId: sucursalId === undefined ? undefined : "s1" };
+            const objetivo = { uid, rol, sucursalId, empresaId };
+            const permitido = uid !== "yo" && empresaId === "e1" && rol !== "super_admin" &&
+              (rolAdmin === "admin_empresa" || (sucursalId === "s1" && !["admin_empresa", "admin_sucursal"].includes(rol)));
+            assert.equal(vm.runInNewContext(`${helper}; puedeEliminarUsuarioEmpresa(objetivo)`, {
+              usuarioActivo: solicitante, objetivo, auth: { currentUser: { uid: "yo" } }, window: { empresaIdActualAdmin: "e1" }
+            }), permitido);
+            const eliminados = [];
+            const ref = { get: async () => ({ exists: true, data: () => objetivo }), delete: async () => eliminados.push("perfil") };
+            class HttpsError extends Error { constructor(code, mensaje) { super(mensaje); this.code = code; } }
+            const ejecutar = vm.runInNewContext(`${empresa}; (async request => {${handler}})`, {
+              obtenerSolicitante: async () => solicitante, exigirAutenticacionReciente: () => {}, texto: valor => valor,
+              db: { collection: () => ({ doc: () => ref }) }, HttpsError,
+              exigirEmpresaOperativa: async () => {}, registrarAuditoria: async () => {},
+              auth: { deleteUser: async () => eliminados.push("cuenta") }
+            });
+            if (permitido) await ejecutar({ data: { usuarioId: uid } });
+            else await assert.rejects(ejecutar({ data: { usuarioId: uid } }), error => ["permission-denied", "failed-precondition"].includes(error.code));
+            assert.deepEqual(eliminados, permitido ? ["cuenta", "perfil"] : []);
+          }
+        }
+      }
+    }
+  }
+});
+
+test("la creación rechaza sucursales ajenas y roles administrativos para admin_sucursal", async () => {
+  const source = await leer("functions/index.js");
+  const empresa = source.match(/function puedeAdministrarEmpresa\(solicitante, empresaId\) \{[\s\S]*?\n\}/)[0];
+  const roles = source.match(/function validarRolCreable\(solicitante, rol\) \{[\s\S]*?\n\}/)[0];
+  const prefijo = source.match(/exports.crearUsuarioEmpresa = onCall\(CALLABLE_OPTIONS, async request => \{([\s\S]*?)  const temporal = passwordTemporal\(\);/)[1];
+  for (const rol of ["tecnico", "admin_empresa", "admin_sucursal"]) {
+    for (const sucursalId of ["s1", "s2", ""]) {
+      const ejecutar = vm.runInNewContext(`${empresa}; ${roles}; (async request => {${prefijo} return true;})`, {
+        obtenerSolicitante: async () => ({ rol: "admin_sucursal", empresaId: "e1", sucursalId: "s1" }),
+        texto: valor => valor || "", correoValido: () => true,
+        ROLES_EMPRESA: ["tecnico", "admin_empresa", "admin_sucursal"],
+        validarCupoUsuariosEmpresa: async () => {}, HttpsError: Error,
+        db: { collection: () => ({ doc: () => ({ get: async () => ({ exists: true, data: () => ({ empresaId: "e1" }) }) }) }) }
+      });
+      const resultado = ejecutar({ data: { empresaId: "e1", nombre: "Usuario", correo: "u@example.com", rol, sucursalId } });
+      if (rol === "tecnico" && sucursalId === "s1") assert.equal(await resultado, true);
+      else await assert.rejects(resultado);
+    }
+  }
 });
