@@ -1,3 +1,9 @@
+import { urlSegura } from "./html-seguro.js";
+import { esFlujoLibre } from "./flujo-libre-modelo.js";
+import { crearFlujoLibre, obtenerPlantillaLibre, actualizarFlujoLibre } from "./flujo-libre-api.js?v=20261031-1";
+import { montarFlujoLibre } from "./flujo-libre-vista.js?v=20261102-1";
+import { etapasDePlantilla, etapasDeOT, actualizarVisibilidadFlujo } from "./flujo-etapas.js?v=20261031-2";
+import { identidadDeSucursal, combinarPlantillasSucursal } from "./configuracion-alcance.js?v=20261031-3";
 import { protegerPagina, cerrarSesion as cerrarSesionGlobal } from "./session.js?v=20261017-1";
 
 import { db, auth, storage } from "./firebase-config.js";
@@ -14,7 +20,7 @@ import {
 
 import {
   inicializarModuloIngreso
-} from "./modulos/ingreso.js?v=20261027-2";
+} from "./modulos/ingreso.js?v=20261031-1";
 
 
 import {
@@ -98,7 +104,7 @@ import {
     renderComentariosItem,
     renderComentariosEvaluacion,
     renderComentariosDespacho
-} from "./modulos/comentarios.js?v=20261027-1";
+} from "./modulos/comentarios.js?v=20261101-2";
 
 
 import {
@@ -248,6 +254,7 @@ function navegarSiguienteEtapa(tabActual) {
 }
 
 function configurarInterfazEtapas() {
+  if (esFlujoLibre(ot)) return;
   document.querySelectorAll("[data-etapa]").forEach(elemento => {
     const activo = etapaHabilitada(elemento.dataset.etapa);
     if (activo) {
@@ -269,6 +276,7 @@ function configurarInterfazEtapas() {
   // Crear OT siempre ocupa una posición; las demás columnas corresponden
   // únicamente a las etapas operativas visibles.
   const timeline = document.querySelector(".tabs-timeline-pro");
+  actualizarVisibilidadFlujo(timeline, ot);
   if (timeline) {
     const etapasVisibles = ORDEN_ETAPAS.filter(etapaHabilitada).length;
     timeline.style.setProperty("--columnas-flujo", String(etapasVisibles + 1));
@@ -292,7 +300,7 @@ function configurarInterfazEtapas() {
 }
 
 function aprobacionEtapaHabilitada(etapa) {
-  if (!aprobacionesActivas || etapa === "ingreso") return false;
+  if (!aprobacionesActivas) return false;
   if (ot?.aprobacionesPorEtapa && typeof ot.aprobacionesPorEtapa === "object") {
     return ot.aprobacionesPorEtapa[etapa] === true;
   }
@@ -305,16 +313,13 @@ function aprobacionesHabilitadas(etapa = "") {
 }
 
 function obtenerAprobacionesSeleccionadas() {
-  return Object.fromEntries(["evaluacion", "mantencion", "pruebas", "despacho"].map(etapa => [
-    etapa,
-    Boolean(document.querySelector(`[data-aprobacion-etapa="${etapa}"]`)?.checked)
-  ]));
+  return Object.fromEntries([...document.querySelectorAll("[data-aprobacion-etapa]")].map(campo => [campo.dataset.aprobacionEtapa, campo.checked === true && !campo.disabled]));
 }
 
 function actualizarResumenAprobaciones() {
   const seleccionadas = Object.entries(obtenerAprobacionesSeleccionadas())
     .filter(([, activa]) => activa)
-    .map(([etapa]) => ({ evaluacion: "Evaluación", mantencion: "Mantención", pruebas: "Pruebas", despacho: "Despacho" }[etapa]));
+    .map(([etapa]) => document.querySelector(`[data-aprobacion-etapa="${etapa}"]`)?.dataset.nombreEtapa || ({ ingreso: "Ingreso", evaluacion: "Evaluación", mantencion: "Mantención", pruebas: "Pruebas", despacho: "Despacho" }[etapa]));
   const resumen = document.getElementById("resumenAprobacionesOT");
   if (resumen) resumen.textContent = seleccionadas.length ? seleccionadas.join(", ") : "Sin aprobaciones";
 }
@@ -354,16 +359,73 @@ function repuestosHabilitados() {
   return repuestosActivos;
 }
 
+async function asegurarEtapasDeGama() {
+  if (ot?.id || localStorage.getItem("otActiva") || !esJefeTaller()) return;
+  const id=document.getElementById("gamaEquipo")?.value;
+  const plantilla=plantillasMantenimiento.find(p=>p.id===id);
+  const boton=document.getElementById("btnGuardarDatosOT");
+  if (!plantilla) { if(boton)boton.disabled=false;actualizarOpcionesAprobacionPorPlantilla();return; }
+  if (plantilla.huellaPlantilla) {if(boton)boton.disabled=false;actualizarOpcionesAprobacionPorPlantilla();return;}
+  plantilla.leyendoEtapas=true;plantilla.errorLectura=false;
+  if(boton)boton.disabled=true;
+  actualizarOpcionesAprobacionPorPlantilla();
+  try {
+    const {data}=await obtenerPlantillaLibre({plantillaId:id.replace(/^sucursal:/,"")});
+    Object.assign(plantilla,data);
+  } catch(error) {
+    plantilla.errorLectura=true;
+    if(document.getElementById("gamaEquipo")?.value===id) await notificarFlujo(error.message || "No se pudieron leer las etapas del checklist.","No se pudo leer la plantilla","error");
+  } finally {
+    plantilla.leyendoEtapas=false;
+    if(document.getElementById("gamaEquipo")?.value===id) {
+      if(boton)boton.disabled=plantilla.errorLectura;
+      actualizarOpcionesAprobacionPorPlantilla();
+    }
+  }
+}
+
 function actualizarOpcionesAprobacionPorPlantilla() {
   const selectorAprobaciones = document.getElementById("configAprobacionesOT");
   const plantillaId = document.getElementById("gamaEquipo")?.value || "";
   const plantilla = plantillasMantenimiento.find(item => item.id === plantillaId);
-  const etapasDisponibles = {
-    evaluacion: normalizarChecklistPlantilla(plantilla?.checklists?.evaluacion).length > 0,
-    mantencion: normalizarChecklistPlantilla(plantilla?.checklists?.mantencion).length > 0,
-    pruebas: normalizarChecklistPlantilla(plantilla?.checklists?.pruebas).length > 0,
-    despacho: plantilla?.etapasHabilitadas?.despacho === true
-  };
+  if (plantilla?.leyendoEtapas || plantilla?.errorLectura) {
+    if(selectorAprobaciones)selectorAprobaciones.hidden=true;
+    return;
+  }
+  if (plantilla?.flujoVersion === 2) {
+    const opciones = selectorAprobaciones?.querySelector(".ot-approval-options");
+    if (!opciones) return;
+    const firma = `${plantillaId}:${plantilla.huellaPlantilla || "metadata"}`;
+    if (selectorAprobaciones.dataset.firma !== firma) {
+      opciones.replaceChildren();
+      plantilla.etapas.forEach((etapa, i) => {
+        const label = document.createElement("label"), input = document.createElement("input"), span = document.createElement("span"), nombre = document.createElement("strong"), ayuda = document.createElement("small");
+        input.type = "checkbox"; input.dataset.aprobacionEtapa = `e_${i}`; input.dataset.nombreEtapa = etapa.nombre;
+        input.addEventListener("change", actualizarResumenAprobaciones);
+        nombre.textContent = etapa.nombre; ayuda.textContent = "Requiere aprobación del Jefe de Taller al finalizar.";
+        span.append(nombre,ayuda); label.append(input,span); opciones.appendChild(label);
+      });
+      selectorAprobaciones.dataset.firma = firma;
+    }
+    selectorAprobaciones.hidden = !aprobacionesActivas || !esJefeTaller() || Boolean(ot?.id);
+    selectorAprobaciones.open = !selectorAprobaciones.hidden;
+    selectorAprobaciones.dataset.plantilla = plantillaId;
+    selectorAprobaciones.dataset.modo = "libre";
+    actualizarResumenAprobaciones();
+    return;
+  }
+  if (selectorAprobaciones?.dataset.modo === "libre") {
+    const opciones = selectorAprobaciones.querySelector(".ot-approval-options");
+    opciones.replaceChildren();
+    for (const [id,nombre] of Object.entries({ingreso:"Ingreso",evaluacion:"Evaluación",mantencion:"Mantención",pruebas:"Pruebas",despacho:"Despacho"})) {
+      const label=document.createElement("label"), input=document.createElement("input"), span=document.createElement("span"), titulo=document.createElement("strong");
+      input.type="checkbox"; input.dataset.aprobacionEtapa=id; titulo.textContent=nombre;
+      input.addEventListener("change",actualizarResumenAprobaciones); span.appendChild(titulo); label.append(input,span); opciones.appendChild(label);
+    }
+    selectorAprobaciones.dataset.modo = "legado";
+    selectorAprobaciones.dataset.firma = "";
+  }
+  const etapasDisponibles = plantilla ? etapasDePlantilla(plantilla, etapasActivas) : {};
 
   let cantidadDisponibles = 0;
   document.querySelectorAll("[data-aprobacion-etapa]").forEach(campo => {
@@ -371,6 +433,7 @@ function actualizarOpcionesAprobacionPorPlantilla() {
     const disponible = Boolean(plantilla && etapasDisponibles[etapa] && etapasActivas[etapa] !== false);
     const contenedor = campo.closest("label");
     if (contenedor) contenedor.hidden = !disponible;
+    campo.disabled = !disponible;
     if (!disponible) campo.checked = false;
     if (disponible) cantidadDisponibles += 1;
   });
@@ -384,6 +447,8 @@ function actualizarOpcionesAprobacionPorPlantilla() {
       cantidadDisponibles > 0
     );
     if (selectorAprobaciones.hidden) selectorAprobaciones.open = false;
+    else if (selectorAprobaciones.dataset.plantilla !== plantillaId) selectorAprobaciones.open = true;
+    selectorAprobaciones.dataset.plantilla = plantillaId;
   }
   actualizarResumenAprobaciones();
 }
@@ -398,6 +463,14 @@ function configurarInterfazAprobaciones() {
   const finalizarPruebas = document.getElementById("btnFinalizarPruebasSinAprobacion");
   const decisionDespacho = document.getElementById("decisionDespachoJefe");
 
+  const requiereIngreso = aprobacionEtapaHabilitada("ingreso");
+  const continuarIngreso = document.getElementById("btnCompletarIngreso");
+  if (continuarIngreso) {
+    continuarIngreso.textContent = requiereIngreso ? "Aprobar Ingreso" : "Completar Ingreso";
+    continuarIngreso.style.display = requiereIngreso && !esJefeTaller() ? "none" : "inline-flex";
+  }
+  const avisoIngreso = document.getElementById("avisoAprobacionIngreso");
+  if (avisoIngreso) avisoIngreso.hidden = !requiereIngreso || esJefeTaller() || ot?.ingresoAprobado === true;
   const requiereEvaluacion = aprobacionEtapaHabilitada("evaluacion");
   const requiereMantencion = aprobacionEtapaHabilitada("mantencion");
   const requierePruebas = aprobacionEtapaHabilitada("pruebas");
@@ -619,6 +692,7 @@ async function cargarConfiguracionAprobaciones() {
     etapasActivas = { ingreso: true, evaluacion: true, mantencion: true, pruebas: true, despacho: true };
   }
 
+  etapasActivas = etapasDeOT(ot, etapasActivas);
   configurarInterfazAprobaciones();
   configurarInterfazReportesPDF();
   configurarInterfazGantt();
@@ -691,37 +765,27 @@ function generarNumeroOTGenerico() {
 const claveBorradorIdentificacion =
   `overtrack:borrador-ot:${usuario.empresaId || "sin-empresa"}:${usuario.uid || "sin-usuario"}`;
 
-function guardarBorradorIdentificacion() {
+function inicializarFormularioNuevaOT() {
   if (ot?.id || localStorage.getItem("otActiva")) return;
-  const borrador = {};
-  ["equipo", "serie", "gamaEquipo", "cliente", "os"].forEach(id => {
-    borrador[id] = document.getElementById(id)?.value || "";
-  });
-  borrador.fecha = Date.now();
-  localStorage.setItem(claveBorradorIdentificacion, JSON.stringify(borrador));
+  localStorage.removeItem(claveBorradorIdentificacion);
+  sessionStorage.removeItem(`overtrack:flujo-libre:${usuario.uid}`);
+  sessionStorage.removeItem(`overtrack:creacion-ot:${usuario.empresaId}:${usuario.uid}`);
+  for (const id of ["equipo", "serie", "gamaEquipo", "cliente", "os"]) {
+    const campo = document.getElementById(id);
+    if (campo) campo.value = "";
+  }
+  document.querySelectorAll("[data-aprobacion-etapa]").forEach(campo => { campo.checked = false; });
+  const panel = document.getElementById("configAprobacionesOT");
+  if (panel) { panel.hidden = true; panel.open = false; panel.dataset.plantilla = ""; panel.dataset.firma = ""; }
+  const resumen = document.getElementById("resumenAprobacionesOT");
+  if (resumen) resumen.textContent = "Sin aprobaciones";
+  const boton = document.getElementById("btnGuardarDatosOT");
+  if (boton) boton.disabled = false;
 }
 
-function restaurarBorradorIdentificacion() {
-  if (ot?.id || localStorage.getItem("otActiva")) return;
-  try {
-    const borrador = JSON.parse(localStorage.getItem(claveBorradorIdentificacion) || "null");
-    if (!borrador || Date.now() - Number(borrador.fecha || 0) > 7 * 24 * 60 * 60 * 1000) {
-      localStorage.removeItem(claveBorradorIdentificacion);
-      return;
-    }
-    ["equipo", "serie", "cliente", "os"].forEach(id => {
-      const campo = document.getElementById(id);
-      if (campo && !campo.value) campo.value = borrador[id] || "";
-    });
-    const selector = document.getElementById("gamaEquipo");
-    if (selector && [...selector.options].some(opcion => opcion.value === borrador.gamaEquipo)) {
-      selector.value = borrador.gamaEquipo;
-    }
-  } catch (error) {
-    console.warn("No fue posible restaurar el borrador de la OT:", error);
-    localStorage.removeItem(claveBorradorIdentificacion);
-  }
-}
+window.addEventListener("pageshow", evento => {
+  if (evento.persisted) inicializarFormularioNuevaOT();
+});
 
 function cargarDatosIdentificacionOT() {
   if (!ot) return;
@@ -761,15 +825,13 @@ async function cargarGamasDisponibles() {
   if (!selector || !usuario?.empresaId) return;
 
   try {
-    const consulta = query(
-      collection(db, "plantillasMantenimiento"),
-      where("empresaId", "==", usuario.empresaId)
-    );
-    const snapshot = await getDocs(consulta);
-    plantillasMantenimiento = snapshot.docs
-      .map(documento => ({ id: documento.id, ...documento.data() }))
-      .filter(plantilla => plantilla.activa !== false)
-      .sort((a, b) => String(a.gama || "").localeCompare(String(b.gama || ""), "es"));
+    plantillasMantenimiento = [];
+    const sucursalPlantillasId = ot?.sucursalId || usuario.sucursalId;
+    if (sucursalPlantillasId) {
+      const propias = await getDocs(collection(db, "sucursales", sucursalPlantillasId, "plantillasSucursal"));
+      plantillasMantenimiento = combinarPlantillasSucursal([],
+        propias.docs.map(d => ({ ...d.data(), id: `sucursal:${d.id}` })));
+    }
 
     selector.innerHTML = '<option value="">Seleccionar gama de equipo</option>';
     plantillasMantenimiento.forEach(plantilla => {
@@ -1021,6 +1083,18 @@ async function guardarDatosOS() {
     return;
   }
 
+  if (ot?.id && esFlujoLibre(ot)) {
+    if (creacionOTEnCurso) return;
+    creacionOTEnCurso=true;
+    const boton=document.getElementById('btnGuardarDatosOT');boton.disabled=true;
+    try {
+      await actualizarFlujoLibre({otId:ot.id,accion:'identificacion',equipo,serie,cliente,os:osIngresada || generarNumeroOTGenerico()});
+      await notificarFlujo('Los datos de la OT se actualizaron correctamente.','Cambios guardados','exito');
+    } catch(error) {await notificarFlujo(error.message || 'No fue posible guardar los datos.','Error al guardar','error');}
+    finally {creacionOTEnCurso=false;boton.disabled=false;}
+    return;
+  }
+
   // Si ya existe una OT, este formulario edita únicamente sus datos de
   // identificación y conserva intacto todo el avance operacional.
   if (ot?.id) {
@@ -1086,7 +1160,36 @@ async function guardarDatosOS() {
     return;
   }
   const checklists = plantilla.checklists || {};
-  const etapasOT = { ...etapasActivas };
+  if (plantilla.flujoVersion === 2) {
+    if (!plantilla.huellaPlantilla) {
+      await asegurarEtapasDeGama();
+      await notificarFlujo("Revisa las etapas y selecciona las aprobaciones antes de crear la OT.", "Plantilla actualizada", "info");
+      return;
+    }
+    if (creacionOTEnCurso) return;
+    creacionOTEnCurso = true;
+    const boton = document.getElementById("btnGuardarDatosOT");
+    boton.disabled = true;
+    const clave = `overtrack:flujo-libre:${usuario.uid}`;
+    const solicitudId = sessionStorage.getItem(clave) || crypto.randomUUID();
+    sessionStorage.setItem(clave,solicitudId);
+    try {
+      const { data } = await crearFlujoLibre({ solicitudId, plantillaId: plantilla.id.replace(/^sucursal:/,""), huellaPlantilla:plantilla.huellaPlantilla, equipo, serie, cliente, os,
+        aprobaciones: Object.entries(obtenerAprobacionesSeleccionadas()).filter(([,activa])=>activa).map(([id])=>id) });
+      localStorage.setItem("otActiva",data.id);
+      sessionStorage.removeItem(clave); localStorage.removeItem(claveBorradorIdentificacion);
+      window.location.href = "flujo.html";
+    } catch (error) {
+      if (error.code === "functions/failed-precondition") delete plantilla.huellaPlantilla;
+      await notificarFlujo(error.message || "No fue posible crear la OT.", "No se pudo crear la OT", "error");
+    } finally { boton.disabled = false; creacionOTEnCurso = false; }
+    return;
+  }
+  const etapasOT = etapasDePlantilla(plantilla, etapasActivas);
+  if (!Object.values(etapasOT).some(Boolean)) {
+    notificarFlujo("La plantilla no tiene etapas disponibles para esta OT.", "Plantilla no disponible", "error");
+    return;
+  }
   const etapasChecklist = [
     { key: "ingreso", nombre: "Ingreso" },
     { key: "evaluacion", nombre: "Evaluación" },
@@ -1115,7 +1218,7 @@ async function guardarDatosOS() {
   }
 
   const estadoInicial = ORDEN_ETAPAS
-    .filter(etapaHabilitada)
+    .filter(etapa => etapasOT[MODULO_POR_TAB[etapa]])
     .map(etapa => ({
       ingreso: "INGRESO",
       evaluacion: "EVALUACION",
@@ -1140,7 +1243,7 @@ async function guardarDatosOS() {
       plantillaMantenimientoVersion: Number(plantilla.version || 1),
       aprobacionesPorEtapa: aprobacionesActivas && esJefeTaller()
         ? obtenerAprobacionesSeleccionadas()
-        : { evaluacion: false, mantencion: false, pruebas: false, despacho: false },
+        : { ingreso: false, evaluacion: false, mantencion: false, pruebas: false, despacho: false },
       etapasConActividad: {
         evaluacion: false,
         mantencion: false,
@@ -1275,7 +1378,11 @@ inicializarModuloInformePDF({
       const empresaId = ot?.empresaId || usuario?.empresaId;
       if (!empresaId) return null;
       const empresaSnap = await getDoc(doc(db, "empresas", empresaId));
-      return empresaSnap.exists() ? empresaSnap.data() : null;
+      if (!empresaSnap.exists()) return null;
+      const sucursalId = ot?.sucursalId || usuario?.sucursalId;
+      if (!sucursalId) return empresaSnap.data();
+      const sucursalSnap = await getDoc(doc(db, "sucursales", sucursalId));
+      return identidadDeSucursal(empresaSnap.data(), sucursalSnap.exists() && sucursalSnap.data().empresaId === empresaId ? sucursalSnap.data() : {});
     }
 });
 
@@ -1309,6 +1416,7 @@ function configurarMenuMovilFlujo() {
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
+  inicializarFormularioNuevaOT();
   await cargarConfiguracionAprobaciones();
   await cargarGamasDisponibles();
   iniciarInventarioTiempoReal();
@@ -1317,19 +1425,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     campo.addEventListener("change", actualizarResumenAprobaciones);
   });
   actualizarResumenAprobaciones();
-  restaurarBorradorIdentificacion();
-  actualizarOpcionesAprobacionPorPlantilla();
-  ["equipo", "serie", "gamaEquipo", "cliente", "os"].forEach(id => {
-    const campo = document.getElementById(id);
-    if (id === "gamaEquipo") {
-      campo?.addEventListener("change", () => {
-        guardarBorradorIdentificacion();
-        actualizarOpcionesAprobacionPorPlantilla();
-      });
-    } else {
-      campo?.addEventListener("input", guardarBorradorIdentificacion);
-    }
-  });
+  document.getElementById("gamaEquipo")?.addEventListener("change", asegurarEtapasDeGama);
+  await asegurarEtapasDeGama();
 });
 
 document.addEventListener("DOMContentLoaded", configurarMenuMovilFlujo);
@@ -1351,6 +1448,7 @@ inicializarModuloGantt({
 
 
 inicializarModuloIngreso({
+    aprobacionesHabilitadas,
 
     getOT: () => ot,
 
@@ -1647,6 +1745,24 @@ window.onload = async () => {
 
     await cargarConfiguracionAprobaciones();
 
+    if (esFlujoLibre(ot)) {
+      cargarDatosIdentificacionOT();
+      const selectorIdentificacion=document.getElementById('gamaEquipo');
+      if(selectorIdentificacion) {
+        const opcionGuardada=document.createElement('option');opcionGuardada.value=ot.plantillaMantenimientoId;opcionGuardada.textContent=ot.gamaEquipo;
+        selectorIdentificacion.append(opcionGuardada);selectorIdentificacion.value=ot.plantillaMantenimientoId;
+      }
+      if(ot.cerrada)document.querySelectorAll('#crear input,#crear select,#crear button').forEach(c=>c.disabled=true);
+      await montarFlujoLibre({ db, usuario, otInicial: ot,
+        modulos:{repuestos:repuestosActivos,gantt:ganttActivo},
+        alCambiar: datos => { ot = datos; setOTContexto(ot); },
+        subirArchivo: subirArchivoStorage, eliminarArchivo: eliminarArchivoStorage,
+        generarPDF: reportesPDFActivos ? () => window.generarPDF() : null });
+      renderUsuarioActivo();
+      window.OverTrackUI?.finalizarCargaPagina?.();
+      return;
+    }
+
     cargarDatosIdentificacionOT();
 
 
@@ -1779,7 +1895,7 @@ window.OverTrackUI?.finalizarCargaPagina?.();
 // ABRIR DOCUMENTO EN EL VISOR NATIVO DEL NAVEGADOR
 // =======================
 function abrirDocumento(doc) {
-  const urlDocumento = doc?.url || doc?.data;
+  const urlDocumento = urlSegura(doc?.url || doc?.data);
 
   if (!urlDocumento) {
     console.error("El documento no tiene una URL disponible");
@@ -1869,6 +1985,10 @@ function validarOTCompleta() {
   }
 
   if (etapaHabilitada("ingreso") && !validarLista("INGRESO", ot.ingreso)) {
+    return false;
+  }
+  if (etapaHabilitada("ingreso") && aprobacionesHabilitadas("ingreso") && !ot.ingresoAprobado) {
+    notificarFlujo("Falta la aprobación de Ingreso por el Jefe de Taller.", "Aprobación pendiente", "advertencia");
     return false;
   }
 

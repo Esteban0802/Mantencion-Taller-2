@@ -31,7 +31,10 @@ service cloud.firestore {
       let empresa = get(
         /databases/$(database)/documents/empresas/$(empresaId)
       ).data;
-      return empresa.activa != false;
+      return (!('activa' in empresa) || empresa.activa != false) &&
+        (!('suscripcion' in empresa) || (empresa.suscripcion is map &&
+          (!('estado' in empresa.suscripcion) || !(empresa.suscripcion.estado in
+            ['cancelacion_solicitada', 'periodo_exportacion', 'pendiente_eliminacion', 'cancelada']))));
     }
 
     function canWriteCompany(data) {
@@ -169,30 +172,35 @@ service cloud.firestore {
       return campo in data && data[campo] == true;
     }
 
+    function etapaActivaOT(data, empresa, etapa) {
+      return data.get('etapasHabilitadas', {}).get(etapa, true) != false &&
+        moduloEtapaActivo(empresa, etapa);
+    }
+
     function ingresoCompleto(data, empresa) {
-      return !moduloEtapaActivo(empresa, 'ingreso') ||
+      return !etapaActivaOT(data, empresa, 'ingreso') ||
         indicadorActivo(data, 'ingresoAprobado');
     }
 
     function evaluacionCompleta(data, empresa) {
-      return !moduloEtapaActivo(empresa, 'evaluacion') ||
+      return !etapaActivaOT(data, empresa, 'evaluacion') ||
         indicadorActivo(data, 'evaluacionAprobada');
     }
 
     function mantencionRequerida(data, empresa) {
-      return !moduloEtapaActivo(empresa, 'evaluacion') ||
+      return !etapaActivaOT(data, empresa, 'evaluacion') ||
         !('overhaulRequerido' in data) ||
         data.overhaulRequerido != false;
     }
 
     function mantencionCompleta(data, empresa) {
-      return !moduloEtapaActivo(empresa, 'mantencion') ||
+      return !etapaActivaOT(data, empresa, 'mantencion') ||
         !mantencionRequerida(data, empresa) ||
         indicadorActivo(data, 'overhaulAprobado');
     }
 
     function pruebasCompletas(data, empresa) {
-      return !moduloEtapaActivo(empresa, 'pruebas') ||
+      return !etapaActivaOT(data, empresa, 'pruebas') ||
         !mantencionRequerida(data, empresa) ||
         indicadorActivo(data, 'pruebasAprobado');
     }
@@ -218,26 +226,26 @@ service cloud.firestore {
           evaluacionCompleta(data, empresa) &&
           mantencionCompleta(data, empresa) &&
           pruebasCompletas(data, empresa)) ||
-        (data.estado == 'INGRESO' && moduloEtapaActivo(empresa, 'ingreso')) ||
+        (data.estado == 'INGRESO' && etapaActivaOT(data, empresa, 'ingreso')) ||
         (data.estado == 'EVALUACION' &&
           ingresoCompleto(data, empresa) &&
-          moduloEtapaActivo(empresa, 'evaluacion')) ||
+          etapaActivaOT(data, empresa, 'evaluacion')) ||
         (data.estado == 'OVERHAUL' &&
           ingresoCompleto(data, empresa) &&
           evaluacionCompleta(data, empresa) &&
           mantencionRequerida(data, empresa) &&
-          moduloEtapaActivo(empresa, 'mantencion')) ||
+          etapaActivaOT(data, empresa, 'mantencion')) ||
         (data.estado == 'PRUEBAS' &&
           ingresoCompleto(data, empresa) &&
           evaluacionCompleta(data, empresa) &&
           mantencionCompleta(data, empresa) &&
-          moduloEtapaActivo(empresa, 'pruebas')) ||
+          etapaActivaOT(data, empresa, 'pruebas')) ||
         (data.estado == 'DESPACHO' &&
           ingresoCompleto(data, empresa) &&
           evaluacionCompleta(data, empresa) &&
           mantencionCompleta(data, empresa) &&
           pruebasCompletas(data, empresa) &&
-          moduloEtapaActivo(empresa, 'despacho'));
+          etapaActivaOT(data, empresa, 'despacho'));
     }
 
     function puedeAprobarOCerrarOT() {
@@ -290,6 +298,8 @@ service cloud.firestore {
       let nueva = request.resource.data.aprobacionesPorEtapa;
       return puedeAprobarOCerrarOT() &&
         anterior is map && nueva is map &&
+        nueva.get('ingreso', false) is bool &&
+        anterior.get('ingreso', false) == nueva.get('ingreso', false) &&
         nueva.evaluacion is bool && nueva.mantencion is bool &&
         nueva.pruebas is bool && nueva.despacho is bool &&
         (anterior.evaluacion == nueva.evaluacion || !etapaIniciada(resource.data, 'evaluacion')) &&
@@ -309,6 +319,7 @@ service cloud.firestore {
     function cambiaCamposAprobacionOT() {
       let cambios = request.resource.data.diff(resource.data).affectedKeys();
       return
+        (aprobacionSeleccionada(resource.data, 'ingreso') && cambios.hasAny(['ingresoAprobado'])) ||
         (aprobacionSeleccionada(resource.data, 'evaluacion') &&
           cambios.hasAny(['decisionEvaluacion', 'evaluacionAprobada', 'overhaulRequerido'])) ||
         (aprobacionSeleccionada(resource.data, 'mantencion') &&
@@ -543,7 +554,31 @@ service cloud.firestore {
 
       // Los cambios de estado se realizan mediante una Cloud Function para
       // impedir desactivar sucursales con OT abiertas. El SDK Admin omite reglas.
-      allow update: if isSuperAdmin();
+      allow update: if isSuperAdmin() || (
+        hasRole(['admin_sucursal']) && profile().sucursalId == sucursalId &&
+        sameCompany(resource.data) && resource.data.activa == true && canWriteCompany(resource.data) &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['identidadVisual', 'fechaActualizacion'])
+      );
+
+      match /plantillasSucursal/{plantillaId} {
+        function sucursalPropia() {
+          let sucursal = get(/databases/$(database)/documents/sucursales/$(sucursalId)).data;
+          return activeUser() && sameCompany(sucursal) && (
+            isCompanyWideAdmin() || (isBranchRole() && profile().sucursalId == sucursalId)
+          );
+        }
+        function editaSucursal() {
+          let sucursal = get(/databases/$(database)/documents/sucursales/$(sucursalId)).data;
+          return sucursalPropia() && hasRole(['admin_sucursal']) && profile().sucursalId == sucursalId &&
+            sucursal.activa == true && canWriteCompany(sucursal);
+        }
+        allow read: if sucursalPropia();
+        allow create: if editaSucursal() && request.resource.data.empresaId == profile().empresaId &&
+          request.resource.data.sucursalId == sucursalId && request.resource.data.creadoPor == request.auth.uid;
+        allow update: if editaSucursal() && request.resource.data.empresaId == resource.data.empresaId &&
+          request.resource.data.sucursalId == resource.data.sucursalId && request.resource.data.creadoPor == resource.data.creadoPor;
+        allow delete: if editaSucursal();
+      }
 
       allow delete: if isSuperAdmin() || (
         hasRole(['admin_empresa']) && sameCompany(resource.data) &&
@@ -559,14 +594,17 @@ service cloud.firestore {
           canWriteCompany(request.resource.data) &&
           sameBranch(request.resource.data) &&
           hasRole(['jefe_taller']) &&
+          request.resource.data.get('flujoVersion', 1) != 2 &&
+          !exists(/databases/$(database)/documents/otsPapelera/$(otId)) &&
+          !exists(/databases/$(database)/documents/otsEliminadas/$(otId)) &&
           request.resource.data.creadoPor == request.auth.uid &&
           request.resource.data.cerrada == false &&
           (!request.resource.data.keys().hasAny(['ingreso', 'evaluacion', 'overhaul', 'pruebas', 'despacho', 'decisionEvaluacion', 'decisionMantencion', 'decisionPruebas', 'decisionDespacho']) ||
             comentariosAutorizados(otId, {})) &&
           (
             (request.resource.data.estado in ['INGRESO', 'Ingreso'] &&
-              moduloEtapaActivo(
-                empresaDeOT(request.resource.data),
+              etapaActivaOT(
+                request.resource.data, empresaDeOT(request.resource.data),
                 'ingreso'
               )) ||
             (request.resource.data.estado != 'INGRESO' &&
@@ -580,6 +618,8 @@ service cloud.firestore {
       );
 
       allow update: if (
+        resource.data.get('flujoVersion', 1) != 2 &&
+        request.resource.data.get('flujoVersion', 1) != 2 &&
         validWorkshopOtUpdateScope() &&
         (!request.resource.data.diff(resource.data).affectedKeys()
           .hasAny(['ingreso', 'evaluacion', 'overhaul', 'pruebas', 'despacho', 'alertaJefe', 'decisionEvaluacion', 'decisionMantencion', 'decisionPruebas', 'decisionDespacho']) ||
@@ -594,11 +634,13 @@ service cloud.firestore {
           )
         );
 
-      allow delete: if (
-        hasRole(['jefe_taller']) && sameCompany(resource.data) &&
-        sameBranch(resource.data) && canWriteCompany(resource.data) &&
-        recentAuthentication()
-      );
+      // Solo la callable puede retirar una OT, conservando una copia atómica.
+      allow delete: if false;
+    }
+
+    match /otsPapelera/{otId} {
+      allow read: if hasRole(['jefe_taller']) && sameBranch(resource.data);
+      allow write: if false;
     }
 
     // Documento liviano para Dashboard e historial. Contiene únicamente
@@ -607,6 +649,9 @@ service cloud.firestore {
       allow read: if canReadBranchData(resource.data);
 
       allow create: if (
+        request.resource.data.get('flujoVersion', 1) != 2 &&
+        (!exists(/databases/$(database)/documents/ots/$(otId)) ||
+          get(/databases/$(database)/documents/ots/$(otId)).data.get('flujoVersion', 1) != 2) &&
         activeUser() &&
         sameCompany(request.resource.data) &&
         canWriteCompany(request.resource.data) &&
@@ -617,6 +662,7 @@ service cloud.firestore {
       );
 
       allow update: if (
+        resource.data.get('flujoVersion', 1) != 2 && request.resource.data.get('flujoVersion', 1) != 2 &&
         activeUser() &&
         canWriteCompany(resource.data) &&
         sameCompany(resource.data) &&
@@ -630,6 +676,7 @@ service cloud.firestore {
       );
 
       allow delete: if (
+        resource.data.get('flujoVersion', 1) != 2 &&
         activeUser() && sameCompany(resource.data) && canWriteCompany(resource.data) &&
         (
           isCompanyWideAdmin() ||
@@ -663,23 +710,10 @@ service cloud.firestore {
       allow delete: if hasRole(['admin_empresa']) && sameCompany(resource.data) && canWriteCompany(resource.data);
     }
 
+    // Plantillas antiguas conservadas únicamente para migración y respaldos.
     match /plantillasMantenimiento/{plantillaId} {
       allow read: if sameCompany(resource.data);
-      allow create: if (
-        hasRole(['admin_empresa']) && sameCompany(request.resource.data) &&
-        canWriteCompany(request.resource.data) &&
-        request.resource.data.creadoPor == request.auth.uid
-      );
-      allow update: if (
-        hasRole(['admin_empresa']) && sameCompany(resource.data) &&
-        canWriteCompany(resource.data) &&
-        sameCompany(request.resource.data) &&
-        request.resource.data.empresaId == resource.data.empresaId
-      );
-      allow delete: if (
-        hasRole(['admin_empresa']) && sameCompany(resource.data) &&
-        canWriteCompany(resource.data)
-      );
+      allow write: if false;
     }
 
     // Inventario independiente por empresa y sucursal. Los técnicos pueden

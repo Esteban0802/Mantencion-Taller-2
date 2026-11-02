@@ -1,3 +1,5 @@
+import { esFlujoLibre, progresoLibre } from "./flujo-libre-modelo.js?v=20261101-1";
+import { escaparHtml } from "./html-seguro.js";
 import { protegerPagina, cerrarSesion } from "./session.js?v=20261017-1";
 
 import {
@@ -15,7 +17,7 @@ import {
   puedeVerDespacho,
   puedeVerReportes,
   puedeEntrarPanelEmpresa
-} from "./permisos.js?v=20261014-1";
+} from "./permisos.js?v=20261029-1";
 
 
 const usuario = protegerPagina([
@@ -85,6 +87,7 @@ function obtenerNombreEstado(estado) {
 // ESTADO AUTOMÁTICO
 // =======================
 function obtenerEstadoOT(ot) {
+  if (esFlujoLibre(ot)) return ot.cerrada ? "CERRADA" : "EN_PROCESO";
 
   if (!ot) return "INGRESO";
 
@@ -115,6 +118,7 @@ function obtenerEstadoOT(ot) {
 // PROGRESO AUTOMÁTICO
 // =======================
 function calcularProgreso(ot) {
+  if (esFlujoLibre(ot)) return progresoLibre(ot);
   if (ot?.cerrada === true || ot?.estado === "CERRADA") return 100;
 
   const etapasActivas = obtenerEtapasDashboardActivas();
@@ -198,7 +202,7 @@ function iniciarInventarioAlertasTiempoReal() {
   inventarioPorOSDashboard = new Map();
 
   if (!moduloActivo(empresaActualDashboard, "inventario") ||
-      !moduloActivo(empresaActualDashboard, "alertas") ||
+      !(moduloActivo(empresaActualDashboard, "alertas") || moduloActivo(empresaActualDashboard, "repuestos")) ||
       !empresaActualDashboard?.id) return;
 
   const restricciones = [where("empresaId", "==", empresaActualDashboard.id)];
@@ -214,16 +218,18 @@ function iniciarInventarioAlertasTiempoReal() {
         const item = documento.data() || {};
         const numeroOS = String(item.datos?.OS || "").trim();
         if (!numeroOS) return;
-        const clave = normalizarClaveOS(numeroOS);
+        const clave = `${item.sucursalId}:${normalizarClaveOS(numeroOS)}`;
         if (!agrupados.has(clave)) agrupados.set(clave, []);
         agrupados.get(clave).push(item);
       });
       inventarioPorOSDashboard = agrupados;
       inventarioAlertasCargado = true;
+      renderTabla(obtenerOTsRecientes(listaFiltrada));
       renderAlertasDashboard(listaFiltrada);
     },
     error => {
       inventarioAlertasCargado = false;
+      renderTabla(obtenerOTsRecientes(listaFiltrada));
       console.warn("No fue posible actualizar las alertas de Inventario:", error);
       renderAlertasDashboard(listaFiltrada);
     }
@@ -776,7 +782,7 @@ function renderTabla(lista = listaOTs) {
   lista.forEach((o) => {
 
     const estado = obtenerEstadoOT(o);
-    const estadoVisible = obtenerNombreEstado(estado);
+    const estadoVisible = esFlujoLibre(o) ? escaparHtml(o.etapaActualNombre || "En proceso") : obtenerNombreEstado(estado);
     const progreso = calcularProgreso(o);
     
 
@@ -806,18 +812,18 @@ function renderTabla(lista = listaOTs) {
       <div class="ot-card-top">
 
         <div>
-          <h3>${o.os || "Sin OS"}</h3>
-          <span>${o.equipo || "Equipo sin nombre"}</span>
+          <h3>${escaparHtml(o.os || "Sin OS")}</h3>
+          <span>${escaparHtml(o.equipo || "Equipo sin nombre")}</span>
         </div>
 
         <div class="estado-card ${estado.toLowerCase()}">
-          ${estadoVisible}
+          ${escaparHtml(estadoVisible)}
         </div>
 
       </div>
 
       <div class="ot-card-cliente">
-        👤 ${o.cliente || "Cliente no definido"}
+        👤 ${escaparHtml(o.cliente || "Cliente no definido")}
       </div>
 
       <div class="ot-card-badges">
@@ -833,16 +839,17 @@ function renderTabla(lista = listaOTs) {
           ></div>
         </div>
 
-        <small>${progreso}% completado</small>
+        <small>${progreso===100 && obtenerRecepcionTarjeta(o)?.pendientes>0 && !o.servicioRechazado ? "Trabajo completado · Repuestos pendientes" : `${progreso}% del trabajo completado`}</small>
 
       </div>
 
       ${moduloActivo(empresaActualDashboard, "gantt") ? `<div class="mini-gantt">${renderMiniGantt(o)}</div>` : ""}
+      ${renderRecepcionTarjeta(o)}
 
       <div class="ot-card-footer">
 
         <div>
-          📅 ${fechaEntrega}
+          📅 ${escaparHtml(fechaEntrega)}
         </div>
 
         ${
@@ -895,6 +902,7 @@ function obtenerListaPruebas(ot) {
 }
 
 function calcularProgresoEtapasOT(ot) {
+  if (esFlujoLibre(ot)) return Object.fromEntries(ot.etapasPersonalizadas.map(e=>[e.id,e.completada?100:Math.round(100*(e.completados??e.items?.filter(i=>i.ok).length??0)/(e.total??e.items?.length??1))]));
   if (ot?.cerrada === true || ot?.estado === "CERRADA") {
     return {
       INGRESO: 100,
@@ -943,7 +951,7 @@ function calcularProgresoEtapasOT(ot) {
 
 
 function renderMiniGantt(ot) {
-  const etapas = obtenerEtapasDashboardActivas();
+  const etapas = esFlujoLibre(ot) ? ot.etapasPersonalizadas.map(e=>({key:e.id,label:e.nombre})) : obtenerEtapasDashboardActivas();
 
   const progresoEtapas = calcularProgresoEtapasOT(ot);
 
@@ -960,7 +968,7 @@ function renderMiniGantt(ot) {
 
     return `
       <div class="mini-gantt-row">
-        <span>${etapa.label}</span>
+        <span>${escaparHtml(etapa.label)}</span>
 
         <div class="mini-gantt-bar">
           <div
@@ -973,21 +981,34 @@ function renderMiniGantt(ot) {
   }).join("");
 }
 
+function obtenerRecepcionTarjeta(ot) {
+  if(!inventarioAlertasCargado || !moduloActivo(empresaActualDashboard,'repuestos'))return null;
+  const items=inventarioPorOSDashboard.get(`${ot.sucursalId}:${normalizarClaveOS(ot.os)}`) || [];
+  if(!items.length)return null;
+  const recibidos=items.filter(repuestoInventarioRecibido).length;
+  return {total:items.length,recibidos,pendientes:items.length-recibidos,porcentaje:Math.round(recibidos/items.length*100)};
+}
+function renderRecepcionTarjeta(ot) {
+  const r=obtenerRecepcionTarjeta(ot);if(!r)return '';
+  return `<div class="ot-recepcion-repuestos ${r.pendientes?'pendiente':'completa'}"><div><strong>Recepción de repuestos</strong><b>${r.porcentaje}%</b></div><div class="ot-recepcion-barra"><span style="width:${r.porcentaje}%"></span></div><small>${r.recibidos} de ${r.total} recibidos${r.pendientes && !ot.servicioRechazado && !ot.cerrada?' · Cierre bloqueado':''}</small></div>`;
+}
 function renderBadgesOT(o, estado, atrasada, diasAtraso) {
 
   const badges = [];
   const revisionPendiente = obtenerEtapaListaParaRevision(o);
   const requiereCorreccion = Boolean(o.alertaJefe && obtenerResumenObservacionesJefe(o));
+  const recepcion=obtenerRecepcionTarjeta(o);
+  if(recepcion?.pendientes>0 && estado!=='CERRADA')badges.push(`<span class="ot-badge badge-amarillo">Repuestos pendientes: ${recepcion.pendientes}</span>`);
 
   if (revisionPendiente) {
     badges.push(`
       <span class="ot-badge badge-azul">
-        ${esAutoridadSucursal() ? "✓ Revisar" : "◷ En revisión"}: ${revisionPendiente}
+        ${esAutoridadSucursal() ? "✓ Revisar" : "◷ En revisión"}: ${escaparHtml(revisionPendiente)}
       </span>
     `);
   }
 
-  if (requiereCorreccion && esTecnicoTaller()) {
+  if (requiereCorreccion && usuario?.rol === "tecnico") {
     badges.push(`
       <span class="ot-badge badge-amarillo">
         ⚠ Requiere corrección
@@ -998,12 +1019,12 @@ function renderBadgesOT(o, estado, atrasada, diasAtraso) {
   if (atrasada) {
     badges.push(`
       <span class="ot-badge badge-rojo">
-        ⏱ ${diasAtraso || 0} día(s) atraso
+        ⏱ ${escaparHtml(diasAtraso || 0)} día(s) atraso
       </span>
     `);
   }
 
-  if (esperaRepuestosActiva(o) && estado !== "CERRADA") {
+  if (!recepcion?.pendientes && esperaRepuestosActiva(o) && estado !== "CERRADA") {
     badges.push(`
       <span class="ot-badge badge-naranjo">
         📦 Repuestos
@@ -1030,15 +1051,12 @@ function renderBadgesOT(o, estado, atrasada, diasAtraso) {
   const resumenObservaciones = obtenerResumenObservacionesJefe(o);
 
   if (o.alertaJefe && resumenObservaciones) {
-    const resumenObs = resumenObservaciones
-      .replace(/`/g, "'")
-      .replace(/"/g, "&quot;");
-
     badges.push(`
       <button 
         type="button"
         class="ot-badge badge-amarillo badge-observacion-btn"
-        onclick="abrirPopoverObservacion(\`${resumenObs}\`)"
+        data-observacion="${escaparHtml(resumenObservaciones)}"
+        onclick="abrirPopoverObservacion(this.dataset.observacion)"
       >
         ⚠ Observación
       </button>
@@ -1101,7 +1119,7 @@ function abrirPopoverObservacion(texto) {
 
   cont.innerHTML = items.map(item => `
     <div class="popover-obs-item">
-      ${item}
+      ${escaparHtml(item)}
     </div>
   `).join("");
 
@@ -1240,7 +1258,7 @@ function obtenerEstadoEsperaRepuestos(ot) {
     return { activa: false };
   }
 
-  const registrosInventario = inventarioPorOSDashboard.get(normalizarClaveOS(ot.os)) || [];
+  const registrosInventario = inventarioPorOSDashboard.get(`${ot.sucursalId}:${normalizarClaveOS(ot.os)}`) || [];
   if (inventarioAlertasCargado && registrosInventario.length > 0) {
     const recibidos = registrosInventario.filter(repuestoInventarioRecibido).length;
     const pendientes = Math.max(0, registrosInventario.length - recibidos);
@@ -1450,6 +1468,11 @@ function obtenerEtapaObservacionPendiente(ot) {
 }
 
 function obtenerEtapaListaParaRevision(ot) {
+  if (esFlujoLibre(ot)) {
+    const e=ot.etapasPersonalizadas.find(e=>!e.completada);
+    const lista=e?.listaParaRevision ?? e?.items?.every(i=>i.ok && i.fotos?.length && i.comentarios?.length);
+    return e?.requiereAprobacion && lista ? e.nombre : "";
+  }
   const estado = obtenerEstadoOT(ot);
   const progreso = calcularProgresoEtapasOT(ot);
   const etapas = [
@@ -1522,8 +1545,8 @@ function renderProximosDespachos(lista = listaOTs) {
     div.className = "despacho-item-pro";
 
     div.innerHTML = `
-      <strong>${item.ot.os || "—"}</strong>
-      <span>${item.ot.equipo || "Equipo sin nombre"} | ${formatearFechaCorta(item.fecha)}</span>
+      <div class="despacho-identidad"><small>ORDEN DE TRABAJO</small><strong>${escaparHtml(item.ot.os || "—")}</strong></div>
+      <span class="despacho-fecha"><strong>${escaparHtml(item.ot.equipo || "Equipo sin nombre")}</strong><small>Entrega estimada · ${escaparHtml(formatearFechaCorta(item.fecha))}</small></span>
       <b class="${clase}">${badge}</b>
     `;
 
@@ -1581,11 +1604,6 @@ function renderGanttTaller(lista = listaOTs) {
 
   wrapper.innerHTML = `
 
-    <div class="gantt-hoy-line"
-        style="left:calc(194px + ${posicionHoy}%);">
-      <span>HOY</span>
-    </div>
-
     <div class="gantt-taller-header">
       <span>${formatearFechaCorta(inicioGlobal)}</span>
       <span>${formatearFechaCorta(terminoGlobal)}</span>
@@ -1595,7 +1613,7 @@ function renderGanttTaller(lista = listaOTs) {
   otsConGantt.forEach(ot => {
 
     const estado = obtenerEstadoOT(ot);
-    const estadoVisible = obtenerNombreEstado(estado);
+    const estadoVisible = esFlujoLibre(ot) ? ot.etapaActualNombre || "En proceso" : obtenerNombreEstado(estado);
     const atrasada = estaOTAtrasada(ot);
 
     const inicio = new Date(ot.gantt.fechaInicio + "T00:00:00");
@@ -1625,26 +1643,29 @@ function renderGanttTaller(lista = listaOTs) {
 
     row.innerHTML = `
       <div class="gantt-taller-info">
-        <strong>${ot.os || "Sin OS"}</strong>
-        <span>${ot.equipo || "Equipo"}</span>
+        <small>ORDEN DE TRABAJO</small>
+        <strong>${escaparHtml(ot.os || "Sin OS")}</strong>
+        <span>${escaparHtml(ot.equipo || "Equipo")}</span>
       </div>
 
       <div class="gantt-taller-track">
+        ${diffHoy >= 0 && diffHoy <= diasTotales ? `<span class="gantt-panel-hoy ${posicionHoy>80?'gantt-panel-hoy-derecha':posicionHoy<20?'gantt-panel-hoy-izquierda':''}" style="left:${posicionHoy}%" aria-label="Hoy, ${escaparHtml(formatearFechaCorta(hoy))}"><span>HOY · ${escaparHtml(formatearFechaCorta(hoy))}</span></span>` : ""}
         <div
           class="gantt-taller-bar ${atrasada ? "atrasada" : estado.toLowerCase()}"
           style="left:${left}%; width:${width}%"
 
-          data-gantt='${JSON.stringify({
+          data-gantt="${escaparHtml(JSON.stringify({
               os: ot.os || "Sin OS",
               equipo: ot.equipo || "Sin equipo",
               estado: estadoVisible,
               inicio: formatearFechaCorta(inicio),
               termino: formatearFechaCorta(termino),
               progreso: calcularProgreso(ot)
-            }).replace(/'/g, "&#39;")}'
+            }))}"
             onclick="abrirPopoverGanttDesdeElemento(this)"
         >
-          ${atrasada ? "ATRASADA" : estadoVisible}
+          <span class="gantt-panel-avance" style="width:${Math.max(0,Math.min(100,calcularProgreso(ot)))}%"></span>
+          <span class="gantt-panel-texto">${escaparHtml(atrasada ? "ATRASADA" : estadoVisible)} · ${calcularProgreso(ot)}%</span>
         </div>
       </div>
     `;
@@ -1918,7 +1939,7 @@ function destruirGraficosDashboard() {
 function renderGraficos(lista = listaOTs) {
 
   const estadosGraficos = [
-    ...obtenerEtapasDashboardActivas(),
+    ...(lista.some(ot=>!esFlujoLibre(ot)) ? obtenerEtapasDashboardActivas() : []),
     { key: "CERRADA", label: "CERRADA", color: "#2ecc71" }
   ];
 
@@ -1926,23 +1947,40 @@ function renderGraficos(lista = listaOTs) {
     estadosGraficos.map(etapa => [etapa.key, 0])
   );
 
-  let progresoTotal = 0;
-
   lista.forEach(ot => {
 
-    const estado = obtenerEstadoOT(ot);
+    let estado = obtenerEstadoOT(ot);
+    if(esFlujoLibre(ot) && estado!=='CERRADA') {
+      const nombre=ot.etapaActualNombre || ot.etapasPersonalizadas.find(e=>!e.completada)?.nombre || 'Pendiente de cierre';
+      estado=`PERSONALIZADA:${nombre.trim().toLocaleLowerCase('es')}`;
+      if(estadosCount[estado]===undefined) {
+        const colores=['#1688e7','#1c9b83','#8661c5','#df9c32','#527b9c','#ce7183'];
+        estadosGraficos.push({key:estado,label:nombre,color:colores[estadosGraficos.filter(e=>e.key.startsWith('PERSONALIZADA:')).length%colores.length]});
+        estadosCount[estado]=0;
+      }
+    }
+    if(estadosCount[estado]===undefined){estadosGraficos.push({key:estado,label:obtenerNombreEstado(estado),color:'#607d8b'});estadosCount[estado]=0;}
     if (estadosCount[estado] !== undefined) {
       estadosCount[estado]++;
     }
 
-    progresoTotal += calcularProgreso(ot);
   });
 
-  const promedio = lista.length ? (progresoTotal / lista.length) : 0;
+  const abiertas=lista.filter(ot=>ot.cerrada!==true && ot.estado!=='CERRADA' && obtenerEstadoOT(ot)!=='CERRADA');
+  const progresoTotal=abiertas.reduce((total,ot)=>total+calcularProgreso(ot),0);
+  const promedio = abiertas.length ? Math.round(progresoTotal / abiertas.length * 100) / 100 : 0;
+  const porcentajeVisible=document.getElementById('porcentajeProgresoAbiertas');
+  if(porcentajeVisible)porcentajeVisible.textContent=abiertas.length ? `${promedio.toLocaleString('es-CL', { maximumFractionDigits: 2 })}%` : '—';
+  const cantidadVisible=document.getElementById('cantidadOTAbiertas');
+  if(cantidadVisible)cantidadVisible.textContent=`${abiertas.length} OT ${abiertas.length===1 ? 'abierta' : 'abiertas'}`;
+  const detalleProgreso=document.getElementById('detalleProgresoGlobal');
+  if(detalleProgreso)detalleProgreso.textContent=abiertas.length ? `Promedio del trabajo de ${abiertas.length} OT ${abiertas.length===1 ? 'abierta' : 'abiertas'} del listado. La recepción de repuestos se muestra por separado en cada tarjeta.` : 'No hay OT abiertas';
+  const canvasProgreso=document.getElementById('graficoProgreso');
+  if(canvasProgreso)canvasProgreso.hidden=abiertas.length===0;
 
   // 🔥 DESTRUIR GRÁFICOS ANTES (IMPORTANTE)
   if (chartEstados) chartEstados.destroy();
-  if (chartProgreso) chartProgreso.destroy();
+  if (chartProgreso) {chartProgreso.destroy();chartProgreso=null;}
 
   // 📊 GRAFICO ESTADOS
 chartEstados = new Chart(document.getElementById("graficoEstados"), {
@@ -1968,12 +2006,13 @@ chartEstados = new Chart(document.getElementById("graficoEstados"), {
 });
 
   // 📊 GRAFICO PROGRESO
+  if(!abiertas.length)return;
   chartProgreso = new Chart(document.getElementById("graficoProgreso"), {
     type: "bar",
     data: {
-      labels: ["Progreso Promedio"],
+      labels: ["OT abiertas"],
       datasets: [{
-        label: "Progreso promedio",
+        label: "Avance promedio del trabajo",
         data: [promedio],
         backgroundColor: ["#1565c0"],
         borderRadius: 8
@@ -2128,7 +2167,7 @@ function mostrarAlertasJefe(ot) {
     alertas.forEach(alerta => {
       const div = document.createElement("div");
       div.className = "alerta-item";
-      div.innerHTML = alerta;
+      div.textContent = alerta;
       lista.appendChild(div);
     });
   }

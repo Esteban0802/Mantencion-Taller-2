@@ -10,8 +10,9 @@
   <link rel="stylesheet" href="css/brand-overtrack-light.css?v=20261017-8">
   <link rel="stylesheet" href="css/notificaciones.css?v=20261007-1">
   <link rel="stylesheet" href="css/desktop-density.css?v=20261004-9">
-  <link rel="stylesheet" href="css/flow-professional.css?v=20261022-1">
+  <link rel="stylesheet" href="css/flow-professional.css?v=20261031-1">
   <link rel="stylesheet" href="css/mobile-normalized.css?v=20261018-4">
+  <link rel="stylesheet" href="css/flujo-libre.css?v=20261101-4">
 </head>
 <body class="ot-view flow-overtrack">
 
@@ -110,7 +111,7 @@
 
 
 <!-- TIMELINE TABS PRO -->
-<div class="tabs tabs-timeline-pro">
+<div class="tabs tabs-timeline-pro" hidden style="display: none !important">
 
   <button class="tab active solo-jefe" data-tab="crear">
     <span class="tab-dot">1</span>
@@ -149,12 +150,12 @@
     <div class="card">
       <h2>Identificación de la máquina</h2>
 
-      <input id="equipo" placeholder="Equipo" aria-label="Equipo">
-      <input id="serie" placeholder="Serie" aria-label="Serie">
-      <select id="gamaEquipo" required aria-label="Gama de equipo">
+      <input id="equipo" autocomplete="off" placeholder="Equipo" aria-label="Equipo">
+      <input id="serie" autocomplete="off" placeholder="Serie" aria-label="Serie">
+      <select id="gamaEquipo" autocomplete="off" required aria-label="Gama de equipo">
         <option value="">Seleccionar gama de equipo</option>
       </select>
-      <input id="cliente" placeholder="Cliente" aria-label="Cliente">
+      <input id="cliente" autocomplete="off" placeholder="Cliente" aria-label="Cliente">
       <div class="os-inventory-picker" id="selectorOSInventario">
         <input id="os" autocomplete="off" placeholder="Número de OT (opcional)" aria-label="Número de orden de trabajo, opcional" aria-controls="osInventarioPanel" aria-expanded="false">
         <button type="button" id="btnAlternarOSInventario" class="os-picker-toggle" aria-label="Mostrar OS de Inventario" aria-controls="osInventarioPanel" aria-expanded="false">⌄</button>
@@ -171,9 +172,10 @@
           <b id="resumenAprobacionesOT">Sin aprobaciones</b>
         </summary>
         <div class="ot-approval-options">
-          <label><input type="checkbox" data-aprobacion-etapa="evaluacion"><span><strong>Evaluación</strong><small>Aprobar antes de iniciar Mantención.</small></span></label>
-          <label><input type="checkbox" data-aprobacion-etapa="mantencion"><span><strong>Mantención</strong><small>Aprobar antes de iniciar Pruebas.</small></span></label>
-          <label><input type="checkbox" data-aprobacion-etapa="pruebas"><span><strong>Pruebas</strong><small>Aprobar antes de iniciar Despacho.</small></span></label>
+          <label><input type="checkbox" data-aprobacion-etapa="ingreso"><span><strong>Ingreso</strong><small>Aprobar al completar esta etapa.</small></span></label>
+          <label><input type="checkbox" data-aprobacion-etapa="evaluacion"><span><strong>Evaluación</strong><small>Aprobar al completar esta etapa.</small></span></label>
+          <label><input type="checkbox" data-aprobacion-etapa="mantencion"><span><strong>Mantención</strong><small>Aprobar al completar esta etapa.</small></span></label>
+          <label><input type="checkbox" data-aprobacion-etapa="pruebas"><span><strong>Pruebas</strong><small>Aprobar al completar esta etapa.</small></span></label>
           <label><input type="checkbox" data-aprobacion-etapa="despacho"><span><strong>Despacho</strong><small>Aprobar antes de cerrar la OT.</small></span></label>
         </div>
       </details>
@@ -203,8 +205,9 @@
       <button class="btn-success btn-guardar-etapa" onclick="guardarIngreso()">
         Guardar progreso
       </button>
-      <button class="btn-primary" onclick="aprobarIngreso()">
-        Continuar a evaluación
+      <p id="avisoAprobacionIngreso" hidden>Al completar el checklist, el Jefe de Taller debe aprobar Ingreso para continuar.</p>
+      <button id="btnCompletarIngreso" class="btn-primary" onclick="aprobarIngreso()">
+        Completar Ingreso
       </button>
       <button class="btn-danger solo-jefe" data-cierre-etapa="ingreso" style="display:none;" onclick="cerrarOT()">
         Cerrar OS
@@ -661,10 +664,10 @@
 
 
 <script src="js/components/notificaciones.js?v=20261022-3"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/4.2.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/5.0.9/jspdf.plugin.autotable.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<script type="module" src="js/app.js?v=20261027-4"></script>
+<script type="module" src="js/app.js?v=20261102-1"></script>
 </body>
 </html>

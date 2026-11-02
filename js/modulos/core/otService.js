@@ -87,6 +87,7 @@ export function inicializarOTService({
 }
 
 export function obtenerEstadoOT(ot) {
+    if (ot?.flujoVersion === 2) return ot.cerrada ? "CERRADA" : ot.etapaActualNombre || "EN_PROCESO";
 
     if (!ot) return "INGRESO";
 

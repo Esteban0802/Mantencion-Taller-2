@@ -516,6 +516,8 @@
 }
 
 .ot-approval-options input { margin-top: 3px; }
+.ot-approval-selector[hidden],
+.ot-approval-options label[hidden] { display: none !important; }
 .ot-approval-options span { display: grid; gap: 2px; }
 .ot-approval-options small { color: #64788c; }
 

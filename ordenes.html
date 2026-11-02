@@ -7,6 +7,7 @@
   <title>Órdenes de Trabajo | Vectaria</title>
   <link rel="icon" type="image/png" href="img/vectaria-favicon-official.png?v=3">
   <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/papelera-ot.css?v=20261101-2">
   <link rel="stylesheet" href="css/brand-overtrack.css">
   <link rel="stylesheet" href="css/brand-overtrack-light.css">
   <link rel="stylesheet" href="css/desktop-density.css?v=20261004-7">
@@ -54,9 +55,18 @@
   <main class="main-content">
     <div class="header">
       <div><h2>Órdenes de Trabajo</h2><p class="ordenes-subtitulo">Consulta las OT activas y el historial de órdenes cerradas.</p></div>
-      <div class="header-right"><div class="user-box"><span id="usuarioNombre">Usuario</span><small id="usuarioRol">Rol</small><button id="btnCerrarSesionDesktop" class="btn-logout permitido-bloqueo">Salir</button></div></div>
+      <div class="header-right"><button type="button" id="btnPapeleraOT" class="papelera-trigger" aria-controls="papeleraOT" aria-expanded="false" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M9 6V4h6v2M5 6l1 14h12l1-14M10 10v6M14 10v6"/></svg><span>Papelera de OT</span></button><div class="user-box"><span id="usuarioNombre">Usuario</span><small id="usuarioRol">Rol</small><button id="btnCerrarSesionDesktop" class="btn-logout permitido-bloqueo">Salir</button></div></div>
     </div>
 
+    <section id="avisosPapeleraOT" class="avisos-papelera" role="status" hidden></section>
+    <section id="papeleraOT" hidden aria-label="Papelera de órdenes de trabajo">
+      <div class="papelera-cabecera">
+        <span class="papelera-emblema" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M9 6V4h6v2M5 6l1 14h12l1-14M10 10v6M14 10v6"/></svg></span>
+        <div><h3>Papelera de tu sucursal</h3><p>Recupera una orden y continúa donde la dejaste.</p></div>
+      </div>
+      <div id="listaPapeleraOT" role="list" aria-live="polite"></div>
+      <button type="button" id="masPapeleraOT" class="btn-secondary" hidden>Ver más</button>
+    </section>
     <section class="card ordenes-panel">
       <div class="ordenes-filtros" role="search">
         <label class="sr-only" for="buscarOrdenes">Buscar órdenes</label>
@@ -81,6 +91,6 @@
   </main>
 </div>
 <script src="js/components/notificaciones.js?v=20261022-3"></script>
-<script type="module" src="js/ordenes.js?v=20261018-9"></script>
+<script type="module" src="js/ordenes.js?v=20261101-3"></script>
 </body>
 </html>

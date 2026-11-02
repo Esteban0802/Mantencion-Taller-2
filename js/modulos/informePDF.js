@@ -1,3 +1,4 @@
+import { esFlujoLibre, gruposLibresInforme } from "../flujo-libre-modelo.js";
 export function inicializarModuloInformePDF(
     servicios = {}
 ) {
@@ -220,6 +221,7 @@ function obtenerListaPruebasInforme() {
 
 
 function obtenerGruposActividadesInforme() {
+    if (esFlujoLibre(ot)) return gruposLibresInforme(ot);
     const grupos = [];
     const omitirIntervencion = evaluacionRechazadaSinMantencion();
 
@@ -415,6 +417,7 @@ function obtenerResumenEjecutivoInforme() {
 
 
 function obtenerEstadoEtapasInforme() {
+  if (esFlujoLibre(ot)) return ot.etapasPersonalizadas.map(e=>({nombre:e.nombre,estado:e.completada?"Completada":e.items.every(i=>i.ok)?(e.requiereAprobacion?"Pendiente de aprobación":"Pendiente de completar"):"En proceso"}));
   const estadoActual = String(ot?.estado || "").toUpperCase();
   const ordenCerrada = ot?.cerrada === true || estadoActual === "CERRADA";
   const etapas = [];
@@ -457,6 +460,7 @@ function obtenerEstadoEtapasInforme() {
 
 
 function generarConclusionTecnicaInforme() {
+  if (esFlujoLibre(ot)) return ot.cerrada ? "Las etapas definidas en la plantilla de esta orden fueron completadas y la OT fue cerrada por el Jefe de Taller." : `La orden se encuentra en la etapa ${ot.etapaActualNombre || "en proceso"}, según la secuencia de su plantilla.`;
   const resumen = obtenerResumenEjecutivoInforme();
   const estado = obtenerEstadoOT(ot);
 
@@ -1021,6 +1025,7 @@ function nombreEtapaVisible(etapa) {
   if (!etapa) return "";
 
   const nombre = String(etapa);
+  if (esFlujoLibre(ot)) return nombre;
 
   if (nombre.toLowerCase().includes("overhaul")) {
     return nombre.replace(/overhaul/gi, "Mantención");

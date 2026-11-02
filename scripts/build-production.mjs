@@ -16,9 +16,9 @@ const dependenciasPublicas = [
 ];
 const reemplazosCdn = new Map([
   ["https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.min.js", "vendor/chart.umd.min.js"],
-  ["https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js", "vendor/xlsx.full.min.js"],
-  ["https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js", "vendor/jspdf.umd.min.js"],
-  ["https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js", "vendor/jspdf.plugin.autotable.min.js"],
+  ["https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js", "vendor/xlsx.full.min.js"],
+  ["https://cdnjs.cloudflare.com/ajax/libs/jspdf/4.2.1/jspdf.umd.min.js", "vendor/jspdf.umd.min.js"],
+  ["https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/5.0.9/jspdf.plugin.autotable.min.js", "vendor/jspdf.plugin.autotable.min.js"],
   ["https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js", "vendor/html2canvas.min.js"]
 ]);
 

@@ -1,3 +1,4 @@
+import { urlSegura } from "./html-seguro.js";
 import { uploadBytes, deleteObject } from "./storage-seguro.js";
 import { db, storage } from "./firebase-config.js";
 import { protegerPagina, cerrarSesion } from "./session.js?v=20261017-1";
@@ -183,7 +184,7 @@ function evidenciasItem(item) {
 function celdaEvidencias(item) {
   const evidencias = evidenciasItem(item);
   const enlaces = evidencias.length
-    ? `<div class="inventario-evidencias-lista">${evidencias.map((evidencia, indice) => `<a href="${escapar(evidencia.url)}" target="_blank" rel="noopener" title="${escapar(evidencia.nombre || `Evidencia ${indice + 1}`)}">${indice + 1}. ${escapar(evidencia.nombre || "Ver evidencia")}</a>`).join("")}</div>`
+    ? `<div class="inventario-evidencias-lista">${evidencias.map((evidencia, indice) => `<a href="${escapar(urlSegura(evidencia.url))}" target="_blank" rel="noopener" title="${escapar(evidencia.nombre || `Evidencia ${indice + 1}`)}">${indice + 1}. ${escapar(evidencia.nombre || "Ver evidencia")}</a>`).join("")}</div>`
     : '<span class="inventario-sin-evidencia">Sin evidencia</span>';
   return `<div class="inventario-evidencias">${enlaces}${puedeEditar ? `<label class="inventario-adjuntar"><input type="file" data-evidencia accept=".jpg,.jpeg,.png,.webp,.heic,.heif,.avif,.pdf,image/jpeg,image/png,image/webp,image/heic,image/heif,image/avif,application/pdf" multiple><span>+ Adjuntar</span></label>` : ""}</div>`;
 }
@@ -344,7 +345,7 @@ function abrirDetalleRepuestosOs(clave) {
   $("detalleRepuestosOsBody").innerHTML = grupo.repuestos.map(item => {
     const recibido = repuestoRecibido(item);
     const informacion = detalleRecepcion(item);
-    return `<tr data-item-id="${item.id}"><td>${escapar(item.datos?.NP || "")}</td><td>${escapar(item.datos?.DESCRIPCION || "")}</td><td>${escapar(item.datos?.CANTIDAD || "")}</td><td><label class="inventario-recibido-check"${informacion ? ` title="${escapar(informacion)}"` : ""}><input type="checkbox" data-repuesto-recibido ${recibido ? "checked" : ""} ${puedeGestionarEstados ? "" : "disabled"}><span aria-hidden="true"></span><strong>Recibido</strong>${recibido ? '<em class="inventario-recepcion-info" aria-hidden="true">ⓘ</em>' : ""}</label></td></tr>`;
+    return `<tr data-item-id="${escapar(item.id)}"><td>${escapar(item.datos?.NP || "")}</td><td>${escapar(item.datos?.DESCRIPCION || "")}</td><td>${escapar(item.datos?.CANTIDAD || "")}</td><td><label class="inventario-recibido-check"${informacion ? ` title="${escapar(informacion)}"` : ""}><input type="checkbox" data-repuesto-recibido ${recibido ? "checked" : ""} ${puedeGestionarEstados ? "" : "disabled"}><span aria-hidden="true"></span><strong>Recibido</strong>${recibido ? '<em class="inventario-recepcion-info" aria-hidden="true">ⓘ</em>' : ""}</label></td></tr>`;
   }).join("");
   $("modalDetalleRepuestosOs").hidden = false;
 }

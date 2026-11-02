@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
+const {responderObservacion}=require('../functions/respuesta-observacion');
+import {dbMemoria} from './helpers/db-memoria.mjs';
 const { validarComentariosOT, etapasOT, autorizarEtapasOT } = require("../functions/comentarios-ot.js");
 const usuario = { uid: "tecnico", rol: "tecnico", empresaId: "e", sucursalId: "s" };
 const propio = { creadoPorUid: "tecnico", rol: "tecnico", texto: "Trabajo", fecha: "hoy" };
@@ -20,6 +22,25 @@ const ubicaciones = {
   despachoFinal: lista => ({ despacho: { comentariosFinal: lista } })
 };
 
+test('respuesta específica conserva observación y datos de OT y valida rol, alcance y concurrencia',async()=>{
+  for(const [nombre,ubicar] of Object.entries(ubicaciones)) {
+    const base={empresaId:'e',sucursalId:'s',estado:'INGRESO',cerrada:false,revision:4,equipo:'Original',...ubicar([observacion])};
+    const db=dbMemoria({'ots/ot':base,'sucursales/s':{empresaId:'e',activa:true},'otsResumen/ot':{equipo:'Original',alertaJefe:true}});
+    const etapa=nombre.startsWith('pruebas')?'pruebas':nombre.startsWith('despacho')?'despacho':nombre;
+    const tipo={pruebasGeneral:'general',pruebasMecanicas:'mecanico',pruebasElectricas:'electrico',despachoPreparacion:'preparacion',despachoFinal:'final'}[nombre];
+    const datos={otId:'ot',etapa,tipo,itemIndex:0,comentarioIndex:0,respuesta:'Evidencia subida',referencia:Object.fromEntries(['texto','fecha','creadoPorUid','rol'].map(k=>[k,observacion[k]]))};
+    await assert.rejects(responderObservacion({db,usuario:{...usuario,rol:'jefe_taller'},datos}));
+    await assert.rejects(responderObservacion({db,usuario:{...usuario,sucursalId:'otra'},datos}));
+    await assert.rejects(responderObservacion({db,usuario,datos:{...datos,referencia:{...datos.referencia,texto:'Cambio'}}}));
+    const r=await responderObservacion({db,usuario,datos});
+    assert.equal(r.respuesta.texto,'Corregir');assert.equal(r.respuesta.atendidoPorUid,'tecnico');assert.equal(r.revision,5);
+    assert.equal(db.documentos.get('ots/ot').equipo,'Original');assert.equal(db.documentos.get('otsResumen/ot').equipo,'Original');
+    assert.equal((await responderObservacion({db,usuario,datos})).revision,5);
+    await assert.rejects(responderObservacion({db,usuario,datos:{...datos,respuesta:'Sobrescribir'}}));
+    db.documentos.get('ots/ot').cerrada=true;
+    await assert.rejects(responderObservacion({db,usuario,datos}));
+  }
+});
 for (const [etapa, datos] of Object.entries(ubicaciones)) {
   test(`${etapa}: conserva ajenos y permite crear, editar y eliminar propios`, () => {
     assert.doesNotThrow(() => validarComentariosOT(datos([ajeno]), datos([ajeno, propio]), usuario));

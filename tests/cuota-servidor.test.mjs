@@ -61,7 +61,6 @@ test("un fallo confirmado de carga libera la reserva y un resultado desconocido 
 test("todos los grupos de archivos de empresa usan la cuota y respetan los roles", async () => {
   const casos = [
     ["admin_empresa", "informe/logo.png", "image/png", Buffer.from([137,80,78,71,13,10,26,10])],
-    ["admin_empresa", "plantillas/p.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", Buffer.from([80,75,3,4,120,108,47])],
     ["sheq", "sheq/documento.pdf", "application/pdf", Buffer.from("%PDF-1.4")],
     ["jefe_taller", "inventario/s/documento.pdf", "application/pdf", Buffer.from("%PDF-1.4")]
   ];

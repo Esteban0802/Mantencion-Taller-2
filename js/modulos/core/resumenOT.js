@@ -31,6 +31,10 @@ function resumirLista(lista = []) {
 }
 
 export function crearResumenOT(ot = {}) {
+  if (ot.flujoVersion === 2) {
+    const claves = ["empresaId","sucursalId","os","equipo","serie","cliente","estado","cerrada","creadoPor","creadoPorNombre","fechaCreacion","fechaActualizacion","revision","flujoVersion","etapaActualNombre","plantillaMantenimientoNombre"];
+    return {...Object.fromEntries(claves.map(k=>[k,ot[k] ?? null])),etapasPersonalizadas:ot.etapasPersonalizadas.map(e=>({id:e.id,nombre:e.nombre,total:e.items.length,completados:e.items.filter(i=>i.ok).length,completada:e.completada,requiereAprobacion:e.requiereAprobacion}))};
+  }
   return {
     empresaId: ot.empresaId || "",
     sucursalId: ot.sucursalId || "",
@@ -94,7 +98,7 @@ export async function asegurarResumenesOT(filtros = []) {
   const idsOT = new Set(otsSnap.docs.map(item => item.id));
 
   const operaciones = [
-    ...otsSnap.docs.map(item => ({ tipo: "set", referencia: doc(db, "otsResumen", item.id), datos: crearResumenOT(item.data()) })),
+    ...otsSnap.docs.filter(item=>item.data().flujoVersion !== 2).map(item => ({ tipo: "set", referencia: doc(db, "otsResumen", item.id), datos: crearResumenOT(item.data()) })),
     ...resumenSnap.docs
       .filter(item => !idsOT.has(item.id))
       .map(item => ({ tipo: "delete", referencia: item.ref }))

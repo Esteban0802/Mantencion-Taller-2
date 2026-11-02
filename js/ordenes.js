@@ -2,7 +2,7 @@ import { protegerPagina, cerrarSesion, reautenticarAccionCritica } from "./sessi
 import { db } from "./firebase-config.js";
 import { obtenerModulosEmpresa, moduloActivo } from "./modulos.js?v=20261018-2";
 import { asegurarResumenesOT } from "./modulos/core/resumenOT.js";
-import { puedeVerOrdenesServicio, puedeCrearOT, puedeAbrirOT, puedeEntrarPanelEmpresa } from "./permisos.js?v=20261014-1";
+import { puedeVerOrdenesServicio, puedeCrearOT, puedeAbrirOT, puedeEntrarPanelEmpresa } from "./permisos.js?v=20261029-1";
 import {
   collection,
   query,
@@ -11,8 +11,15 @@ import {
   onSnapshot,
   doc,
   getDoc,
-  writeBatch
+  getDocs,
+  limit,
+  startAfter
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-functions.js";
+const enviarOTPapelera = httpsCallable(getFunctions(undefined, "us-central1"), "enviarOTPapelera");
+const restaurarOTPapelera = httpsCallable(getFunctions(undefined, "us-central1"), "restaurarOTPapelera");
+const eliminarOTPapelera = httpsCallable(getFunctions(undefined, "us-central1"), "eliminarOTPapelera");
 
 const usuario = protegerPagina(["admin_empresa", "admin_sucursal", "jefe_taller", "supervisor", "tecnico", "planificador"]);
 if (!usuario) throw new Error("Acceso no autorizado");
@@ -42,6 +49,7 @@ function estaAtrasada(ot) {
 }
 
 function nombreEstado(ot) {
+  if (ot.flujoVersion === 2 && !ot.cerrada) return ot.etapaActualNombre || "En proceso";
   if (estaCerrada(ot)) return "Cerrada";
   if (estaAtrasada(ot)) return "Atrasada";
   const estados = {
@@ -137,7 +145,7 @@ function renderizar() {
         </div>
         <div class="orden-item-acciones">
           <button type="button" class="btn-card-open" data-ot-id="${textoSeguro(ot.id)}">${estaCerrada(ot) ? "Consultar OT" : "Abrir OT"}</button>
-          ${usuario.rol === "jefe_taller" ? `<button type="button" class="btn-card-delete" data-eliminar-ot="${textoSeguro(ot.id)}">Eliminar OS</button>` : ""}
+          ${puedeCrearOT(usuario, empresaActual) ? `<button type="button" class="btn-card-delete" data-eliminar-ot="${textoSeguro(ot.id)}">Enviar a papelera</button>` : ""}
         </div>
       </article>`;
   }).join("");
@@ -203,30 +211,168 @@ function nuevaOT() {
 }
 
 async function eliminarOT(id) {
-  if (usuario.rol !== "jefe_taller" || !id) return;
+  if (!puedeCrearOT(usuario, empresaActual) || !id) return;
   const confirmar = window.OverTrackUI?.confirmarAccion
     ? await window.OverTrackUI.confirmarAccion({
-        titulo: "Eliminar orden de servicio",
-        mensaje: "La OS y su registro en el historial se eliminarán definitivamente. Esta acción no se puede deshacer.",
+        titulo: "Enviar orden a la papelera",
+        mensaje: "La OS se enviará a la papelera de tu sucursal. Podrás restaurarla junto con sus archivos. Los archivos seguirán ocupando almacenamiento.",
         tipo: "advertencia",
-        textoConfirmar: "Eliminar OS",
+        textoConfirmar: "Enviar a papelera",
         textoCancelar: "Cancelar",
         peligrosa: true
       })
-    : window.confirm("¿Eliminar definitivamente esta OS?");
+    : window.confirm("¿Enviar esta OS a la papelera?");
   if (!confirmar) return;
-  if (!(await reautenticarAccionCritica("eliminar definitivamente esta orden de servicio"))) return;
+  if (!(await reautenticarAccionCritica("enviar esta orden de servicio a la papelera"))) return;
   const eliminar = async () => {
-    const lote = writeBatch(db);
-    lote.delete(doc(db, "ots", id));
-    lote.delete(doc(db, "otsResumen", id));
-    await lote.commit();
+    await enviarOTPapelera({ otId: id });
+    if (!document.getElementById("papeleraOT").hidden) await cargarPapelera();
   };
   if (window.OverTrackUI?.ejecutarConCarga) {
-    await window.OverTrackUI.ejecutarConCarga(eliminar, "Eliminando orden de servicio…");
+    await window.OverTrackUI.ejecutarConCarga(eliminar, "Enviando orden a la papelera…");
   } else {
     await eliminar();
   }
+}
+
+let cursorPapelera = null;
+let cargandoPapelera = false;
+function plazoPapelera(datos, ahora = Date.now()) {
+  const inicio = datos.eliminadoEn?.toDate?.()?.getTime();
+  if (!Number.isFinite(inicio)) return null;
+  const aviso = datos.avisoEliminacionEn?.toDate?.()?.getTime();
+  const limite = Math.max(inicio + 15 * 86400000, Number.isFinite(aviso) ? aviso + 3 * 86400000 : 0);
+  const dias = Math.max(0, Math.ceil((limite - ahora) / 86400000));
+  const revision = datos.ultimaRevisionPapeleraEn?.toDate?.()?.getTime();
+  const proxima = datos.proximaRevisionPapeleraEn?.toDate?.()?.getTime();
+  const fecha = ms => new Date(ms).toLocaleString("es-CL");
+  let texto = `Conservación mínima hasta ${fecha(limite)}. Recibirás un aviso cuando la revisión programe su eliminación.`;
+  if (Number.isFinite(aviso)) {
+    texto = `Aviso registrado el ${fecha(aviso)}. ${Number.isFinite(revision) && revision >= limite ? "Plazo cumplido; eliminación pendiente." : `La OT se conserva. Puede eliminarse a partir del ${fecha(limite)}.`}`;
+    if (Number.isFinite(revision)) texto += ` Última revisión: ${fecha(revision)}.`;
+    if (Number.isFinite(proxima)) texto += ` Próxima revisión prevista: ${fecha(proxima)}.`;
+  }
+  return { limite, dias, urgente: Number.isFinite(aviso), texto };
+}
+async function cargarAvisosPapelera() {
+  if (usuario.rol !== "jefe_taller" || !usuario.sucursalId) return;
+  const contenedor = document.getElementById("avisosPapeleraOT");
+  if (!contenedor) return;
+  const resultado = await getDocs(query(collection(db, "otsPapelera"),
+    where("empresaId", "==", empresaActual.id), where("sucursalId", "==", usuario.sucursalId),
+    where("avisoEliminacionEn", "<=", new Date()), limit(20)));
+  contenedor.replaceChildren();
+  contenedor.hidden = resultado.empty;
+  if (resultado.empty) return;
+  const titulo = document.createElement("strong");
+  titulo.textContent = "OT próximas a eliminarse de la papelera";
+  contenedor.appendChild(titulo);
+  for (const documento of resultado.docs) {
+    const datos = documento.data(), plazo = plazoPapelera(datos);
+    if (!plazo) continue;
+    const aviso = document.createElement("p");
+    aviso.textContent = `${datos.os || "Sin OS"} · ${plazo.texto} Restaura la OT para conservarla.`;
+    contenedor.appendChild(aviso);
+  }
+  const abrir = document.createElement("button");
+  abrir.type = "button"; abrir.className = "papelera-restaurar"; abrir.textContent = "Revisar papelera";
+  abrir.addEventListener("click", () => {
+    document.getElementById("papeleraOT").hidden = false;
+    document.getElementById("btnPapeleraOT").setAttribute("aria-expanded", "true");
+    cargarPapelera().catch(error => alert(error.message));
+  });
+  contenedor.appendChild(abrir);
+  if (resultado.size === 20) {
+    const nota = document.createElement("p"); nota.textContent = "Se muestran hasta 20 avisos. Revisa la papelera para ver todas las OT."; contenedor.appendChild(nota);
+  }
+}
+function mostrarPapeleraVacia(lista) {
+  lista.innerHTML = '<div class="papelera-vacia"><span aria-hidden="true">✓</span><strong>No hay OT en la papelera</strong><p>Las órdenes que envíes a la papelera aparecerán aquí.</p></div>';
+}
+async function cargarPapelera(mas = false) {
+  if (usuario.rol !== "jefe_taller" || !usuario.sucursalId || cargandoPapelera) return;
+  cargandoPapelera = true;
+  const lista = document.getElementById("listaPapeleraOT");
+  const botonMas = document.getElementById("masPapeleraOT");
+  botonMas.disabled = true;
+  try {
+    if (!mas) { lista.replaceChildren(); cursorPapelera = null; }
+    const filtros = [where("empresaId", "==", empresaActual.id), where("sucursalId", "==", usuario.sucursalId)];
+    if (mas && cursorPapelera) filtros.push(startAfter(cursorPapelera));
+    const resultado = await getDocs(query(collection(db, "otsPapelera"), ...filtros, limit(20)));
+    cursorPapelera = resultado.docs.at(-1) || null;
+    if (!mas && resultado.empty) mostrarPapeleraVacia(lista);
+    for (const documento of resultado.docs) {
+      const datos = documento.data();
+      const fila = document.createElement("article");
+      fila.className = "papelera-item";
+      fila.setAttribute("role", "listitem");
+      const informacion = document.createElement("div");
+      informacion.className = "papelera-item-info";
+      const etiqueta = document.createElement("small");
+      etiqueta.textContent = "ORDEN DE TRABAJO";
+      const nombre = document.createElement("h4");
+      nombre.textContent = datos.os || "Sin OS";
+      const equipo = document.createElement("p");
+      equipo.textContent = [datos.equipo || "Equipo sin especificar", datos.orden?.cliente].filter(Boolean).join(" · ");
+      informacion.append(etiqueta, nombre, equipo);
+      if (typeof datos.eliminadoEn?.toDate === "function") {
+        const fecha = datos.eliminadoEn.toDate();
+        if (!Number.isNaN(fecha.getTime())) {
+          const detalle = document.createElement("span");
+          detalle.className = "papelera-item-fecha";
+          detalle.textContent = `Enviada el ${fecha.toLocaleDateString("es-CL", { day: "numeric", month: "short", year: "numeric" })}`;
+          informacion.appendChild(detalle);
+        }
+      }
+      const boton = document.createElement("button");
+      const plazo = plazoPapelera(datos);
+      if (plazo) {
+        const detalle = document.createElement("span");
+        detalle.className = `papelera-plazo ${plazo.urgente ? "urgente" : ""}`;
+        detalle.textContent = plazo.texto;
+        informacion.appendChild(detalle);
+      }
+      boton.type = "button"; boton.className = "papelera-restaurar"; boton.textContent = "Restaurar OT";
+      boton.disabled = !puedeCrearOT(usuario, empresaActual) || datos.borradoPendiente === true;
+      boton.addEventListener("click", async () => {
+        if (!(await reautenticarAccionCritica("restaurar esta orden de servicio"))) return;
+        boton.disabled = true;
+        try {
+          await restaurarOTPapelera({ otId: documento.id });
+          fila.remove();
+          cargarAvisosPapelera().catch(console.warn);
+          if (!lista.querySelector(".papelera-item") && botonMas.hidden) mostrarPapeleraVacia(lista);
+        } catch (error) { alert(error.message || "No fue posible restaurar la OT."); }
+        finally { boton.disabled = datos.borradoPendiente === true; }
+      });
+      fila.append(informacion, boton); lista.appendChild(fila);
+      const eliminar = document.createElement("button");
+      eliminar.type = "button";
+      eliminar.className = "papelera-eliminar";
+      eliminar.textContent = datos.borradoPendiente ? "Reintentar eliminación" : "Eliminar definitivamente";
+      eliminar.disabled = !puedeCrearOT(usuario, empresaActual);
+      eliminar.addEventListener("click", async () => {
+        const mensaje = `Se eliminará definitivamente la OT «${datos.os || "Sin OS"}» y todos sus archivos adjuntos. No podrá restaurarse desde la papelera. El inventario se conservará. ¿Deseas continuar?`;
+        const confirmar = window.OverTrackUI?.confirmarAccion
+          ? await window.OverTrackUI.confirmarAccion({ titulo: "Eliminar OT definitivamente", mensaje, tipo: "advertencia", peligrosa: true, textoConfirmar: "Eliminar definitivamente", textoCancelar: "Cancelar" })
+          : window.confirm(mensaje);
+        if (!confirmar || !(await reautenticarAccionCritica("eliminar definitivamente esta OT y sus archivos"))) return;
+        boton.disabled = true; eliminar.disabled = true;
+        try {
+          await eliminarOTPapelera({ otId: documento.id });
+          fila.remove();
+          cargarAvisosPapelera().catch(console.warn);
+          if (!lista.querySelector(".papelera-item") && botonMas.hidden) mostrarPapeleraVacia(lista);
+        } catch (error) {
+          eliminar.textContent = "Reintentar eliminación";
+          alert(error.message || "No se pudo completar la eliminación. Puedes reintentar.");
+        } finally { eliminar.disabled = false; }
+      });
+      fila.appendChild(eliminar);
+    }
+    botonMas.hidden = resultado.size < 20;
+  } finally { cargandoPapelera = false; botonMas.disabled = false; }
 }
 
 function volverPanelEmpresa() {
@@ -237,6 +383,14 @@ function volverPanelEmpresa() {
 }
 
 function configurarInterfaz() {
+  document.getElementById("btnPapeleraOT").hidden = usuario.rol !== "jefe_taller";
+  document.getElementById("btnPapeleraOT").addEventListener("click", () => {
+    const panel = document.getElementById("papeleraOT");
+    panel.hidden = !panel.hidden;
+    document.getElementById("btnPapeleraOT").setAttribute("aria-expanded", String(!panel.hidden));
+    if (!panel.hidden) cargarPapelera().catch(error => alert(error.message));
+  });
+  document.getElementById("masPapeleraOT").addEventListener("click", () => cargarPapelera(true).catch(error => alert(error.message)));
   document.getElementById("usuarioNombre").textContent = usuario.nombre || usuario.email || "Usuario";
   document.getElementById("usuarioRol").textContent = String(usuario.rol || "").replaceAll("_", " ");
   document.getElementById("menuNuevaOT").style.display = puedeCrearOT(usuario, empresaActual) ? "" : "none";
@@ -295,6 +449,7 @@ window.addEventListener("DOMContentLoaded", async () => {
       return;
     }
     configurarInterfaz();
+    cargarAvisosPapelera().catch(error => console.warn("No fue posible consultar los avisos de papelera:", error));
     escucharOrdenes();
   } catch (error) {
     console.error("No fue posible iniciar el archivo de órdenes:", error);

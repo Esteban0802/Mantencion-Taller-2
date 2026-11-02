@@ -20,6 +20,7 @@ import {
   doc,
   getDoc,
   getDocs,
+  limit,
   query,
   runTransaction,
   Timestamp,
@@ -1199,6 +1200,36 @@ test("Jefe de Taller no puede retirar la aprobación de una etapa ya iniciada", 
   );
 });
 
+test("Ingreso con aprobación seleccionada solo puede completarlo el Jefe de Taller", async () => {
+  await testEnv.withSecurityRulesDisabled(c => updateDoc(doc(c.firestore(), "ots", "ot-flujo-a"), { "aprobacionesPorEtapa.ingreso": true }));
+  for (const uid of ["taller-a", "supervisor-a"]) {
+    await assertFails(updateDoc(doc(firestoreComo(uid), "ots", "ot-flujo-a"), { ingresoAprobado:true, estado:"EVALUACION" }));
+  }
+  await assertFails(updateDoc(doc(firestoreComo("jefe-a"), "ots", "ot-flujo-a"), { "aprobacionesPorEtapa.ingreso":false }));
+  await assertSucceeds(updateDoc(doc(firestoreComo("jefe-a"), "ots", "ot-flujo-a"), { ingresoAprobado:true, estado:"EVALUACION" }));
+});
+
+test("Ingreso sin aprobación seleccionada permite continuar al técnico", async () => {
+  await assertSucceeds(updateDoc(doc(firestoreComo("taller-a"), "ots", "ot-flujo-a"), { ingresoAprobado:true, estado:"EVALUACION" }));
+});
+
+test("una OT con solo Evaluación puede cerrarse sin exigir etapas ajenas a su plantilla", async () => {
+  await testEnv.withSecurityRulesDisabled(c => updateDoc(doc(c.firestore(), "ots", "ot-flujo-a"), {
+    etapasHabilitadas:{ingreso:false,evaluacion:true,mantencion:false,pruebas:false,despacho:false},estado:"EVALUACION"
+  }));
+  const ref=doc(firestoreComo("jefe-a"),"ots","ot-flujo-a");
+  await assertFails(updateDoc(ref,{estado:"CERRADA",cerrada:true}));
+  await assertSucceeds(updateDoc(ref,{evaluacionAprobada:true,estado:"CERRADA",cerrada:true}));
+});
+
+test("no se puede avanzar a una etapa que no existe en la plantilla de la OT", async () => {
+  await testEnv.withSecurityRulesDisabled(c => updateDoc(doc(c.firestore(), "ots", "ot-flujo-a"), {
+    etapasHabilitadas:{ingreso:true,evaluacion:true,mantencion:true,pruebas:true,despacho:false},
+    ingresoAprobado:true,evaluacionAprobada:true,overhaulAprobado:true,pruebasAprobado:true,estado:"PRUEBAS"
+  }));
+  await assertFails(updateDoc(doc(firestoreComo("jefe-a"),"ots","ot-flujo-a"),{estado:"DESPACHO"}));
+});
+
 test("Técnico no puede aprobar Pruebas cuando Aprobaciones está habilitado", async () => {
   const db = firestoreComo("taller-a");
   await autorizarComentariosEnPrueba("taller-a", "ot-flujo-a", { decisionPruebas: { resultado: "APROBADO" } });
@@ -1287,14 +1318,29 @@ test("Admin Empresa no puede eliminar una OT de su empresa", async () => {
   await assertFails(deleteDoc(doc(db, "ots", "ot-abierta-a")));
 });
 
-test("Jefe de Taller puede eliminar una OT de su sucursal", async () => {
+test("Jefe de Taller no puede eludir la papelera borrando directamente una OT", async () => {
   const db = firestoreComo("jefe-a");
-  await assertSucceeds(deleteDoc(doc(db, "ots", "ot-abierta-a")));
+  await assertFails(deleteDoc(doc(db, "ots", "ot-abierta-a")));
 });
 
 test("Jefe de Taller con autenticación antigua no puede eliminar una OT", async () => {
   const db = firestoreComo("jefe-a", Math.floor(Date.now() / 1000) - 3600);
   await assertFails(deleteDoc(doc(db, "ots", "ot-abierta-a")));
+});
+
+test("solo el jefe de la sucursal consulta la papelera y ningún cliente puede modificarla", async () => {
+  const datos = { empresaId: "empresa-a", sucursalId: "sucursal-a", orden: { os: "Original" } };
+  await testEnv.withSecurityRulesDisabled(contexto => setDoc(doc(contexto.firestore(), "otsPapelera", "papelera-a"), datos));
+  await assertSucceeds(getDoc(doc(firestoreComo("jefe-a"), "otsPapelera", "papelera-a")));
+  for (const uid of ["tecnico-a", "admin-a", "admin-sucursal-a", "super-admin", "taller-a2", "taller-b", "inactivo-a"]) {
+    await assertFails(getDoc(doc(firestoreComo(uid), "otsPapelera", "papelera-a")));
+  }
+  for (const uid of ["jefe-a", "super-admin"]) {
+    const db = firestoreComo(uid);
+    await assertFails(setDoc(doc(db, "otsPapelera", "copia-falsa"), datos));
+    await assertFails(updateDoc(doc(db, "otsPapelera", "papelera-a"), { orden: {} }));
+    await assertFails(deleteDoc(doc(db, "otsPapelera", "papelera-a")));
+  }
 });
 
 test("Técnico puede crear el resumen liviano de una OT de su sucursal", async () => {
@@ -1362,6 +1408,73 @@ test("Admin Empresa no puede crear directamente un usuario desde el cliente", as
       activo: true,
     }),
   );
+});
+
+test("admin sucursal configura solo identidad propia, sin datos generales ni límites", async () => {
+  const db = firestoreComo("admin-sucursal-a");
+  await assertSucceeds(updateDoc(doc(db, "sucursales", "sucursal-a"), { identidadVisual: { colorPrimario: "#123456", brandingInforme: {} } }));
+  for (const cambios of [{ nombre: "Otra" }, { activa: false }, { empresaId: "empresa-b" }, { maxStorageGB: 999 }]) {
+    await assertFails(updateDoc(doc(db, "sucursales", "sucursal-a"), cambios));
+  }
+  await assertFails(updateDoc(doc(db, "sucursales", "sucursal-a2"), { identidadVisual: { colorPrimario: "#123456" } }));
+  await assertFails(updateDoc(doc(db, "empresas", "empresa-a"), { colorPrimario: "#123456" }));
+  await assertSucceeds(updateDoc(doc(db, "sucursales", "sucursal-a"), { identidadVisual: deleteField() }));
+});
+
+test("flujos libres se consultan por sucursal y solo el servidor puede crearlos, actualizarlos o alterar su resumen", async () => {
+  const datos={empresaId:"empresa-a",sucursalId:"sucursal-a",creadoPor:"jefe-a",estado:"EN_PROCESO",cerrada:false,flujoVersion:2,etapasPersonalizadas:[{id:"e_0",nombre:"Desarme",items:[],completada:false}]};
+  await testEnv.withSecurityRulesDisabled(async c=>{
+    await setDoc(doc(c.firestore(),"ots","libre-a"),datos);
+    await setDoc(doc(c.firestore(),"otsResumen","libre-a"),datos);
+  });
+  for(const uid of ["jefe-a","tecnico-a","admin-a","admin-sucursal-a"]) {
+    const db=firestoreComo(uid);
+    await assertSucceeds(getDoc(doc(db,"ots","libre-a")));
+    await assertFails(setDoc(doc(db,"ots","libre-nueva"),datos));
+    await assertFails(updateDoc(doc(db,"ots","libre-a"),{etapaActualNombre:"Saltada"}));
+    await assertFails(updateDoc(doc(db,"ots","libre-a"),{flujoVersion:1,estado:"CERRADA",cerrada:true}));
+    await assertFails(updateDoc(doc(db,"otsResumen","libre-a"),{flujoVersion:1,estado:"CERRADA",cerrada:true}));
+    await assertFails(deleteDoc(doc(db,"otsResumen","libre-a")));
+  }
+  for(const uid of ["taller-a2","taller-b","super-admin"]) await assertFails(getDoc(doc(firestoreComo(uid),"ots","libre-a")));
+});
+
+test("plantillas de sucursal permiten gestión propia y consulta operacional, aislando otras ramas", async () => {
+  const db = firestoreComo("admin-sucursal-a");
+  const ruta = ["sucursales", "sucursal-a", "plantillasSucursal", "plantilla-local"];
+  const datos = { empresaId: "empresa-a", sucursalId: "sucursal-a", creadoPor: "admin-sucursal-a", gama: "Motor", checklists: {} };
+  const empresa = firestoreComo("admin-a");
+  await assertFails(setDoc(doc(empresa, "plantillasMantenimiento", "nueva-global"), { empresaId: "empresa-a", creadoPor: "admin-a" }));
+  await assertFails(updateDoc(doc(empresa, "plantillasMantenimiento", "plantilla-a"), { nombre: "Cambio" }));
+  await assertFails(deleteDoc(doc(empresa, "plantillasMantenimiento", "plantilla-a")));
+  await assertFails(setDoc(doc(empresa, ...ruta), datos));
+  await assertSucceeds(setDoc(doc(db, ...ruta), datos));
+  await assertSucceeds(updateDoc(doc(db, ...ruta), { nombre: "Propia" }));
+  for (const uid of ["tecnico-a", "jefe-a", "admin-a"]) await assertSucceeds(getDocs(collection(firestoreComo(uid), "sucursales", "sucursal-a", "plantillasSucursal")));
+  for (const uid of ["taller-a2", "taller-b", "super-admin"]) await assertFails(getDoc(doc(firestoreComo(uid), ...ruta)));
+  await assertFails(setDoc(doc(db, "sucursales", "sucursal-a2", "plantillasSucursal", "ajena"), datos));
+  await assertFails(updateDoc(doc(db, ...ruta), { empresaId: "empresa-b" }));
+  await assertFails(updateDoc(doc(db, ...ruta), { sucursalId: "sucursal-a2" }));
+  await assertFails(updateDoc(doc(firestoreComo("tecnico-a"), ...ruta), { nombre: "Alterada" }));
+  await assertFails(updateDoc(doc(db, "plantillasMantenimiento", "plantilla-a"), { nombre: "General alterada" }));
+  await assertSucceeds(deleteDoc(doc(db, ...ruta)));
+});
+
+test("cancelación bloquea configuración de sucursal y sus plantillas", async () => {
+  await testEnv.withSecurityRulesDisabled(c => updateDoc(doc(c.firestore(), "empresas", "empresa-a"), { activa: true, suscripcion: { estado: "periodo_exportacion" } }));
+  const db = firestoreComo("admin-sucursal-a");
+  await assertFails(updateDoc(doc(db, "sucursales", "sucursal-a"), { identidadVisual: { colorPrimario: "#123456" } }));
+  await assertFails(setDoc(doc(db, "sucursales", "sucursal-a", "plantillasSucursal", "p"), { empresaId: "empresa-a", sucursalId: "sucursal-a", creadoPor: "admin-sucursal-a" }));
+});
+
+test("archivos de identidad de sucursal usan el servidor, cuota y lectores de su ámbito", async () => {
+  const ruta = "empresas/empresa-a/sucursales/sucursal-a/informe/logo.png";
+  await archivoEnServidorPrueba("admin-sucursal-a", "subirEmpresa", { ruta, contentType: "image/png", base64: Buffer.from([137,80,78,71,13,10,26,10]).toString("base64") });
+  for (const uid of ["admin-sucursal-a", "jefe-a", "tecnico-a", "admin-a"]) await assertSucceeds(getBytes(ref(storageComo(uid), ruta)));
+  for (const uid of ["taller-a2", "taller-b", "super-admin"]) await assertFails(getBytes(ref(storageComo(uid), ruta)));
+  await assertFails(uploadBytes(ref(storageComo("admin-sucursal-a"), ruta), new Uint8Array([1]), { contentType: "image/png" }));
+  await assert.rejects(archivoEnServidorPrueba("admin-sucursal-a", "subirEmpresa", { ruta: ruta.replace("/sucursal-a/", "/sucursal-a2/"), contentType: "image/png", base64: Buffer.from([137,80,78,71,13,10,26,10]).toString("base64") }));
+  await archivoEnServidorPrueba("admin-sucursal-a", "eliminarEmpresa", { ruta });
 });
 
 test("Admin Empresa no puede crear un superadministrador", async () => {
@@ -1684,6 +1797,21 @@ test("Técnico puede leer únicamente su copia personal publicada", async () => 
     "programacionPublicadaUsuarios",
     "empresa-a_2026-10-12_tecnico-a",
   )));
+});
+
+test("la consulta personal permite semanas vacías sin abrir publicaciones ajenas ni borradores", async () => {
+  for (const uid of ["tecnico-a", "supervisor-a"]) {
+    const db = firestoreComo(uid);
+    for (const semanaInicio of ["2026-10-12", "2026-10-26"]) {
+      const resultado = await assertSucceeds(getDocs(query(collection(db, "programacionPublicadaUsuarios"),
+        where("empresaId", "==", "empresa-a"), where("usuarioId", "==", uid),
+        where("estado", "==", "publicada"), where("semanaInicio", "==", semanaInicio), limit(1))));
+      assert.equal(resultado.size, uid === "tecnico-a" && semanaInicio === "2026-10-12" ? 1 : 0);
+    }
+    await assertFails(getDocs(query(collection(db, "programacionPublicadaUsuarios"),
+      where("empresaId", "==", "empresa-a"), where("usuarioId", "==", "otro"), where("estado", "==", "publicada"))));
+    await assertFails(getDoc(doc(db, "programacionSemanas", "empresa-a_2026-10-19")));
+  }
 });
 
 test("Planificador puede registrar turnos de emergencia de una semana", async () => {
@@ -2154,6 +2282,21 @@ test("no autoriza adjuntar archivos de otra OT ni quitar un archivo antiguo sin 
 });
 
 for (const estado of ["cancelacion_solicitada", "periodo_exportacion", "pendiente_eliminacion", "cancelada"]) {
+  test(`${estado}: Firestore conserva lectura y bloquea escrituras operativas aunque activa=true`, async () => {
+    await testEnv.withSecurityRulesDisabled(contexto => updateDoc(doc(contexto.firestore(), "empresas", "empresa-a"), { activa: true, suscripcion: { estado } }));
+    const admin = firestoreComo("admin-a");
+    await assertSucceeds(getDoc(doc(admin, "clientes", "cliente-a")));
+    await assertSucceeds(getDoc(doc(firestoreComo("tecnico-a"), "ots", "ot-abierta-a")));
+    await assertFails(updateDoc(doc(admin, "empresas", "empresa-a"), { nombre: "Alterado" }));
+    await assertFails(updateDoc(doc(admin, "clientes", "cliente-a"), { nombre: "Alterado" }));
+    await assertFails(setDoc(doc(admin, "clientes", "cliente-nuevo"), { empresaId: "empresa-a", nombre: "Nuevo" }));
+    await assertFails(deleteDoc(doc(admin, "clientes", "cliente-a")));
+    await assertFails(deleteDoc(doc(firestoreComo("jefe-a"), "ots", "ot-abierta-a")));
+    await assertFails(updateDoc(doc(firestoreComo("planificador-a"), "inventarioItems", "item-a"), { datos: { DESCRIPCION: "Alterada" } }));
+  });
+}
+
+for (const estado of ["cancelacion_solicitada", "periodo_exportacion", "pendiente_eliminacion", "cancelada"]) {
   test(`${estado}: bloquea archivos propios de los tres roles y conserva descarga`, async () => {
     for (const uid of ["tecnico-a", "supervisor-a", "jefe-a"]) {
       const datos = datosArchivoPrueba();
@@ -2185,7 +2328,7 @@ test("activa=false bloquea archivos propios aunque la suscripción diga activa",
 const rutasCancelacion = [
   { uid: "admin-a", ruta: "empresas/empresa-a/informe/cancelacion.png", contentType: "image/png" },
   { uid: "super-admin", ruta: "empresas/empresa-a/informe/cancelacion-super.png", contentType: "image/png" },
-  { uid: "admin-a", ruta: "empresas/empresa-a/plantillas/cancelacion.xlsx", contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" },
+  { uid: "admin-sucursal-a", ruta: "empresas/empresa-a/sucursales/sucursal-a/plantillas/p/cancelacion.xlsx", contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" },
   { uid: "sheq-a", ruta: "empresas/empresa-a/sheq/persona/taller-a/cancelacion.pdf", contentType: "application/pdf" },
   { uid: "jefe-a", ruta: "empresas/empresa-a/inventario/sucursal-a/item-a/cancelacion.pdf", contentType: "application/pdf" }
 ];

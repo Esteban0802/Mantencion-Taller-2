@@ -1,6 +1,23 @@
 {
   "indexes": [
     {
+      "collectionGroup": "otsPapelera",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "empresaId", "order": "ASCENDING" },
+        { "fieldPath": "sucursalId", "order": "ASCENDING" },
+        { "fieldPath": "avisoEliminacionEn", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "otsPapelera",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "empresaId", "order": "ASCENDING" },
+        { "fieldPath": "sucursalId", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "ots",
       "queryScope": "COLLECTION",
       "fields": [
@@ -44,5 +61,8 @@
       ]
     }
   ],
-  "fieldOverrides": []
+  "fieldOverrides": [
+    { "collectionGroup": "otsPapelera", "fieldPath": "orden", "indexes": [] },
+    { "collectionGroup": "otsPapelera", "fieldPath": "resumen", "indexes": [] }
+  ]
 }

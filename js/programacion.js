@@ -15,6 +15,7 @@ import {
   doc,
   getDoc,
   getDocs,
+  limit,
   query,
   serverTimestamp,
   setDoc,
@@ -506,16 +507,17 @@ async function cargarSemana() {
 
   let semanaGuardada = null;
   if (ES_TRABAJADOR_CON_SEMANA_PERSONAL) {
-    try {
-      const publicacionPersonal = await getDoc(doc(db, "programacionPublicadaUsuarios", `${empresaId}_${inicio}_${usuario.uid}`));
-      semanaGuardada = publicacionPersonal.exists() ? publicacionPersonal.data() : null;
-    } catch (error) {
-      // Compatibilidad durante el despliegue escalonado: las reglas antiguas
-      // todavía no conocen la colección personal y rechazan su lectura.
-      if (error?.code !== "permission-denied") throw error;
-      const semanaAnterior = await getDoc(doc(db, "programacionSemanas", `${empresaId}_${inicio}`));
-      semanaGuardada = semanaAnterior.exists() ? semanaAnterior.data() : null;
-    }
+    // Una consulta autorizada puede estar vacía para un usuario nuevo.
+    // No consultar borradores como alternativa a un rechazo de permisos.
+    const publicaciones = await getDocs(query(
+      collection(db, "programacionPublicadaUsuarios"),
+      where("empresaId", "==", empresaId),
+      where("usuarioId", "==", usuario.uid),
+      where("estado", "==", "publicada"),
+      where("semanaInicio", "==", inicio),
+      limit(1)
+    ));
+    semanaGuardada = publicaciones.docs[0]?.data() || null;
   } else {
     const semanaSnap = await getDoc(doc(db, "programacionSemanas", `${empresaId}_${inicio}`));
     semanaGuardada = semanaSnap.exists() ? semanaSnap.data() : null;
@@ -530,7 +532,9 @@ async function cargarSemana() {
 
   if (!PUEDE_VER_BORRADORES && estadoSemanaActual !== "publicada") {
     asignacionesSemana = [];
-    mostrarMensaje("La programación de esta semana todavía no ha sido publicada.");
+    mostrarMensaje(ES_TRABAJADOR_CON_SEMANA_PERSONAL
+      ? "Todavía no tienes una programación publicada para esta semana. Si acabas de incorporarte, consulta al planificador."
+      : "La programación de esta semana todavía no ha sido publicada.");
     $("resumenProgramacion").textContent = "Programación pendiente de publicación";
     const confirmacion = $("confirmacionProgramacion");
     if (confirmacion) {
@@ -620,7 +624,7 @@ function actualizarEncabezadoSemana() {
   const termino = sumarDias(semanaInicio, 6);
   $("tituloSemana").textContent = `Semana ${numeroSemana(semanaInicio)}`;
   $("rangoSemana").textContent = `${fechaCorta(semanaInicio)} – ${fechaCorta(termino)} ${termino.getFullYear()}`;
-  $("estadoSemana").textContent = estadoSemanaActual === "publicada" ? "Publicada" : "Borrador";
+  $("estadoSemana").textContent = estadoSemanaActual === "publicada" ? "Publicada" : PUEDE_VER_BORRADORES ? "Borrador" : "Sin publicar";
   $("estadoSemana").className = `estado-semana ${estadoSemanaActual}`;
   $("btnPublicarSemana").textContent = estadoSemanaActual === "publicada" ? "Actualizar publicación" : "Publicar semana";
 }

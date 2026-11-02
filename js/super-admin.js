@@ -1,5 +1,6 @@
+import { argumentoHtml } from "./html-seguro.js";
 import { protegerPagina, cerrarSesion, reautenticarAccionCritica } from "./session.js?v=20261017-1";
-import { abrirWizard } from "./components/wizard.js";
+import { abrirWizard } from "./components/wizard.js?v=20261028-1";
 import {
   MODULOS_COMERCIALES,
   PLANES_FLEXIBLES_BASE,
@@ -290,7 +291,7 @@ function filasAlertasSuscripcion(filtro = "") {
     <article class="subscription-alert-row ${alerta.tipo}">
       <div><strong>${escaparHtml(empresa.nombre || "Empresa sin nombre")}</strong><span>${escaparHtml(empresa.plan || "Sin plan")} · Vencimiento ${escaparHtml(formatearFechaPago(alerta.vencimiento))}</span></div>
       <span class="subscription-alert-badge ${alerta.tipo}">${escaparHtml(textoAlertaSuscripcion(alerta))}</span>
-      <button type="button" class="btn-secondary" onclick="abrirConfiguracionEmpresa('${empresa.id}')">Revisar</button>
+      <button type="button" class="btn-secondary" onclick="abrirConfiguracionEmpresa(${argumentoHtml(empresa.id)})">Revisar</button>
     </article>`).join("");
 }
 
@@ -791,9 +792,9 @@ function contenidoEmpresas(limite = 0) {
         <span class="empresa-estado ${emp.activa ? "activa" : "inactiva"}">
           ${emp.activa ? "Activa" : "Inactiva"}
         </span>
-        <button class="btn-secondary" onclick="abrirConfiguracionEmpresa('${emp.id}')">Configurar</button>
-        <button class="btn-primary" onclick="verEmpresa('${emp.id}')">Administrar</button>
-        <button class="btn-danger" onclick="eliminarEmpresa('${emp.id}')" ${permiteEliminar ? "" : "disabled"} title="${permiteEliminar ? "Eliminar definitivamente" : "Disponible solo después de finalizar los 30 días de exportación"}">Eliminar</button>
+        <button class="btn-secondary" onclick="abrirConfiguracionEmpresa(${argumentoHtml(emp.id)})">Configurar</button>
+        <button class="btn-primary" onclick="verEmpresa(${argumentoHtml(emp.id)})">Administrar</button>
+        <button class="btn-danger" onclick="eliminarEmpresa(${argumentoHtml(emp.id)})" ${permiteEliminar ? "" : "disabled"} title="${permiteEliminar ? "Eliminar definitivamente" : "Disponible solo después de finalizar los 30 días de exportación"}">Eliminar</button>
       </div>
     </article>
   `;}).join("");
@@ -885,8 +886,8 @@ function filasUsuarios(lista) {
       <td data-label="Rol"><span class="role-badge">${escaparHtml(etiquetaRol(u.rol))}</span></td>
       <td data-label="Estado"><span class="status-badge ${u.activo === false ? "off" : "on"}">${u.activo === false ? "Inactivo" : "Activo"}</span></td>
       <td data-label="Acciones"><div class="table-actions">
-        ${u.empresaId ? `<button class="btn-table-view" onclick="verEmpresa('${u.empresaId}')">Ver empresa</button>` : ""}
-        <button class="${u.activo === false ? "btn-table-enable" : "btn-table-disable"}" onclick="cambiarEstadoUsuarioGlobal('${u.id}', ${u.activo === false ? "true" : "false"})">${u.activo === false ? "Activar" : "Desactivar"}</button>
+        ${u.empresaId ? `<button class="btn-table-view" onclick="verEmpresa(${argumentoHtml(u.empresaId)})">Ver empresa</button>` : ""}
+        <button class="${u.activo === false ? "btn-table-enable" : "btn-table-disable"}" onclick="cambiarEstadoUsuarioGlobal(${argumentoHtml(u.id)}, ${u.activo === false ? "true" : "false"})">${u.activo === false ? "Activar" : "Desactivar"}</button>
       </div></td>
     </tr>`).join("");
 }
@@ -1013,8 +1014,8 @@ function filasSucursales(filtro = "", estado = "") {
       <td data-label="Empresa">${escaparHtml(nombreEmpresa(s.empresaId))}</td>
       <td data-label="Estado"><span class="status-badge ${(s.activa === false || s.estado === "inactiva") ? "off" : "on"}">${(s.activa === false || s.estado === "inactiva") ? "Inactiva" : "Activa"}</span></td>
       <td data-label="Acciones"><div class="table-actions">
-        ${s.empresaId ? `<button class="btn-table-view" onclick="verEmpresa('${s.empresaId}')">Ver empresa</button>` : ""}
-        <button class="${(s.activa === false || s.estado === "inactiva") ? "btn-table-enable" : "btn-table-disable"}" onclick="cambiarEstadoSucursalGlobal('${s.id}', ${(s.activa === false || s.estado === "inactiva") ? "true" : "false"})">${(s.activa === false || s.estado === "inactiva") ? "Activar" : "Desactivar"}</button>
+        ${s.empresaId ? `<button class="btn-table-view" onclick="verEmpresa(${argumentoHtml(s.empresaId)})">Ver empresa</button>` : ""}
+        <button class="${(s.activa === false || s.estado === "inactiva") ? "btn-table-enable" : "btn-table-disable"}" onclick="cambiarEstadoSucursalGlobal(${argumentoHtml(s.id)}, ${(s.activa === false || s.estado === "inactiva") ? "true" : "false"})">${(s.activa === false || s.estado === "inactiva") ? "Activar" : "Desactivar"}</button>
       </div></td>
     </tr>`).join("");
 }
@@ -1394,7 +1395,7 @@ function renderVistaPlanes() {
           <li><strong>${plan.maxStorageGB} GB</strong> de almacenamiento</li>
           <li><strong>${plan.maxModulosElegibles}</strong> módulos como referencia comercial</li>
         </ul>
-        <div class="plan-actions"><button class="btn-primary" onclick="abrirEditorPlan('${plan.id}')">Editar plan</button></div>
+        <div class="plan-actions"><button class="btn-primary" onclick="abrirEditorPlan(${argumentoHtml(plan.id)})">Editar plan</button></div>
       </article>`).join("")}</section>
     <p class="info-note">Los cambios se aplican a empresas nuevas. Las empresas existentes conservan su configuración actual.</p>`;
 }

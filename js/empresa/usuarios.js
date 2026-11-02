@@ -1,4 +1,5 @@
-import { abrirWizard } from "../components/wizard.js";
+import { escaparHtml, argumentoHtml } from "../html-seguro.js";
+import { abrirWizard } from "../components/wizard.js?v=20261028-1";
 import { app, auth, db } from "../firebase-config.js";
 
 import {
@@ -402,22 +403,23 @@ function renderTablaUsuariosEmpresa(lista) {
     const pendienteSucursal = requiereSucursal && !usuario.sucursalId;
     const puedeCambiarSucursal = ["super_admin", "admin_empresa"].includes(usuarioActivo?.rol) && requiereSucursal;
     const puedeEliminar = puedeEliminarUsuarioEmpresa(usuario);
+    const puedeCambiarEstado = puedeEliminar && !usuario.suspendidoPorSucursal;
 
     return `
     <tr>
       <td data-label="Usuario">
-        <strong>${usuario.nombreCompleto || usuario.nombre || "-"}</strong>
+        <strong>${escaparHtml(usuario.nombreCompleto || usuario.nombre || "-")}</strong>
       </td>
 
-      <td data-label="Correo">${usuario.correo || "-"}</td>
+      <td data-label="Correo">${escaparHtml(usuario.correo || "-")}</td>
 
       <td data-label="Rol">
         <span class="badge-rol">
-          ${formatearRol(usuario.rol)}
+          ${escaparHtml(formatearRol(usuario.rol))}
         </span>
       </td>
 
-      <td data-label="Sucursal">${nombreSucursal(usuario.sucursalId)}</td>
+      <td data-label="Sucursal">${escaparHtml(nombreSucursal(usuario.sucursalId))}</td>
 
       <td data-label="Estado">
         <span class="${!usuario.activo || pendienteSucursal ? "badge-inactivo" : "badge-activo"}">
@@ -434,23 +436,25 @@ function renderTablaUsuariosEmpresa(lista) {
       <td data-label="Acciones">
         <div class="table-actions">
           ${puedeCambiarSucursal ? `
-            <button class="btn-secondary" onclick="abrirAsignacionSucursal('${usuario.uid}')">
+            <button class="btn-secondary" onclick="abrirAsignacionSucursal(${argumentoHtml(usuario.uid)})">
               ${usuario.sucursalId ? "Cambiar sucursal" : "Asignar sucursal"}
             </button>
           ` : ""}
           <button
             class="${usuario.activo ? "btn-danger" : "btn-primary"}"
-            onclick="cambiarEstadoUsuarioEmpresa('${usuario.uid}', ${!usuario.activo})"
+            onclick="cambiarEstadoUsuarioEmpresa(${argumentoHtml(usuario.uid)}, ${!usuario.activo})"
             ${usuario.suspendidoPorSucursal
               ? "disabled title=\"Activa la sucursal para recuperar su acceso\""
               : auth.currentUser?.uid === usuario.uid
                 ? "disabled title=\"No puedes desactivar tu propia cuenta\""
-                : ""}
+                : !puedeCambiarEstado
+                  ? "disabled title=\"No puedes cambiar el estado de este usuario\""
+                  : ""}
           >
             ${usuario.suspendidoPorSucursal ? "Acceso suspendido" : usuario.activo ? "Desactivar" : "Activar"}
           </button>
           ${puedeEliminar ? `
-            <button class="btn-danger" onclick="eliminarUsuarioEmpresa('${usuario.uid}')">
+            <button class="btn-danger" onclick="eliminarUsuarioEmpresa(${argumentoHtml(usuario.uid)})">
               Eliminar
             </button>
           ` : ""}
@@ -515,7 +519,7 @@ window.abrirAsignacionSucursal = function (uid) {
   overlay.innerHTML = `
     <div class="asignacion-modal">
       <h2>${usuario.sucursalId ? "Cambiar sucursal" : "Asignar sucursal"}</h2>
-      <p>${usuario.nombreCompleto || usuario.nombre || usuario.correo}</p>
+      <p>${escaparHtml(usuario.nombreCompleto || usuario.nombre || usuario.correo)}</p>
       <label for="sucursalUsuarioSeleccionada">Sucursal</label>
       <select id="sucursalUsuarioSeleccionada">
         <option value="">Sin sucursal asignada</option>
@@ -523,8 +527,8 @@ window.abrirAsignacionSucursal = function (uid) {
           .filter(sucursal => sucursal.activa === true)
           .sort((a, b) => (a.nombre || "").localeCompare(b.nombre || "", "es"))
           .map(sucursal => `
-            <option value="${sucursal.id}" ${sucursal.id === usuario.sucursalId ? "selected" : ""}>
-              ${sucursal.nombre} (${sucursal.codigo || sucursal.id})
+            <option value="${escaparHtml(sucursal.id)}" ${sucursal.id === usuario.sucursalId ? "selected" : ""}>
+              ${escaparHtml(sucursal.nombre)} (${escaparHtml(sucursal.codigo || sucursal.id)})
             </option>
           `).join("")}
       </select>
@@ -601,10 +605,13 @@ window.filtrarUsuariosEmpresa = function () {
 
 window.cambiarEstadoUsuarioEmpresa = async function (uid, nuevoEstado) {
   const usuario = usuariosEmpresa.find(item => item.uid === uid);
-  if (!usuario || usuario.rol === "super_admin") return;
-
   if (!usuario) {
     alert("No se encontró el usuario seleccionado");
+    return;
+  }
+
+  if (!puedeEliminarUsuarioEmpresa(usuario) || usuario.suspendidoPorSucursal) {
+    alert("No puedes cambiar el estado de este usuario");
     return;
   }
 
@@ -757,8 +764,8 @@ window.abrirWizardUsuario = async function () {
               ? `<option value="">Sin sucursal asignada</option>`
               : ""}
             ${sucursalesEmpresa.map(sucursal => `
-              <option value="${sucursal.id}">
-                ${sucursal.nombre} (${sucursal.codigo || sucursal.id})
+              <option value="${escaparHtml(sucursal.id)}">
+                ${escaparHtml(sucursal.nombre)} (${escaparHtml(sucursal.codigo || sucursal.id)})
               </option>
             `).join("")}
           </select>
@@ -771,10 +778,10 @@ window.abrirWizardUsuario = async function () {
         titulo: "Resumen",
         render: (datos) => `
           <h3>Resumen</h3>
-          <p><strong>Nombre:</strong> ${datos.nombre} ${datos.apellido || ""}</p>
-          <p><strong>Correo:</strong> ${datos.correo}</p>
-          <p><strong>Rol:</strong> ${formatearRol(datos.rol)}</p>
-          <p><strong>Sucursal:</strong> ${nombreSucursal(datos.sucursalId)}</p>
+          <p><strong>Nombre:</strong> ${escaparHtml(datos.nombre)} ${escaparHtml(datos.apellido || "")}</p>
+          <p><strong>Correo:</strong> ${escaparHtml(datos.correo)}</p>
+          <p><strong>Rol:</strong> ${escaparHtml(formatearRol(datos.rol))}</p>
+          <p><strong>Sucursal:</strong> ${escaparHtml(nombreSucursal(datos.sucursalId))}</p>
         `
       }
     ],
@@ -820,59 +827,6 @@ async function crearUsuarioEmpresaFirebase(datos) {
         : "Error al crear usuario: " + mensaje
     );
   }
-}
-
-function obtenerPermisosPorRol(rol) {
-  if (rol === "admin_empresa") {
-    return {
-      crearOS: true,
-      cargarChecklist: true,
-      aprobarIngreso: true,
-      aprobarEvaluacion: true,
-      aprobarMantencion: true,
-      aprobarPruebas: true,
-      cerrarOS: true,
-      administrarUsuarios: true
-    };
-  }
-
-  if (rol === "admin_sucursal") {
-    return {
-      crearOS: true,
-      cargarChecklist: true,
-      aprobarIngreso: true,
-      aprobarEvaluacion: true,
-      aprobarMantencion: true,
-      aprobarPruebas: true,
-      cerrarOS: true,
-      administrarUsuarios: true,
-      administrarSucursal: true
-    };
-  }
-
-  if (rol === "jefe_taller") {
-    return {
-      crearOS: true,
-      cargarChecklist: true,
-      aprobarIngreso: true,
-      aprobarEvaluacion: true,
-      aprobarMantencion: true,
-      aprobarPruebas: true,
-      cerrarOS: true,
-      administrarUsuarios: false
-    };
-  }
-
-  return {
-    crearOS: false,
-    cargarChecklist: true,
-    aprobarIngreso: false,
-    aprobarEvaluacion: false,
-    aprobarMantencion: false,
-    aprobarPruebas: false,
-    cerrarOS: false,
-    administrarUsuarios: false
-  };
 }
 
 function formatearRol(rol) {

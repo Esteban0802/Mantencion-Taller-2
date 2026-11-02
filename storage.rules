@@ -163,6 +163,13 @@ service firebase.storage {
       allow create, update, delete: if false;
     }
 
+    match /empresas/{empresaId}/sucursales/{sucursalId}/{allPaths=**} {
+      allow read: if activeUser() && profile().empresaId == empresaId && (
+        profile().rol == 'admin_empresa' || profile().sucursalId == sucursalId
+      );
+      allow write: if false;
+    }
+
     match /empresas/{empresaId}/informe/{fileName} {
       allow read: if canReadCompanyBranding(empresaId);
       allow create, update: if false;

@@ -12,6 +12,7 @@
   <link rel="stylesheet" href="css/notificaciones.css?v=20261007-1">
     <link rel="stylesheet" href="css/desktop-density.css?v=20261004-7">
   <link rel="stylesheet" href="css/mobile-normalized.css?v=20261018-4">
+  <link rel="stylesheet" href="css/dashboard-planificacion.css?v=20261101-6">
 </head>
 <body class="dashboard-overtrack dashboard-page">
 
@@ -211,8 +212,13 @@
   </div>
 
   <div class="chart-card">
-    <h3><svg class="ot-icon section-icon" aria-hidden="true"><use href="img/icons-overtrack.svg#bar-chart"></use></svg>Progreso Global</h3>
+    <h3><svg class="ot-icon section-icon" aria-hidden="true"><use href="img/icons-overtrack.svg#bar-chart"></use></svg>Progreso de OT abiertas</h3>
+    <div class="resumen-progreso-abiertas" aria-live="polite">
+      <div><strong id="porcentajeProgresoAbiertas">—</strong><span>Avance promedio del trabajo</span></div>
+      <span id="cantidadOTAbiertas" class="cantidad-ot-abiertas">Cargando OT…</span>
+    </div>
     <canvas id="graficoProgreso"></canvas>
+    <p id="detalleProgresoGlobal" class="detalle-progreso-global"></p>
   </div>
 
 </div>
@@ -303,10 +309,11 @@
 <div id="popoverObservacion" class="popover-observacion">
   <div class="popover-observacion-content">
     <div class="popover-observacion-header">
-      <h3>⚠ Observaciones del Jefe</h3>
-      <button onclick="cerrarPopoverObservacion()">×</button>
+      <div><small>REVISIÓN DEL SERVICIO</small><h3>Observaciones del Jefe de Taller</h3></div>
+      <button type="button" aria-label="Cerrar observaciones" onclick="cerrarPopoverObservacion()">×</button>
     </div>
 
+    <p class="popover-observacion-intro">Revisa las observaciones pendientes y responde desde la actividad correspondiente en la OT.</p>
     <div id="popoverObservacionTexto"></div>
   </div>
 </div>
@@ -335,6 +342,6 @@
 
 <script src="js/components/notificaciones.js?v=20261022-3"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.min.js"></script>
-<script type="module" src="js/dashboard.js?v=20261018-13"></script>
+<script type="module" src="js/dashboard.js?v=20261101-7"></script>
 </body>
 </html>

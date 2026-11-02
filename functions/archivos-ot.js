@@ -28,7 +28,7 @@ async function exigirContextoArchivo({ db, usuario, otId }) {
   if (orden.cerrada === true || String(orden.estado || "").toUpperCase() === "CERRADA") {
     rechazar("failed-precondition", "La OT está cerrada y no permite modificar archivos.");
   }
-  return { empresaId: orden.empresaId };
+  return { empresaId: orden.empresaId, orden };
 }
 
 function contenidoArchivo(base64, tipo, permitidos = ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif", "image/avif", "application/pdf"]) {
@@ -66,9 +66,29 @@ async function metadataOpcional(archivo) {
   catch (error) { if (Number(error.code) === 404) return null; throw error; }
 }
 
+function exigirActividadLibre(orden, etapa, itemIndex) {
+  if (orden.flujoVersion !== 2) return;
+  const actual = orden.etapasPersonalizadas?.find(e=>!e.completada);
+  if (!actual || etapa !== `personalizada_${actual.id}` || !Number.isInteger(itemIndex) || !actual.items[itemIndex]) {
+    rechazar("failed-precondition", "La actividad no pertenece a la etapa actual.");
+  }
+}
+
+function exigirArchivoDesvinculado(orden,ruta,bucketName,otId) {
+  if (orden.flujoVersion!==2)return;
+  const vinculado=orden.etapasPersonalizadas.some(e=>e.items.some(i=>i.fotos.some(f=>{
+    try{return rutaArchivoOT(f.url,bucketName,otId)===ruta;}catch(_){return false;}
+  })));
+  if(vinculado)rechazar("failed-precondition","Retira primero la evidencia de la actividad antes de eliminar su archivo.");
+}
+
 async function subirArchivoOT({ db, bucket, usuario, datos }) {
-  const { empresaId } = await exigirContextoArchivo({ db, usuario, otId: datos.otId });
-  if (!/^(ingreso|evaluacion|overhaul|pruebas_(general|mecanico|electrico)|despacho_(preparacion|final)|decision_evaluacion_(aprobado|rechazado))$/.test(datos.etapa || "") ||
+  const { empresaId, orden } = await exigirContextoArchivo({ db, usuario, otId: datos.otId });
+  const etapaLibre = orden.flujoVersion === 2 ? orden.etapasPersonalizadas?.find(e => !e.completada) : null;
+  const destinoValido = orden.flujoVersion === 2
+    ? etapaLibre && datos.etapa === `personalizada_${etapaLibre.id}` && Number.isInteger(datos.itemIndex) && Boolean(etapaLibre.items[datos.itemIndex])
+    : /^(ingreso|evaluacion|overhaul|pruebas_(general|mecanico|electrico)|despacho_(preparacion|final)|decision_evaluacion_(aprobado|rechazado))$/.test(datos.etapa || "");
+  if (!destinoValido ||
       !/^(documentos|0|[1-9][0-9]{0,5})$/.test(String(datos.itemIndex)) ||
       !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(datos.subidaId || "")) {
     rechazar("invalid-argument", "El destino del archivo no es válido.");
@@ -81,12 +101,16 @@ async function subirArchivoOT({ db, bucket, usuario, datos }) {
   let metadata = await metadataOpcional(archivo);
   if (!metadata) {
     metadata = await subirConCuota({ db, bucket, empresaId, ruta, bytes, uid: usuario.uid, hash,
-      contentType: datos.contentType, verificar: () => exigirContextoArchivo({ db, usuario, otId: datos.otId }) });
+      contentType: datos.contentType, verificar: async () => {
+        const { orden: vigente } = await exigirContextoArchivo({ db, usuario, otId: datos.otId });
+        exigirActividadLibre(vigente, datos.etapa, datos.itemIndex);
+      } });
   }
   if (metadata.metadata?.creadoPorUid !== usuario.uid || metadata.metadata?.sha256 !== hash || metadata.contentType !== datos.contentType) {
     rechazar("permission-denied", "No puedes reemplazar un archivo existente con esta carga.");
   }
-  await exigirContextoArchivo({ db, usuario, otId: datos.otId });
+  const { orden: vigente } = await exigirContextoArchivo({ db, usuario, otId: datos.otId });
+  exigirActividadLibre(vigente, datos.etapa, datos.itemIndex);
   if (metadata.metadata?.cuotaReservaId) await actualizarReserva({ db, empresaId, id: metadata.metadata.cuotaReservaId });
   const token = String(metadata.metadata.firebaseStorageDownloadTokens || "").split(",")[0];
   if (!token) rechazar("internal", "No fue posible obtener el enlace del archivo.");
@@ -94,16 +118,21 @@ async function subirArchivoOT({ db, bucket, usuario, datos }) {
 }
 
 async function eliminarArchivoOT({ db, bucket, usuario, datos }) {
-  await exigirContextoArchivo({ db, usuario, otId: datos.otId });
+  const { orden } = await exigirContextoArchivo({ db, usuario, otId: datos.otId });
   let ruta;
   try { ruta = rutaArchivoOT(datos.url, bucket.name, datos.otId); }
   catch (_) { rechazar("invalid-argument", "El archivo no pertenece a esta OT."); }
+  const partes = ruta.split("/");
+  exigirActividadLibre(orden, partes[2], /^item_\d+$/.test(partes[3] || "") ? Number(partes[3].slice(5)) : -1);
+  exigirArchivoDesvinculado(orden,ruta,bucket.name,datos.otId);
   const metadata = await metadataOpcional(bucket.file(ruta));
   if (!metadata) return { ok: true };
   if (metadata.metadata?.creadoPorUid !== usuario.uid) {
     rechazar("permission-denied", "Solo puedes eliminar tus propias evidencias. Los archivos sin autor identificado están protegidos.");
   }
-  await exigirContextoArchivo({ db, usuario, otId: datos.otId });
+  const { orden: vigente } = await exigirContextoArchivo({ db, usuario, otId: datos.otId });
+  exigirActividadLibre(vigente, partes[2], Number(partes[3]?.slice(5)));
+  exigirArchivoDesvinculado(vigente,ruta,bucket.name,datos.otId);
   await bucket.file(ruta, { generation: metadata.generation }).delete({ ignoreNotFound: true });
   if (metadata.metadata?.cuotaReservaId) await actualizarReserva({ db, empresaId: metadata.metadata.cuotaEmpresaId, id: metadata.metadata.cuotaReservaId, eliminar: true });
   return { ok: true };

@@ -4,6 +4,8 @@ Este documento define cómo proteger y recuperar los datos operativos de Vectari
 
 ## Objetivos
 
+Estado remoto verificado el 29 de octubre de 2026: PITR de 7 días habilitado; respaldo diario con retención de 14 días; catorce respaldos listados en estado `READY`. No existe programación semanal en la respuesta consultada. La siguiente tabla representa objetivos propuestos; no debe interpretarse como configuración aplicada. Falta realizar y documentar un simulacro de restauración.
+
 | Protección | Frecuencia o ventana | Retención | Uso principal |
 | --- | --- | --- | --- |
 | Firestore PITR | Continua | 7 días | Recuperar cambios o eliminaciones recientes con precisión de minutos. |

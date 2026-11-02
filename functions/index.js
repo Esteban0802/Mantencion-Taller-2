@@ -1,6 +1,7 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { onObjectFinalized, onObjectDeleted } = require("firebase-functions/storage");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
+const { onDocumentUpdated, onDocumentWritten, onDocumentDeleted } = require("firebase-functions/v2/firestore");
 const { initializeApp } = require("firebase-admin/app");
 const { getAuth } = require("firebase-admin/auth");
 const { getFirestore, FieldValue, Timestamp } = require("firebase-admin/firestore");
@@ -10,6 +11,7 @@ const archivosEmpresa = require("./archivos-empresa");
 const { actualizarReserva } = require("./cuota-storage");
 const { getStorage } = require("firebase-admin/storage");
 const crypto = require("node:crypto");
+const { moverOT, eliminarDefinitivamenteOT, procesarPapelera } = require("./papelera-ot");
 
 initializeApp();
 
@@ -195,9 +197,9 @@ function permisosPorRol(rol) {
   }
   if (rol === "admin_sucursal") {
     return {
-      crearOS: true, cargarChecklist: true, aprobarIngreso: true,
-      aprobarEvaluacion: true, aprobarMantencion: true,
-      aprobarPruebas: true, cerrarOS: true,
+      crearOS: false, cargarChecklist: false, aprobarIngreso: false,
+      aprobarEvaluacion: false, aprobarMantencion: false,
+      aprobarPruebas: false, cerrarOS: false,
       administrarUsuarios: true, administrarSucursal: true
     };
   }
@@ -220,7 +222,7 @@ function permisosPorRol(rol) {
       cerrarOS: false, administrarUsuarios: false, administrarInventario: true };
   }
   return {
-    crearOS: true, cargarChecklist: true, aprobarIngreso: false,
+    crearOS: false, cargarChecklist: ["tecnico", "supervisor"].includes(rol), aprobarIngreso: false,
     aprobarEvaluacion: false, aprobarMantencion: false,
     aprobarPruebas: false, cerrarOS: false, administrarUsuarios: false
   };
@@ -345,6 +347,11 @@ async function validarCupoUsuariosEmpresa(empresaId, solicitante) {
 }
 
 async function documentosDeEmpresa(coleccion, empresaId) {
+  if (coleccion === "plantillasSucursal") {
+    const sucursales = await documentosDeEmpresa("sucursales", empresaId);
+    const resultados = await Promise.all(sucursales.map(s => s.ref.collection("plantillasSucursal").get()));
+    return resultados.flatMap(s => s.docs);
+  }
   const snap = await db.collection(coleccion)
     .where("empresaId", "==", empresaId)
     .get();
@@ -535,7 +542,11 @@ async function empresaIdDesdeRutaStorage(ruta) {
   if (partes[0] === "empresas" && partes[1]) return partes[1];
   if (partes[0] === "ots" && partes[1]) {
     const otSnap = await db.collection("ots").doc(partes[1]).get();
-    return otSnap.exists ? texto(otSnap.data().empresaId, 128) : "";
+    if (otSnap.exists) return texto(otSnap.data().empresaId, 128);
+    const copia = await db.collection("otsPapelera").doc(partes[1]).get();
+    if (copia.exists) return texto(copia.data().empresaId, 128);
+    const eliminada = await db.collection("otsEliminadas").doc(partes[1]).get();
+    return eliminada.exists ? texto(eliminada.data().empresaId, 128) : "";
   }
   return "";
 }
@@ -616,6 +627,43 @@ exports.eliminarArchivoOT = operacionArchivoOT(archivosOT.eliminarArchivoOT);
 exports.subirArchivoEmpresa = operacionArchivoOT(archivosEmpresa.subirArchivoEmpresa);
 exports.eliminarArchivoEmpresa = operacionArchivoOT(archivosEmpresa.eliminarArchivoEmpresa);
 
+exports.limpiarIdentidadEmpresa = onDocumentUpdated({
+  document: "empresas/{empresaId}", region: REGION, retry: true, maxInstances: 1, timeoutSeconds: 120
+}, async evento => {
+  await require("./limpieza-identidad").limpiarIdentidadAnterior({ db, bucket, empresaId: evento.params.empresaId,
+    anterior: evento.data.before.data().brandingInforme, actual: evento.data.after.data().brandingInforme });
+});
+
+exports.limpiarEvidenciasOT = onDocumentUpdated({
+  document: "ots/{otId}", region: REGION, retry: true, maxInstances: 1, timeoutSeconds: 540
+}, async evento => {
+  await require("./limpieza-evidencias").limpiarEvidenciasRetiradas({ db, bucket, otId: evento.params.otId,
+    anterior: evento.data.before.data(), actual: evento.data.after.data() });
+});
+
+exports.limpiarArchivosDocumentoSheq = onDocumentWritten({
+  document: "sheqDocumentos/{documentoId}", region: REGION, retry: true, maxInstances: 1, timeoutSeconds: 540
+}, async evento => {
+  await require("./limpieza-sheq").limpiarDocumentoSheq({ db, bucket,
+    anterior: evento.data.before.data(), actual: evento.data.after.data() });
+});
+
+exports.limpiarArchivosVehiculoSheq = onDocumentDeleted({
+  document: "sheqVehiculos/{vehiculoId}", region: REGION, retry: true, maxInstances: 1, timeoutSeconds: 540
+}, async evento => {
+  await require("./limpieza-sheq").limpiarVehiculoSheq({ db, bucket,
+    vehiculoId: evento.params.vehiculoId, anterior: evento.data.data() });
+});
+
+exports.limpiarIdentidadSucursal = onDocumentUpdated({
+  document: "sucursales/{sucursalId}", region: REGION, retry: true, maxInstances: 1, timeoutSeconds: 120
+}, async evento => {
+  const anterior = evento.data.before.data(), actual = evento.data.after.data();
+  if (!actual.empresaId || anterior.empresaId !== actual.empresaId) return;
+  await require("./limpieza-identidad").limpiarIdentidadAnterior({ db, bucket, empresaId: actual.empresaId, sucursalId: evento.params.sucursalId,
+    anterior: anterior.identidadVisual?.brandingInforme, actual: actual.identidadVisual?.brandingInforme });
+});
+
 exports.conciliarReservasAlmacenamiento = onSchedule({
   schedule: "every 60 minutes", region: REGION, timeoutSeconds: 300, maxInstances: 1
 }, async () => {
@@ -639,6 +687,12 @@ exports.conciliarReservasAlmacenamiento = onSchedule({
 exports.validarComentariosOT = onCall(CALLABLE_OPTIONS, async request => {
   const usuario = await obtenerSolicitante(request);
   const otId = texto(request.data?.otId, 128);
+  if(request.data?.accion==='responder') {
+    if(!otId || otId.includes('/'))throw new HttpsError('invalid-argument','OT no válida.');
+    await exigirEmpresaOperativa(usuario.empresaId,usuario);
+    try {return await require('./respuesta-observacion').responderObservacion({db,usuario,datos:{...request.data,otId}});}
+    catch(error){throw new HttpsError(error.code || 'internal',error.message);}
+  }
   if (!otId || otId.includes("/") || !request.data?.etapas || typeof request.data.etapas !== "object") {
     throw new HttpsError("invalid-argument", "La OT y sus etapas son obligatorias.");
   }
@@ -925,6 +979,31 @@ exports.cambiarEstadoSucursal = onCall(CALLABLE_OPTIONS, async request => {
   return { ok: true, activa };
 });
 
+exports.obtenerDesgloseAlmacenamiento = onCall(
+  { ...CALLABLE_OPTIONS, timeoutSeconds: 300, memory: "512MiB", maxInstances: 1 },
+  async request => {
+    const usuario = await obtenerSolicitante(request);
+    try {
+      return await require("./desglose-storage").obtenerDesglose({ db, bucket, usuario, empresaId: texto(request.data?.empresaId, 128) });
+    } catch (error) {
+      if (error.code === "permission-denied") throw new HttpsError(error.code, error.message);
+      throw error;
+    }
+  }
+);
+
+for (const [nombre, metodo] of [["crearOTFlujoLibre", "crearOT"], ["actualizarOTFlujoLibre", "actualizarOT"], ["obtenerPlantillaFlujoLibre", "obtenerPlantilla"]]) {
+  exports[nombre] = onCall({ ...CALLABLE_OPTIONS, maxInstances:2, concurrency:4, memory:"512MiB", timeoutSeconds:120 }, async request => {
+    const usuario = await obtenerSolicitante(request);
+    try {
+      return await require("./flujo-libre")[metodo]({ db, bucket, usuario, datos: request.data || {} });
+    } catch (error) {
+      if (["permission-denied", "failed-precondition", "invalid-argument", "not-found", "resource-exhausted"].includes(error.code)) throw new HttpsError(error.code, error.message);
+      throw error;
+    }
+  });
+}
+
 exports.recalcularAlmacenamientoEmpresa = onCall(
   { ...CALLABLE_OPTIONS, timeoutSeconds: 300, memory: "512MiB", maxInstances: 2 },
   async request => {
@@ -954,9 +1033,12 @@ exports.recalcularAlmacenamientoEmpresa = onCall(
     const otsSnap = await db.collection("ots")
       .where("empresaId", "==", empresaId)
       .get();
+    const papeleraSnap = await db.collection("otsPapelera")
+      .where("empresaId", "==", empresaId)
+      .get();
     const prefijos = [
       `empresas/${empresaId}/`,
-      ...otsSnap.docs.map(documento => `ots/${documento.id}/`)
+      ...[...otsSnap.docs, ...papeleraSnap.docs].map(documento => `ots/${documento.id}/`)
     ];
     let totalBytes = 0;
     let totalArchivos = 0;
@@ -992,6 +1074,28 @@ exports.recalcularAlmacenamientoEmpresa = onCall(
   }
 );
 
+for (const [nombre, restaurar] of [["enviarOTPapelera", false], ["restaurarOTPapelera", true]]) {
+  exports[nombre] = onCall(CALLABLE_OPTIONS, async request => {
+    const usuario = await obtenerSolicitante(request);
+    exigirAutenticacionReciente(request);
+    return moverOT({ db, usuario, otId: request.data?.otId, restaurar });
+  });
+}
+
+exports.eliminarOTPapelera = onCall({ ...CALLABLE_OPTIONS, timeoutSeconds: 540, concurrency: 1 }, async request => {
+  const usuario = await obtenerSolicitante(request);
+  exigirAutenticacionReciente(request);
+  return eliminarDefinitivamenteOT({ db, bucket, usuario, otId: request.data?.otId });
+});
+
+exports.limpiarPapeleraOT = onSchedule({
+  schedule: "every 120 hours", timeZone: "UTC", region: REGION, timeoutSeconds: 540, maxInstances: 1, concurrency: 1
+}, async () => {
+  const resultado = await procesarPapelera({ db, bucket });
+  console.info("limpiarPapeleraOT", resultado);
+  if (resultado.errores) throw new Error("Quedaron OT pendientes; se reintentarán en la próxima ejecución.");
+});
+
 exports.cambiarEstadoUsuario = onCall(CALLABLE_OPTIONS, async request => {
   const solicitante = await obtenerSolicitante(request);
   const usuarioId = texto(request.data?.usuarioId, 128);
@@ -1017,7 +1121,7 @@ exports.cambiarEstadoUsuario = onCall(CALLABLE_OPTIONS, async request => {
   await exigirEmpresaOperativa(objetivo.empresaId, solicitante);
 
   if (solicitante.rol === "admin_sucursal" &&
-      (objetivo.sucursalId !== solicitante.sucursalId ||
+      (!solicitante.sucursalId || objetivo.sucursalId !== solicitante.sucursalId ||
        ["admin_empresa", "admin_sucursal"].includes(objetivo.rol))) {
     throw new HttpsError("permission-denied", "No puedes administrar este usuario.");
   }
@@ -1407,6 +1511,7 @@ exports.eliminarEmpresaCompleta = onCall({
     "equipos",
     "ots",
     "otsResumen",
+    "otsPapelera",
     "plantillasMantenimiento",
     "inventarioItems",
     "inventarioConfiguraciones",
@@ -1433,7 +1538,7 @@ exports.eliminarEmpresaCompleta = onCall({
   const prefijosStorage = [
     `empresas/${empresaId}/`,
     `exportaciones/${empresaId}/`,
-    ...asociados.ots.map(ot => `ots/${ot.id}/`)
+    ...[...asociados.ots, ...asociados.otsPapelera].map(ot => `ots/${ot.id}/`)
   ];
   for (const prefix of prefijosStorage) {
     await bucket.deleteFiles({ prefix, force: true });
@@ -1483,8 +1588,8 @@ exports.generarExportacionEmpresa = onCall({
   if (!empresaSnap.exists) throw new HttpsError("not-found", "La empresa no existe.");
   const empresa = { id: empresaSnap.id, ...valorExportable(empresaSnap.data()) };
   const colecciones = [
-    "usuarios", "sucursales", "clientes", "equipos", "ots", "otsResumen",
-    "plantillasMantenimiento", "inventarioItems", "inventarioConfiguraciones",
+    "usuarios", "sucursales", "clientes", "equipos", "ots", "otsResumen", "otsPapelera",
+    "plantillasMantenimiento", "plantillasSucursal", "inventarioItems", "inventarioConfiguraciones",
     "programaciones", "programacionSemanas", "programacionPublicadaUsuarios",
     "programacionHistorial", "programacionAusencias", "programacionConfirmaciones",
     "sheqContratos", "sheqVehiculos",
@@ -1560,6 +1665,9 @@ exports.generarExportacionEmpresa = onCall({
       zip.append(JSON.stringify(datosOt, null, 2), { name: `${carpeta}/datos_OT.json` });
       zip.append(await crearResumenPdfOt(datosOt, empresa, sucursalesPorId.get(datosOt.sucursalId) || "-"), { name: `${carpeta}/resumen_exportacion_OT.pdf` });
       archivosIncluidos += await anexarArchivosStorage(zip, `ots/${documentoOt.id}/`, `${carpeta}/archivos`);
+    }
+    for (const documento of asociados.otsPapelera) {
+      archivosIncluidos += await anexarArchivosStorage(zip, `ots/${documento.id}/`, `papelera_OT/${nombreSeguro(documento.id, "ot")}/archivos`);
     }
     archivosIncluidos += await anexarArchivosStorage(zip, `empresas/${empresaId}/`, "configuracion/archivos");
     await zip.finalize();

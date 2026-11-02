@@ -16,8 +16,14 @@ function usuarioValido(usuario) {
   return Boolean(
     usuario &&
     usuario.uid &&
-    usuario.activo !== false
+    usuario.activo === true
   );
+}
+
+function empresaOperativa(empresa) {
+  return Boolean(empresa) && empresa.activa !== false &&
+    !["cancelacion_solicitada", "periodo_exportacion", "pendiente_eliminacion", "cancelada"]
+      .includes(empresa.suscripcion?.estado);
 }
 
 export function tieneRol(
@@ -71,22 +77,19 @@ export function puedeVerDashboard(
   usuario,
   empresa
 ) {
-  return puedeUsarModulo(
-    usuario,
-    empresa,
-    "dashboard"
-  );
+  return puedeVerOrdenesServicio(usuario, empresa) &&
+    puedeUsarModulo(usuario, empresa, "dashboard");
 }
 
 export function puedeVerOrdenesServicio(
   usuario,
   empresa
 ) {
-  return puedeUsarModulo(
-    usuario,
-    empresa,
-    "ordenesServicio"
-  );
+  return tieneRol(usuario, [
+    ROLES.ADMIN_EMPRESA, ROLES.ADMIN_SUCURSAL, ROLES.JEFE_TALLER,
+    ROLES.SUPERVISOR, ROLES.TECNICO, ROLES.PLANIFICADOR
+  ]) && (usuario.rol === ROLES.ADMIN_EMPRESA || Boolean(usuario.sucursalId)) &&
+    puedeUsarModulo(usuario, empresa, "ordenesServicio");
 }
 
 export function puedeCrearOT(
@@ -94,13 +97,12 @@ export function puedeCrearOT(
   empresa
 ) {
   if (
-    !puedeVerOrdenesServicio(usuario, empresa)
+    !empresaOperativa(empresa) || !puedeVerOrdenesServicio(usuario, empresa)
   ) {
     return false;
   }
 
   return tieneRol(usuario, [
-    ROLES.SUPER_ADMIN,
     ROLES.JEFE_TALLER
   ]);
 }
@@ -116,7 +118,6 @@ export function puedeAbrirOT(
   }
 
   return tieneRol(usuario, [
-    ROLES.SUPER_ADMIN,
     ROLES.ADMIN_EMPRESA,
     ROLES.ADMIN_SUCURSAL,
     ROLES.JEFE_TALLER,
@@ -147,14 +148,12 @@ export function puedeCargarChecklists(
   empresa
 ) {
   if (
-    !puedeVerChecklists(usuario, empresa)
+    !empresaOperativa(empresa) || !puedeVerChecklists(usuario, empresa)
   ) {
     return false;
   }
 
   return tieneRol(usuario, [
-    ROLES.SUPER_ADMIN,
-    ROLES.ADMIN_SUCURSAL,
     ROLES.JEFE_TALLER,
     ROLES.SUPERVISOR,
     ROLES.TECNICO
@@ -166,15 +165,12 @@ export function puedeCompletarChecklists(
   empresa
 ) {
   if (
-    !puedeVerChecklists(usuario, empresa)
+    !empresaOperativa(empresa) || !puedeVerChecklists(usuario, empresa)
   ) {
     return false;
   }
 
   return tieneRol(usuario, [
-    ROLES.SUPER_ADMIN,
-    ROLES.ADMIN_EMPRESA,
-    ROLES.ADMIN_SUCURSAL,
     ROLES.JEFE_TALLER,
     ROLES.SUPERVISOR,
     ROLES.TECNICO

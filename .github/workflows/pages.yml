@@ -26,6 +26,9 @@ jobs:
         with:
           node-version: 22
           cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            functions/package-lock.json
 
       - name: Preparar Java para los emuladores de Firebase
         uses: actions/setup-java@v4
@@ -35,6 +38,12 @@ jobs:
 
       - name: Instalar dependencias
         run: npm ci
+
+      - name: Instalar dependencias de Functions para las pruebas
+        run: npm ci --prefix functions
+
+      - name: Validar sintaxis de Functions
+        run: npm run check:functions
 
       - name: Validar lógica crítica
         run: npm run test:unit

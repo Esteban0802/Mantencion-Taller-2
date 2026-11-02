@@ -25,6 +25,8 @@ export function inicializarModuloIngreso(servicios) {
     renderComentariosItem,
 
     OTBloqueada,
+    esJefeTaller,
+    aprobacionesHabilitadas,
 
     agregarBitacora,
 
@@ -660,6 +662,11 @@ async function aprobarIngreso() {
 
     if (!ot) return;
 
+    if (OTBloqueada()) return;
+    if (aprobacionesHabilitadas("ingreso") && !esJefeTaller()) {
+        mostrarAlerta("Ingreso requiere la aprobación del Jefe de Taller.", "warning");
+        return;
+    }
     if (!validarIngresoCompleto()) return;
 
     aprobacionIngresoEnCurso = true;

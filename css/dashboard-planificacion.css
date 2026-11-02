@@ -1,0 +1,61 @@
+#listaProximosDespachos { display:grid; gap:12px; }
+.detalle-progreso-global { margin:14px 0 0; color:#6a8398; font-size:11px; line-height:1.6; }
+#listaProximosDespachos .despacho-item-pro { display:grid; grid-template-columns:170px 1fr auto; gap:22px; align-items:center; padding:18px 20px; border:1px solid #d8e5f1; border-left:4px solid #1688e7; border-radius:13px; background:#fff; box-shadow:0 4px 15px #12344c05; }
+#listaProximosDespachos .despacho-identidad small,#listaProximosDespachos .despacho-fecha small { display:block; color:#72899c; font-size:11px; margin-bottom:5px; }
+#listaProximosDespachos .despacho-identidad small { letter-spacing:.5px; font-weight:700; font-size:9px; }
+#listaProximosDespachos .despacho-identidad strong { color:#1b3953; font-size:16px; }
+#listaProximosDespachos .despacho-fecha strong { display:block; color:#3f617d; font-size:13px; margin-bottom:6px; }
+#listaProximosDespachos .despacho-item-pro > b { border-radius:20px; padding:8px 13px; font-size:12px; white-space:nowrap; }
+#listaProximosDespachos .badge-despacho-ok { background:#e8f7ef; color:#178052; border:1px solid #c7ead8; }
+#listaProximosDespachos .badge-despacho-riesgo { background:#fff5e4; color:#a66a16; border:1px solid #f1dfb8; }
+#listaProximosDespachos .badge-despacho-atrasado { background:#fff0f2; color:#b43e50; border:1px solid #f3d0d7; }
+#ganttTaller { padding:16px; border:1px solid #dbe6f0; border-radius:14px; background:#f7fafe; overflow-x:auto; }
+#ganttTaller .gantt-taller-wrapper { min-width:640px; gap:12px; }
+#ganttTaller .gantt-taller-header { padding:0 0 6px 204px; color:#587690; font-size:12px; font-weight:600; }
+#ganttTaller .gantt-taller-row { grid-template-columns:190px minmax(0,1fr); gap:14px; }
+#ganttTaller .gantt-taller-info { border:1px solid #d5e3ef; border-radius:11px; background:white; padding:13px 15px; }
+#ganttTaller .gantt-taller-info small { display:block; color:#8095a7; font-size:9px; font-weight:700; letter-spacing:.4px; margin-bottom:5px; }
+#ganttTaller .gantt-taller-info strong { color:#203d57; font-size:15px; }
+#ganttTaller .gantt-taller-info span { display:block; color:#6e879a; font-size:12px; margin-top:5px; }
+#ganttTaller .gantt-taller-track { height:72px; border:1px solid #d6e3ef; border-radius:10px; background:repeating-linear-gradient(90deg,#edf4fb 0,#edf4fb 69px,#dbe7f3 70px); overflow:visible; }
+#ganttTaller .gantt-taller-bar { top:30px; height:30px; min-width:6px; border-radius:8px; border:0; color:white; background:linear-gradient(105deg,#126fbd,#2999ed); box-shadow:0 3px 8px #126fbd20; cursor:pointer; overflow:hidden; }
+#ganttTaller .gantt-taller-bar.atrasada { background:linear-gradient(105deg,#bc5361,#dc7180); }
+#ganttTaller .gantt-panel-avance { position:absolute; inset:0 auto 0 0; background:#1b9b72; opacity:.85; }
+#ganttTaller .gantt-panel-texto { position:relative; z-index:1; padding:0 10px; font-size:11px; font-weight:700; white-space:nowrap; text-overflow:ellipsis; overflow:hidden; }
+#ganttTaller .gantt-panel-hoy { position:absolute; top:21px; bottom:5px; width:3px; transform:translateX(-1.5px); background:#db641b; box-shadow:0 0 0 1px #fff; z-index:2; pointer-events:none; }
+#ganttTaller .gantt-panel-hoy > span { position:absolute; top:-18px; left:50%; transform:translateX(-50%); white-space:nowrap; padding:4px 7px; border-radius:5px; background:#fff1df; border:1px solid #efbb82; color:#9b4b12; font-size:9px; font-weight:800; line-height:1.2; box-shadow:0 2px 5px #70421c0d; }
+#ganttTaller .gantt-panel-hoy-derecha > span { left:auto; right:-7px; transform:none; }
+#ganttTaller .gantt-panel-hoy-izquierda > span { left:-7px; transform:none; }
+#ganttTaller .gantt-taller-row.atrasada .gantt-taller-info { background:#fff8f9; border-color:#efd0d7; }
+@media(max-width:650px) {
+  #listaProximosDespachos .despacho-item-pro { grid-template-columns:1fr auto; gap:12px; padding:15px; }
+  #listaProximosDespachos .despacho-fecha { grid-column:1; grid-row:2; }
+  #listaProximosDespachos .despacho-item-pro > b { grid-column:2; grid-row:1/3; }
+  #ganttTaller { padding:12px; }
+}
+#popoverObservacion { background:rgba(5,19,34,.65); backdrop-filter:blur(4px); padding:20px; box-sizing:border-box; }
+#popoverObservacion .popover-observacion-content { width:min(660px,100%); max-height:85vh; overflow:auto; padding:0; border:1px solid #caddeb; border-radius:18px; background:#f5f9fd; box-shadow:0 24px 70px #03162755; }
+#popoverObservacion .popover-observacion-header { display:flex; align-items:center; justify-content:space-between; gap:18px; margin:0; padding:22px 24px; background:linear-gradient(115deg,#081e34,#103858); border:0; border-bottom:3px solid #1187ed; }
+#popoverObservacion .popover-observacion-header small { display:block; color:#a6c4dd; font-size:10px; font-weight:700; letter-spacing:.7px; margin-bottom:8px; }
+#popoverObservacion .popover-observacion-header h3 { margin:0; color:#fff!important; font-size:21px; line-height:1.35; }
+#popoverObservacion .popover-observacion-header button { display:grid; place-items:center; width:36px; height:36px; min-height:0; flex-shrink:0; padding:0; margin:0; border:1px solid #ffffff40; border-radius:10px; background:#ffffff10; color:#fff; font-size:23px; cursor:pointer; }
+#popoverObservacion .popover-observacion-header button:hover { background:#ffffff25; }
+#popoverObservacion .popover-observacion-intro { margin:0; padding:20px 24px 0; color:#607e96; font-size:13px; line-height:1.6; }
+#popoverObservacion #popoverObservacionTexto { padding:18px 24px 24px; display:grid; gap:12px; }
+#popoverObservacion .popover-obs-item { margin:0; padding:16px 18px; border:1px solid #d5e4f1; border-left:4px solid #1689df; border-radius:11px; background:#fff; color:#274d6b; font-size:14px; line-height:1.6; overflow-wrap:anywhere; box-shadow:0 3px 10px #12344c04; }
+@media(max-width:550px) { #popoverObservacion .popover-observacion-header { padding:18px; } #popoverObservacion .popover-observacion-header h3 { font-size:18px; } }
+
+.ot-recepcion-repuestos { margin:14px 0 5px; padding:12px; border:1px solid #eedcba; border-radius:10px; background:#fff9ed; }
+.ot-recepcion-repuestos > div:first-child { display:flex; justify-content:space-between; gap:10px; font-size:11px; color:#92631c; }
+.ot-recepcion-repuestos .ot-recepcion-barra { height:6px; background:#f2e8d5; border-radius:5px; overflow:hidden; margin:9px 0 7px; }
+.ot-recepcion-repuestos .ot-recepcion-barra span { display:block; height:100%; background:#e9ab3d; }
+.ot-recepcion-repuestos small { color:#8c754e; font-size:10px; line-height:1.5; }
+.ot-recepcion-repuestos.completa { border-color:#cce7d9; background:#f0faf5; }
+.ot-recepcion-repuestos.completa > div:first-child,.ot-recepcion-repuestos.completa small { color:#277b57; }
+.ot-recepcion-repuestos.completa .ot-recepcion-barra span { background:#2ba573; }
+
+.resumen-progreso-abiertas { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:16px; margin:18px 0; padding:18px 20px; border:1px solid #d5e4f1; border-radius:12px; background:#f4f9fe; }
+.resumen-progreso-abiertas > div { display:grid; gap:5px; }
+.resumen-progreso-abiertas strong { color:#1565c0; font-size:34px; line-height:1.1; font-weight:800; }
+.resumen-progreso-abiertas > div > span { color:#607e96; font-size:12px; }
+.resumen-progreso-abiertas .cantidad-ot-abiertas { padding:9px 12px; border:1px solid #c9dff4; border-radius:20px; background:white; color:#245a88; font-size:12px; font-weight:700; }

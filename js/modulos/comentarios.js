@@ -1,3 +1,4 @@
+import { responderObservacionSegura } from "./core/comentariosSeguros.js?v=20261101-1";
 let getOT = null;
 let getUsuario = null;
 
@@ -353,45 +354,14 @@ export async function responderComentarioJefe(
 
     const usuario = obtenerUsuario();
 
-    const estadoAnterior = {
-        atendido: comentario.atendido,
-        respuestaUsuario: comentario.respuestaUsuario,
-        atendidoPor: comentario.atendidoPor,
-        atendidoPorUid: comentario.atendidoPorUid,
-        fechaAtendido: comentario.fechaAtendido,
-        alertaJefe: obtenerOT()?.alertaJefe
-    };
-
     try {
-        comentario.atendido = true;
-        comentario.atendidoPorUid = usuario?.uid || "";
-        comentario.respuestaUsuario =
-            respuesta.trim();
-
-        comentario.atendidoPor =
-            usuario?.nombre || "Técnico";
-
-        comentario.fechaAtendido =
-            new Date().toLocaleString();
-
-        actualizarAlertaJefe();
-
-        const guardado = await guardarCambiosOT();
-        if (!guardado) {
-            comentario.atendido = estadoAnterior.atendido;
-            comentario.respuestaUsuario = estadoAnterior.respuestaUsuario;
-            comentario.atendidoPor = estadoAnterior.atendidoPor;
-            if (estadoAnterior.atendidoPorUid === undefined) delete comentario.atendidoPorUid;
-            else comentario.atendidoPorUid = estadoAnterior.atendidoPorUid;
-            comentario.fechaAtendido = estadoAnterior.fechaAtendido;
-            const ot = obtenerOT();
-            if (ot) ot.alertaJefe = estadoAnterior.alertaJefe;
-            return;
-        }
-
+        const resultadoRespuesta = await responderObservacionSegura({otId:localStorage.getItem("otActiva"),etapa,tipo,itemIndex,comentarioIndex,respuesta:respuesta.trim(),referencia:Object.fromEntries(["texto","fecha","creadoPorUid","rol"].map(k=>[k,comentario[k]]))});
+        Object.assign(comentario,resultadoRespuesta.respuesta); Object.assign(obtenerOT(),{revision:resultadoRespuesta.revision,alertaJefe:resultadoRespuesta.alertaJefe});
         ejecutarRenderEtapa(etapa, tipo);
 
         alert("Observación atendida ✅");
+    } catch(error) {
+        await alert(error.message || "No fue posible guardar la respuesta. Inténtalo nuevamente.");
     } finally {
         respuestasEnCurso.delete(claveRespuesta);
     }
@@ -881,45 +851,14 @@ export async function responderComentarioJefeDespacho(
 
     const usuario = obtenerUsuario();
 
-    const estadoAnterior = {
-        atendido: comentario.atendido,
-        respuestaUsuario: comentario.respuestaUsuario,
-        atendidoPor: comentario.atendidoPor,
-        atendidoPorUid: comentario.atendidoPorUid,
-        fechaAtendido: comentario.fechaAtendido,
-        alertaJefe: obtenerOT()?.alertaJefe
-    };
-
     try {
-        comentario.atendido = true;
-        comentario.atendidoPorUid = usuario?.uid || "";
-        comentario.respuestaUsuario =
-            respuesta.trim();
-
-        comentario.atendidoPor =
-            usuario?.nombre || "Técnico";
-
-        comentario.fechaAtendido =
-            new Date().toLocaleString();
-
-        actualizarAlertaJefe();
-
-        const guardado = await guardarCambiosOT();
-        if (!guardado) {
-            comentario.atendido = estadoAnterior.atendido;
-            comentario.respuestaUsuario = estadoAnterior.respuestaUsuario;
-            comentario.atendidoPor = estadoAnterior.atendidoPor;
-            if (estadoAnterior.atendidoPorUid === undefined) delete comentario.atendidoPorUid;
-            else comentario.atendidoPorUid = estadoAnterior.atendidoPorUid;
-            comentario.fechaAtendido = estadoAnterior.fechaAtendido;
-            const ot = obtenerOT();
-            if (ot) ot.alertaJefe = estadoAnterior.alertaJefe;
-            return;
-        }
-
+        const resultadoRespuesta = await responderObservacionSegura({otId:localStorage.getItem("otActiva"),etapa:"despacho",tipo,comentarioIndex,respuesta:respuesta.trim(),referencia:Object.fromEntries(["texto","fecha","creadoPorUid","rol"].map(k=>[k,comentario[k]]))});
+        Object.assign(comentario,resultadoRespuesta.respuesta); Object.assign(obtenerOT(),{revision:resultadoRespuesta.revision,alertaJefe:resultadoRespuesta.alertaJefe});
         renderComentariosDespacho(tipo);
 
         alert("Observación atendida ✅");
+    } catch(error) {
+        await alert(error.message || "No fue posible guardar la respuesta. Inténtalo nuevamente.");
     } finally {
         respuestasEnCurso.delete(claveRespuesta);
     }
@@ -977,6 +916,8 @@ function crearTarjetaComentario({
         ["jefe_taller", "admin_sucursal"].includes(comentario?.rol)
             ? "comentario-card comentario-jefe"
             : "comentario-card";
+    const observacionJefe=["jefe_taller","admin_sucursal"].includes(comentario?.rol);
+    if(observacionJefe)tarjeta.classList.add(comentario.atendido===true?'observacion-respondida':'observacion-pendiente');
 
     const nombre =
         escaparHTML(
@@ -1083,6 +1024,7 @@ function crearTarjetaComentario({
     }
 
     tarjeta.innerHTML = `
+        ${observacionJefe ? `<div class="observacion-jefe-cabecera"><span class="observacion-jefe-titulo">Observación del Jefe de Taller</span><span class="observacion-jefe-estado">${comentario.atendido===true?'Respondida':'Pendiente de respuesta'}</span></div>` : ""}
         <strong>👨‍🔧 ${nombre}</strong>
 
         <p class="comentario-fecha">

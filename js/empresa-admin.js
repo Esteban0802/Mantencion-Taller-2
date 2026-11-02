@@ -1,7 +1,11 @@
+import { procesarLibroPlantilla } from "./plantillas-excel.js?v=20261031-3";
+import { escaparHtml, urlSegura } from "./html-seguro.js";
 import { renderIndicadorAlmacenamiento } from "./storage-indicador.js";
+import { conectarDesgloseAlmacenamiento } from "./almacenamiento-sucursales.js?v=20261031-1";
+import { renderConfiguracionSucursal } from "./empresa/configuracion-sucursal.js?v=20261102-1";
 import { uploadBytes, deleteObject } from "./storage-seguro.js";
-import { renderVistaUsuariosEmpresa } from "./empresa/usuarios.js";
-import { renderVistaSucursalesEmpresa } from "./empresa/sucursales.js";
+import { renderVistaUsuariosEmpresa } from "./empresa/usuarios.js?v=20261029-1";
+import { renderVistaSucursalesEmpresa } from "./empresa/sucursales.js?v=20261028-1";
 import { app, db } from "./firebase-config.js";
 import { protegerPagina, cerrarSesion, reautenticarAccionCritica } from "./session.js?v=20261017-1";
 import { aplicarModulosEnInterfaz, moduloActivo, obtenerModulosEmpresa} from "./modulos.js?v=20261018-2";
@@ -18,9 +22,7 @@ import {
   query,
   where,
   getCountFromServer,
-  getDocs,
-  addDoc,
-  deleteDoc
+  getDocs
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 import {
@@ -61,7 +63,6 @@ if (!usuarioActivo) throw new Error("Acceso no autorizado");
 let empresaActual = null;
 let detenerVisorAlmacenamiento = null;
 let empresaIdActual = null;
-let plantillasMantenimientoActuales = [];
 
 const alert = (mensaje) => {
   const texto = String(mensaje || "");
@@ -260,8 +261,7 @@ function configurarMenuSegunRol() {
   }
 
   [
-    "menuSucursalesEmpresa",
-    "menuConfiguracionEmpresa"
+    "menuSucursalesEmpresa"
   ].forEach(id => {
     const elemento = document.getElementById(id);
     if (elemento) elemento.style.display = esAdminSucursal ? "none" : "";
@@ -616,22 +616,22 @@ function renderVistaDashboardEmpresa() {
 
       <div class="dato-box">
         <span>Nombre</span>
-        <strong>${empresaActual.nombre || "-"}</strong>
+        <strong>${escaparHtml(empresaActual.nombre || "-")}</strong>
       </div>
 
       <div class="dato-box">
         <span>RUT</span>
-        <strong>${empresaActual.rut || "-"}</strong>
+        <strong>${escaparHtml(empresaActual.rut || "-")}</strong>
       </div>
 
       <div class="dato-box">
         <span>Correo</span>
-        <strong>${empresaActual.correo || "-"}</strong>
+        <strong>${escaparHtml(empresaActual.correo || "-")}</strong>
       </div>
 
       <div class="dato-box">
         <span>Plan</span>
-        <strong>${empresaActual.plan || "-"}</strong>
+        <strong>${escaparHtml(empresaActual.plan || "-")}</strong>
       </div>
 
       <div class="dato-box">
@@ -641,22 +641,22 @@ function renderVistaDashboardEmpresa() {
 
       <div class="dato-box">
         <span>País</span>
-        <strong>${empresaActual.pais || "-"}</strong>
+        <strong>${escaparHtml(empresaActual.pais || "-")}</strong>
       </div>
 
       <div class="dato-box">
         <span>Máx. usuarios</span>
-        <strong>${empresaActual.maxUsuarios || "-"}</strong>
+        <strong>${escaparHtml(empresaActual.maxUsuarios || "-")}</strong>
       </div>
 
       <div class="dato-box">
         <span>Máx. sucursales</span>
-        <strong>${empresaActual.maxSucursales || "-"}</strong>
+        <strong>${escaparHtml(empresaActual.maxSucursales || "-")}</strong>
       </div>
 
       <div class="dato-box">
         <span>Storage</span>
-        <strong>${empresaActual.maxStorageGB || "-"} GB</strong>
+        <strong>${escaparHtml(empresaActual.maxStorageGB || "-")} GB</strong>
       </div>
 
     </div>
@@ -949,11 +949,7 @@ async function guardarModulosEmpresa() {
 }
 
 function escaparAtributo(valor) {
-  return String(valor ?? "")
-    .replaceAll("&", "&amp;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;");
+  return escaparHtml(valor);
 }
 
 function puedeEditarConfiguracionEmpresa() {
@@ -1057,6 +1053,12 @@ async function solicitarCancelacionEmpresa() {
 }
 
 function renderVistaConfiguracionEmpresa() {
+  if (usuarioActivo.rol === "admin_sucursal") {
+    renderConfiguracionSucursal({ db, usuario: usuarioActivo, empresa: empresaActual, procesarExcel: procesarExcelPlantilla })
+      .then(agregarVisorSucursales)
+      .catch(error => { console.error("Configuración de sucursal", error); alert(error.message); });
+    return;
+  }
   const cont = document.getElementById("vistaEmpresaContenido");
   if (!cont || !empresaActual) return;
 
@@ -1065,7 +1067,6 @@ function renderVistaConfiguracionEmpresa() {
   const modulosActivos = CATALOGO_MODULOS
     .filter(modulo => obtenerModulosEmpresa(empresaActual)[modulo.key])
     .map(modulo => modulo.nombre);
-  const etapasChecklistActivas = obtenerEtapasChecklistActivasEmpresa();
   const storageUsadoBytes = Math.max(0, Number(empresaActual.storageUsadoBytes || 0));
   const cancelacionActiva = empresaEnPeriodoDeSalida();
   const fechaLimiteCancelacion = empresaActual.cancelacion?.fechaLimiteExportacion
@@ -1103,7 +1104,6 @@ function renderVistaConfiguracionEmpresa() {
 
     <div class="config-tabs" role="tablist" aria-label="Secciones de configuración">
       <button type="button" class="config-tab active" data-config-tab="general">Configuración general</button>
-      <button type="button" class="config-tab" data-config-tab="plantillas">Plantillas de mantenimiento</button>
     </div>
 
     <div id="configPanelGeneral" class="configuracion-grid">
@@ -1175,7 +1175,7 @@ function renderVistaConfiguracionEmpresa() {
             <span>Logo para informes</span>
             <div class="branding-preview branding-preview-logo">
               ${empresaActual?.brandingInforme?.logoUrl
-                ? `<img src="${escaparAtributo(empresaActual.brandingInforme.logoUrl)}" alt="Logo actual del informe">`
+                ? `<img src="${escaparAtributo(urlSegura(empresaActual.brandingInforme.logoUrl))}" alt="Logo actual del informe">`
                 : `<strong>Logo predeterminado de Vectaria</strong>`}
             </div>
             <input id="configLogoInforme" type="file" accept="image/png,image/jpeg,image/webp" ${deshabilitado}>
@@ -1191,7 +1191,7 @@ function renderVistaConfiguracionEmpresa() {
             <span>Imagen de portada</span>
             <div class="branding-preview branding-preview-portada">
               ${empresaActual?.brandingInforme?.portadaUrl
-                ? `<img src="${escaparAtributo(empresaActual.brandingInforme.portadaUrl)}" alt="Portada actual del informe">`
+                ? `<img src="${escaparAtributo(urlSegura(empresaActual.brandingInforme.portadaUrl))}" alt="Portada actual del informe">`
                 : `<strong>Se usará la primera evidencia disponible</strong>`}
             </div>
             <input id="configPortadaInforme" type="file" accept="image/png,image/jpeg,image/webp" ${deshabilitado}>
@@ -1212,10 +1212,10 @@ function renderVistaConfiguracionEmpresa() {
       <section class="config-panel">
         <h3>Plan y límites</h3>
         <div class="config-summary-grid">
-          <div><span>Plan</span><strong>${empresaActual.plan || "-"}</strong></div>
-          <div><span>Usuarios</span><strong>${empresaActual.maxUsuarios || "-"}</strong></div>
-          <div><span>Sucursales</span><strong>${empresaActual.maxSucursales || "-"}</strong></div>
-          <div><span>Storage contratado</span><strong>${empresaActual.maxStorageGB || "-"} GB</strong></div>
+          <div><span>Plan</span><strong>${escaparHtml(empresaActual.plan || "-")}</strong></div>
+          <div><span>Usuarios</span><strong>${escaparHtml(empresaActual.maxUsuarios || "-")}</strong></div>
+          <div><span>Sucursales</span><strong>${escaparHtml(empresaActual.maxSucursales || "-")}</strong></div>
+          <div><span>Storage contratado</span><strong>${escaparHtml(empresaActual.maxStorageGB || "-")} GB</strong></div>
           <div><span>Storage utilizado</span><strong>${empresaActual.storageCuotaVersion === 1 ? formatearAlmacenamiento(storageUsadoBytes) : "Pendiente de medir"}</strong></div>
           <div><span>Archivos</span><strong>${Number(empresaActual.storageArchivos || 0)}</strong></div>
         </div>
@@ -1261,43 +1261,9 @@ function renderVistaConfiguracionEmpresa() {
       ` : ""}
     </div>
 
-    <div id="configPanelPlantillas" class="plantillas-panel" hidden>
-      <div class="plantillas-encabezado">
-        <h3>Plantillas de mantenimiento</h3>
-        <p>Asocia cada gama de equipo con el checklist que se aplicará automáticamente al crear una OT.</p>
-      </div>
-      <div class="plantillas-grid">
-        <form id="formPlantillaMantenimiento" class="config-panel plantilla-form">
-          <h3>Crear plantilla</h3>
-          <label><span>Equipo o gama</span>
-            <input id="plantillaGama" type="text" maxlength="100" placeholder="Ej.: Bombas centrífugas" required ${deshabilitado}>
-          </label>
-          <label><span>Nombre de la plantilla</span>
-            <input id="plantillaNombre" type="text" maxlength="140" placeholder="Ej.: Mantenimiento integral de bombas" required ${deshabilitado}>
-          </label>
-          <label><span>Archivo de checklist</span>
-            <div class="plantilla-upload-zone">
-              <strong>Archivo Excel del flujo completo</strong>
-              <span>Hojas requeridas: ${etapasChecklistActivas.map(etapa => etapa.nombre).join(", ") || "ninguna etapa de checklist habilitada"}.</span>
-              <input id="plantillaArchivo" type="file" accept=".xlsx,.xls" required ${deshabilitado}>
-            </div>
-          </label>
-          ${editable ? '<button type="submit" class="btn-primary">Guardar plantilla</button>' : ''}
-        </form>
-        <section class="config-panel plantillas-listado">
-          <div class="plantillas-listado-header">
-            <h3>Plantillas configuradas</h3>
-            <input id="buscarPlantilla" type="search" placeholder="Buscar por equipo o gama...">
-          </div>
-          <div id="listaPlantillasMantenimiento" class="plantillas-items"><p class="config-helper">Cargando plantillas...</p></div>
-          <div class="config-info-note">Las nuevas OT utilizarán la versión activa. Las órdenes existentes conservarán su checklist original.</div>
-        </section>
-      </div>
-    </div>
   `;
 
-  conectarTabsConfiguracion();
-  cargarPlantillasMantenimiento();
+  agregarVisorSucursales();
 
   if (!editable) return;
 
@@ -1317,182 +1283,26 @@ function renderVistaConfiguracionEmpresa() {
     ?.addEventListener("click", descargarExportacionEmpresa);
   document.getElementById("btnSolicitarCancelacion")
     ?.addEventListener("click", solicitarCancelacionEmpresa);
-  document.getElementById("formPlantillaMantenimiento")
-    ?.addEventListener("submit", guardarPlantillaMantenimiento);
 }
 
-function conectarTabsConfiguracion() {
-  document.querySelectorAll("[data-config-tab]").forEach(boton => {
-    boton.addEventListener("click", () => {
-      const plantillas = boton.dataset.configTab === "plantillas";
-      document.querySelectorAll("[data-config-tab]").forEach(item => item.classList.toggle("active", item === boton));
-      document.getElementById("configPanelGeneral").hidden = plantillas;
-      document.getElementById("configPanelPlantillas").hidden = !plantillas;
-      const guardarGeneral = document.getElementById("btnGuardarConfiguracionEmpresa");
-      if (guardarGeneral) guardarGeneral.hidden = plantillas;
-    });
-  });
-}
-
-const ETAPAS_CHECKLIST_PLANTILLA = [
-  { key: "ingreso", nombre: "Ingreso", aliases: ["ingreso"] },
-  { key: "evaluacion", nombre: "Evaluación", aliases: ["evaluacion"] },
-  { key: "mantencion", nombre: "Mantención", aliases: ["mantencion", "mantenimiento", "overhaul"] },
-  { key: "pruebas", nombre: "Pruebas", aliases: ["pruebas", "prueba"] }
-];
-
-function obtenerEtapasChecklistActivasEmpresa() {
-  const modulos = obtenerModulosEmpresa(empresaActual);
-  return ETAPAS_CHECKLIST_PLANTILLA.filter(etapa => modulos[etapa.key] === true);
-}
-
-function normalizarTextoPlantilla(valor) {
-  return String(valor || "").trim().toLocaleLowerCase("es")
-    .normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ");
-}
-
-function itemsDesdeHoja(hoja) {
-  if (!hoja) return [];
-  return XLSX.utils.sheet_to_json(hoja, { header: 1 }).flat()
-    .map(valor => String(valor ?? "").trim()).filter(Boolean).slice(0, 400)
-    .map(item => ({ item: item.slice(0, 240) }));
-}
-
-function buscarHoja(workbook, aliases) {
-  const nombre = workbook.SheetNames.find(item => aliases.includes(normalizarTextoPlantilla(item)));
-  return nombre ? workbook.Sheets[nombre] : null;
+function agregarVisorSucursales() {
+  const contenido = document.getElementById("vistaEmpresaContenido");
+  if (!contenido) return;
+  const contenedor = document.createElement("section");
+  contenedor.className = "config-panel";
+  contenido.appendChild(contenedor);
+  if (usuarioActivo.rol === "admin_sucursal") {
+    const cuota = document.createElement("div");
+    cuota.innerHTML = renderIndicadorAlmacenamiento(empresaActual);
+    contenido.insertBefore(cuota, contenedor);
+  }
+  conectarDesgloseAlmacenamiento({ contenedor, consultar: httpsCallable(functions, "obtenerDesgloseAlmacenamiento", { timeout: 300000 }), empresaId: empresaActual.id, limiteGB: empresaActual.maxStorageGB });
 }
 
 async function procesarExcelPlantilla(archivo) {
   if (!window.XLSX) throw new Error("No fue posible cargar el lector de archivos Excel.");
   const workbook = XLSX.read(await archivo.arrayBuffer(), { type: "array" });
-  const modulos = obtenerModulosEmpresa(empresaActual);
-  const checklists = {};
-  const faltantes = [];
-  const ignoradas = [];
-
-  ETAPAS_CHECKLIST_PLANTILLA.forEach(etapa => {
-    const items = itemsDesdeHoja(buscarHoja(workbook, etapa.aliases));
-    const activa = modulos[etapa.key] === true;
-
-    if (activa && !items.length) faltantes.push(etapa.nombre);
-    if (!activa && items.length) ignoradas.push(etapa.nombre);
-    checklists[etapa.key] = activa ? items : [];
-  });
-
-  if (faltantes.length) {
-    throw new Error(`Faltan hojas requeridas o están vacías: ${faltantes.join(", ")}.`);
-  }
-
-  const total = Object.values(checklists).reduce((suma, items) => suma + items.length, 0);
-  if (!total) throw new Error("La empresa no tiene etapas de checklist activas o el Excel no contiene actividades válidas.");
-
-  const etapasHabilitadas = {
-    ingreso: modulos.ingreso === true,
-    evaluacion: modulos.evaluacion === true,
-    mantencion: modulos.mantencion === true,
-    pruebas: modulos.pruebas === true,
-    despacho: modulos.despacho === true
-  };
-
-  return { checklists, total, etapasHabilitadas, ignoradas };
-}
-
-async function cargarPlantillasMantenimiento() {
-  const lista = document.getElementById("listaPlantillasMantenimiento");
-  if (!lista || !empresaActual?.id) return;
-  try {
-    const consulta = query(collection(db, "plantillasMantenimiento"), where("empresaId", "==", empresaActual.id));
-    const snapshot = await getDocs(consulta);
-    plantillasMantenimientoActuales = snapshot.docs.map(item => ({ id: item.id, ...item.data() }))
-      .sort((a, b) => String(a.gama || "").localeCompare(String(b.gama || ""), "es"));
-    renderPlantillasMantenimiento();
-    document.getElementById("buscarPlantilla")?.addEventListener("input", renderPlantillasMantenimiento);
-  } catch (error) {
-    console.error("Error cargando plantillas:", error);
-    lista.innerHTML = '<p class="config-helper">No fue posible cargar las plantillas.</p>';
-  }
-}
-
-function renderPlantillasMantenimiento() {
-  const lista = document.getElementById("listaPlantillasMantenimiento");
-  if (!lista) return;
-  const filtro = normalizarTextoPlantilla(document.getElementById("buscarPlantilla")?.value);
-  const items = plantillasMantenimientoActuales.filter(item => !filtro || normalizarTextoPlantilla(`${item.gama} ${item.nombre}`).includes(filtro));
-  if (!items.length) {
-    lista.innerHTML = '<p class="plantillas-vacio">Aún no hay plantillas configuradas para esta empresa.</p>';
-    return;
-  }
-  lista.innerHTML = items.map(item => `
-    <article class="plantilla-item">
-      <div class="plantilla-item-icon">▤</div>
-      <div class="plantilla-item-info"><strong>${escaparAtributo(item.gama)}</strong><span>${escaparAtributo(item.nombre)}</span><small>Versión ${Number(item.version || 1)} · ${Number(item.totalActividades || 0)} actividades</small></div>
-      <span class="plantilla-estado ${item.activa === false ? "inactiva" : ""}">${item.activa === false ? "INACTIVA" : "ACTIVA"}</span>
-      ${puedeEditarConfiguracionEmpresa() ? `<button type="button" class="btn-secondary" data-eliminar-plantilla="${item.id}">Eliminar</button>` : ""}
-    </article>`).join("");
-  lista.querySelectorAll("[data-eliminar-plantilla]").forEach(boton => boton.addEventListener("click", () => eliminarPlantillaMantenimiento(boton.dataset.eliminarPlantilla)));
-}
-
-async function guardarPlantillaMantenimiento(evento) {
-  evento.preventDefault();
-  if (!empresaActual || !puedeEditarConfiguracionEmpresa()) return;
-  const gama = document.getElementById("plantillaGama").value.trim();
-  const nombre = document.getElementById("plantillaNombre").value.trim();
-  const archivo = document.getElementById("plantillaArchivo").files?.[0];
-  if (!gama || !nombre || !archivo) return alert("Completa la gama, el nombre y selecciona el archivo Excel.");
-  if (archivo.size > 5 * 1024 * 1024) return alert("El archivo Excel no puede superar 5 MB.");
-  const tipoPlantilla = /\.xls$/i.test(archivo.name) ? "application/vnd.ms-excel" : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
-  await validarFirmaArchivo(archivo, tipoPlantilla);
-  const gamaNormalizada = normalizarTextoPlantilla(gama);
-  if (plantillasMantenimientoActuales.some(item => item.activa !== false && item.gamaNormalizada === gamaNormalizada)) return alert("Ya existe una plantilla activa para esta gama.");
-  const boton = evento.submitter;
-  let documentoCreado = null;
-  let referenciaArchivoCreado = null;
-  try {
-    boton.disabled = true; boton.textContent = "Procesando...";
-    const { checklists, total, etapasHabilitadas, ignoradas } = await procesarExcelPlantilla(archivo);
-    documentoCreado = await addDoc(collection(db, "plantillasMantenimiento"), {
-      empresaId: empresaActual.id, gama, gamaNormalizada, nombre, version: 1, activa: true,
-      checklists, etapasHabilitadas, totalActividades: total, archivoNombre: archivo.name,
-      creadoPor: usuarioActivo.uid, fechaCreacion: serverTimestamp(), fechaActualizacion: serverTimestamp()
-    });
-    const ruta = `empresas/${empresaActual.id}/plantillas/${documentoCreado.id}/${Date.now()}-${crypto.randomUUID()}-${archivo.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
-    const referencia = storageRef(storage, ruta);
-    referenciaArchivoCreado = referencia;
-    await uploadBytes(referencia, archivo, { contentType: tipoPlantilla });
-    await updateDoc(documentoCreado, { archivoRuta: ruta, archivoUrl: await getDownloadURL(referencia) });
-    evento.target.reset(); await cargarPlantillasMantenimiento();
-    const avisoIgnoradas = ignoradas.length
-      ? `\n\nSe ignoraron hojas de módulos desactivados: ${ignoradas.join(", ")}.`
-      : "";
-    alert(`Plantilla guardada correctamente. Ya está disponible al crear una OT.${avisoIgnoradas}`);
-  } catch (error) {
-    console.error("Error guardando plantilla:", error);
-    if (referenciaArchivoCreado) await deleteObject(referenciaArchivoCreado).catch(() => {});
-    if (documentoCreado) await deleteDoc(documentoCreado).catch(() => {});
-    alert(error?.message || "No fue posible guardar la plantilla.");
-  } finally {
-    boton.disabled = false; boton.textContent = "Guardar plantilla";
-  }
-}
-
-async function eliminarPlantillaMantenimiento(id) {
-  const plantilla = plantillasMantenimientoActuales.find(item => item.id === id);
-  if (!plantilla) return;
-  const confirmado = await confirmarAccionAdmin({
-    titulo: "Eliminar plantilla",
-    mensaje: `Se eliminará la plantilla de ${plantilla.gama}. Las OT existentes conservarán su checklist.`,
-    textoConfirmar: "Eliminar",
-    peligrosa: true
-  });
-  if (!confirmado) return;
-  try {
-    if (plantilla.archivoRuta) await deleteObject(storageRef(storage, plantilla.archivoRuta)).catch(() => {});
-    await deleteDoc(doc(db, "plantillasMantenimiento", id));
-    await cargarPlantillasMantenimiento();
-  } catch (error) {
-    console.error("Error eliminando plantilla:", error); alert("No fue posible eliminar la plantilla.");
-  }
+  return procesarLibroPlantilla(workbook, obtenerModulosEmpresa(empresaActual), XLSX.utils);
 }
 
 function conectarPreviewImagen(inputId, selectorPreview) {
@@ -1660,8 +1470,6 @@ async function guardarConfiguracionEmpresa() {
     validarImagenInforme(archivoLogo, 2, "Logo del informe");
     validarImagenInforme(archivoPortada, 5, "Portada del informe");
 
-    const rutaLogoAnterior = empresaActual?.brandingInforme?.logoRuta;
-    const rutaPortadaAnterior = empresaActual?.brandingInforme?.portadaRuta;
     const brandingInforme = {
       ...(empresaActual.brandingInforme || {})
     };
@@ -1684,31 +1492,12 @@ async function guardarConfiguracionEmpresa() {
       fechaActualizacion: serverTimestamp()
     });
 
-    const rutasAntiguas = [
-      archivoLogo && rutaLogoAnterior !== brandingInforme.logoRuta
-        ? rutaLogoAnterior
-        : null,
-      archivoPortada && rutaPortadaAnterior !== brandingInforme.portadaRuta
-        ? rutaPortadaAnterior
-        : null
-    ].filter(Boolean);
-
-    for (const rutaAntigua of rutasAntiguas) {
-      try {
-        await deleteObject(storageRef(storage, rutaAntigua));
-      } catch (errorStorage) {
-        if (errorStorage?.code !== "storage/object-not-found") {
-          console.warn("No fue posible limpiar una imagen corporativa anterior.", errorStorage);
-        }
-      }
-    }
-
     Object.assign(empresaActual, datos, { brandingInforme });
     window.empresaActualAdmin = empresaActual;
     document.getElementById("nombreEmpresa").textContent = empresaActual.nombre;
     document.getElementById("tituloEmpresa").textContent = empresaActual.nombre;
 
-    alert("Configuración actualizada correctamente.");
+    alert(archivoLogo || archivoPortada ? "Configuración actualizada. Las imágenes anteriores reemplazadas se eliminarán automáticamente en el servidor." : "Configuración actualizada correctamente.");
     renderVistaConfiguracionEmpresa();
   } catch (error) {
     console.error("Error actualizando configuración:", error);
@@ -1728,10 +1517,10 @@ function renderVistaPlaceholder(titulo, texto) {
 
   cont.innerHTML = `
     <div class="section-header">
-      <h2>${titulo}</h2>
+      <h2>${escaparHtml(titulo)}</h2>
     </div>
 
-    <p>${texto}</p>
+    <p>${escaparHtml(texto)}</p>
   `;
 }
 

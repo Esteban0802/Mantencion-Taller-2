@@ -1,3 +1,4 @@
+import { escaparHtml } from "../html-seguro.js";
 export function abrirWizard({ titulo, pasos, onFinish }) {
   if (document.querySelector(".wizard-overlay")) {
     alert("Ya hay un asistente abierto. Ciérralo antes de abrir otro.");
@@ -21,7 +22,7 @@ export function abrirWizard({ titulo, pasos, onFinish }) {
 
       <div class="wizard-header">
         <div>
-          <h2>${titulo}</h2>
+          <h2>${escaparHtml(titulo)}</h2>
           <p>Completa los pasos para continuar.</p>
         </div>
 
@@ -138,7 +139,7 @@ export function abrirWizard({ titulo, pasos, onFinish }) {
             <span>${i + 1}</span>
 
             <small>
-              ${p.titulo || `Paso ${i + 1}`}
+              ${escaparHtml(p.titulo || `Paso ${i + 1}`)}
             </small>
           </div>
         `

@@ -1,0 +1,17 @@
+import { escaparHtml as esc } from './html-seguro.js';
+export function etapaOperacion(ot) {
+  const i=ot.etapasPersonalizadas.findIndex(e=>e.requiereAprobacion);
+  return i>=0 && ot.etapasPersonalizadas[i].decision?.resultado==='aprobada' ? ot.etapasPersonalizadas[i+1] : null;
+}
+export function vistaIdentificacion(ot,ocupado) {
+  return `<section class="libre-decision"><h2>Crear OT · Datos de identificación</h2><p>Modifica los datos de la orden. La plantilla y el avance se conservan.</p>${['equipo','serie','cliente','os'].map(k=>`<label>${{equipo:'Equipo',serie:'Serie',cliente:'Cliente',os:'Número de OS'}[k]}<input data-identificacion="${k}" value="${esc(ot[k])}" ${ocupado || ot.cerrada?'disabled':''}></label>`).join('')}<p>Gama de equipo: <strong>${esc(ot.gamaEquipo)}</strong></p>${!ot.cerrada?`<button type="button" class="btn-primary" data-guardar-identificacion ${ocupado?'disabled':''}>Guardar cambios</button>`:''}</section>`;
+}
+export function vistaOperacion(ot,e,usuario,ocupado,modulos={}) {
+  if(etapaOperacion(ot)?.id!==e.id)return '';
+  const jefe=usuario.rol==='jefe_taller';
+  const editar=['jefe_taller','tecnico','supervisor'].includes(usuario.rol) && !ot.cerrada && !e.completada;
+  const filas=ot.gantt?.etapas || [];
+  const inicio=Date.parse(ot.gantt?.fechaInicio),fin=Date.parse(ot.gantt?.fechaTermino),duracion=Math.max(86400000,fin-inicio+86400000);
+  return `<div class="libre-operacion">${modulos.repuestos!==false?`<section class="libre-decision"><h3>Repuestos de la OS ${esc(ot.os)}</h3><p>Listado vinculado al inventario de esta sucursal.</p>${editar?`<button type="button" class="btn-primary" data-sincronizar-repuestos ${ocupado?'disabled':''}>Actualizar desde Inventario</button>`:''}<div class="libre-tabla-scroll"><table><thead><tr><th>Código</th><th>Descripción</th><th>Cantidad</th><th>Disponibilidad</th><th>Utilizado</th></tr></thead><tbody>${(ot.repuestos?.items || []).map(i=>`<tr><td>${esc(i.codigo)}</td><td>${esc(i.descripcion)}</td><td>${esc(i.cantidad)}</td><td>${i.recibidoInventario?'Recibido':'Pendiente'}</td><td><input type="checkbox" data-usar-repuesto="${esc(i.inventarioItemId)}" aria-label="Utilizado ${esc(i.codigo)}" ${i.usado?'checked':''} ${!editar || ocupado || !i.recibidoInventario?'disabled':''}></td></tr>`).join('')}</tbody></table></div>${!ot.repuestos?.items?.length?'<p>No hay repuestos vinculados a esta OS.</p>':''}</section>`:''}
+  ${modulos.gantt!==false?`<section class="libre-decision"><h3>Carta Gantt</h3><p>Planificación de las etapas del checklist seleccionado.</p><div class="libre-tabla-scroll"><table><thead><tr><th>Etapa</th><th>Inicio</th><th>Término</th><th>Planificación</th></tr></thead><tbody>${ot.etapasPersonalizadas.map(et=>{const f=filas.find(f=>f.id===et.id);return `<tr><td>${esc(et.nombre)}</td><td>${jefe && editar?`<input type="date" data-gantt-inicio="${et.id}" value="${esc(f?.inicio || '')}" ${ocupado?'disabled':''}>`:esc(f?.inicio || 'Sin programar')}</td><td>${jefe && editar?`<input type="date" data-gantt-fin="${et.id}" value="${esc(f?.fin || '')}" ${ocupado?'disabled':''}>`:esc(f?.fin || 'Sin programar')}</td><td><div class="libre-gantt-pista">${f?`<span style="margin-left:${Math.max(0,(Date.parse(f.inicio)-inicio)/duracion*100)}%;width:${Math.max(1,(Date.parse(f.fin)-Date.parse(f.inicio)+86400000)/duracion*100)}%"></span>`:''}</div></td></tr>`;}).join('')}</tbody></table></div>${jefe && editar?`<button type="button" class="btn-primary" data-guardar-gantt ${ocupado?'disabled':''}>Guardar planificación</button>`:''}</section>`:''}</div>`;
+}

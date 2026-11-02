@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync } from "node:fs";
+import vm from "node:vm";
 
 import {
   etiquetaRolProgramacion,
@@ -55,4 +56,60 @@ test("las ausencias pueden abrirse desde el calendario y actualizarse", () => {
   assert.match(source, /data-ausencia-id/);
   assert.match(source, /abrirEdicionAusenciaProgramacion/);
   assert.match(source, /updateDoc\(doc\(db, "programacionAusencias", ausenciaId\)/);
+});
+
+function cargarSemanaPersonal(documentos, error = null) {
+  const source = readFileSync(new URL("../js/programacion.js", import.meta.url), "utf8");
+  const funcion = source.match(/async function cargarSemana\(\) \{[\s\S]*?\n\}/)[0];
+  const nodos = new Map(); const consultas = []; const mensajes = [];
+  let renders = 0;
+  const contexto = vm.createContext({
+    ES_TRABAJADOR_CON_SEMANA_PERSONAL: true, PUEDE_VER_BORRADORES: false,
+    usuario: { uid: "nuevo" }, empresaId: "empresa", semanaInicio: 0,
+    db: {}, estadoSemanaActual: "borrador", asignacionesEmpresa: [], asignacionesSemana: [],
+    fechaISO: valor => valor === 0 ? "2026-10-26" : "2026-11-01", sumarDias: (_, dias) => dias,
+    mostrarMensaje: texto => mensajes.push(texto), actualizarEncabezadoSemana() {},
+    collection: (_, nombre) => ({ nombre }), where: (campo, operador, valor) => ({ campo, operador, valor }),
+    limit: cantidad => ({ limite: cantidad }), query: (...partes) => partes,
+    getDocs: async consulta => { consultas.push(consulta); if (error) throw error; return { docs: documentos.map(data => ({ data: () => data })) }; },
+    getDoc: () => { throw Error("No debe leer una semana general ni un borrador"); },
+    cargarConfirmacionesSemana: async () => {}, renderCuadro: () => { renders++; },
+    $: id => { if (!nodos.has(id)) nodos.set(id, {}); return nodos.get(id); }
+  });
+  const ejecutar = () => vm.runInContext(`${funcion}; cargarSemana();`, contexto);
+  return { contexto, consultas, mensajes, nodos, ejecutar, renders: () => renders };
+}
+
+test("usuario sin copia personal ve semana pendiente sin solicitar borradores", async () => {
+  const e = cargarSemanaPersonal([]);
+  await e.ejecutar();
+  assert.equal(e.consultas.length, 1);
+  assert.equal(e.consultas[0][0].nombre, "programacionPublicadaUsuarios");
+  const filtros = e.consultas[0].slice(1).filter(p => p.campo);
+  assert.deepEqual(filtros, [
+    { campo: "empresaId", operador: "==", valor: "empresa" },
+    { campo: "usuarioId", operador: "==", valor: "nuevo" },
+    { campo: "estado", operador: "==", valor: "publicada" },
+    { campo: "semanaInicio", operador: "==", valor: "2026-10-26" }
+  ]);
+  assert.equal(e.consultas[0].at(-1).limite, 1);
+  assert.match(e.mensajes.at(-1), /Todavía no tienes una programación publicada/);
+  assert.equal(e.nodos.get("confirmacionProgramacion").hidden, true);
+  assert.equal(e.renders(), 0);
+});
+
+test("la copia publicada sigue mostrando las asignaciones del trabajador", async () => {
+  const asignacion = { id: "a", fecha: "2026-10-27" };
+  const e = cargarSemanaPersonal([{ estado: "publicada", asignaciones: [asignacion] }]);
+  await e.ejecutar();
+  assert.equal(e.contexto.estadoSemanaActual, "publicada");
+  assert.equal(e.contexto.asignacionesSemana[0].id, "a");
+  assert.equal(e.renders(), 1);
+});
+
+test("un rechazo real de permisos no se oculta consultando la semana general", async () => {
+  const error = Object.assign(new Error("Sin permiso"), { code: "permission-denied" });
+  const e = cargarSemanaPersonal([], error);
+  await assert.rejects(e.ejecutar(), e => e === error);
+  assert.equal(e.consultas.length, 1);
 });

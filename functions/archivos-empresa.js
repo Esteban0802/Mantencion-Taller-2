@@ -11,11 +11,20 @@ async function contexto({ db, usuario, ruta }) {
   if (!empresaSnap.exists || empresa.activa === false || ["cancelacion_solicitada", "periodo_exportacion", "pendiente_eliminacion", "cancelada"].includes(empresa.suscripcion?.estado)) fallo("failed-precondition", "La empresa solo permite consultar y descargar archivos.");
   let tipos = [], maximo = 20 * 1024 ** 2, permitido = false;
   const imagenes = ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif", "image/avif"];
-  if (grupo === "informe" && ruta.split("/").length === 4) {
+  if (grupo === "sucursales") {
+    const partes = ruta.split("/");
+    const rama = partes[4];
+    const sucursalSnap = await db.collection("sucursales").doc(sucursal).get();
+    permitido = usuario.rol === "admin_sucursal" && Boolean(usuario.sucursalId) && usuario.sucursalId === sucursal &&
+      sucursalSnap.exists && sucursalSnap.data().empresaId === empresaId && sucursalSnap.data().activa === true;
+    if (rama === "informe" && partes.length === 6) { tipos = imagenes.slice(0,3); maximo = 5 * 1024 ** 2; }
+    else if (rama === "plantillas" && partes.length === 7) { tipos = ["application/vnd.ms-excel", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"]; maximo = 5 * 1024 ** 2; }
+    else permitido = false;
+  } else if (grupo === "informe" && ruta.split("/").length === 4) {
     permitido = ["super_admin", "admin_empresa"].includes(usuario.rol);
     tipos = imagenes.slice(0,3); maximo = 5 * 1024 ** 2;
   } else if (grupo === "plantillas") {
-    permitido = usuario.rol === "admin_empresa";
+    permitido = false; // Las plantillas se administran exclusivamente por sucursal.
     tipos = ["application/vnd.ms-excel", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"]; maximo = 5 * 1024 ** 2;
   } else if (grupo === "sheq") {
     permitido = usuario.rol === "sheq" && empresa.modulos?.sheq !== false;

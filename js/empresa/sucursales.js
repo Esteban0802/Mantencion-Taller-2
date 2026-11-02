@@ -1,4 +1,5 @@
-import { abrirWizard } from "../components/wizard.js";
+import { escaparHtml, argumentoHtml } from "../html-seguro.js";
+import { abrirWizard } from "../components/wizard.js?v=20261028-1";
 import { app, db } from "../firebase-config.js";
 
 import {
@@ -133,10 +134,10 @@ function renderTablaSucursales() {
 
   tbody.innerHTML = sucursalesEmpresa.map(sucursal => `
     <tr>
-      <td data-label="Sucursal"><strong>${sucursal.nombre || "-"}</strong></td>
-      <td data-label="Código">${sucursal.codigo || "-"}</td>
-      <td data-label="Ciudad">${sucursal.ciudad || "-"}</td>
-      <td data-label="Dirección">${sucursal.direccion || "-"}</td>
+      <td data-label="Sucursal"><strong>${escaparHtml(sucursal.nombre || "-")}</strong></td>
+      <td data-label="Código">${escaparHtml(sucursal.codigo || "-")}</td>
+      <td data-label="Ciudad">${escaparHtml(sucursal.ciudad || "-")}</td>
+      <td data-label="Dirección">${escaparHtml(sucursal.direccion || "-")}</td>
       <td data-label="Estado">
         <span class="${sucursal.activa ? "badge-activo" : "badge-inactivo"}">
           ${sucursal.activa ? "Activa" : "Inactiva"}
@@ -146,7 +147,7 @@ function renderTablaSucursales() {
         <div class="table-actions">
           <button
             class="${sucursal.activa ? "btn-danger" : "btn-primary"}"
-            onclick="cambiarEstadoSucursal('${sucursal.id}', ${!sucursal.activa})"
+            onclick="cambiarEstadoSucursal(${argumentoHtml(sucursal.id)}, ${!sucursal.activa})"
           >
             ${sucursal.activa ? "Desactivar" : "Activar"}
           </button>
@@ -228,10 +229,10 @@ window.abrirWizardSucursal = function () {
         titulo: "Resumen",
         render: datos => `
           <h3>Resumen</h3>
-          <p><strong>Nombre:</strong> ${datos.nombre}</p>
-          <p><strong>Código:</strong> ${datos.codigo}</p>
-          <p><strong>Ciudad:</strong> ${datos.ciudad}</p>
-          <p><strong>Dirección:</strong> ${datos.direccion || "-"}</p>
+          <p><strong>Nombre:</strong> ${escaparHtml(datos.nombre)}</p>
+          <p><strong>Código:</strong> ${escaparHtml(datos.codigo)}</p>
+          <p><strong>Ciudad:</strong> ${escaparHtml(datos.ciudad)}</p>
+          <p><strong>Dirección:</strong> ${escaparHtml(datos.direccion || "-")}</p>
         `
       }
     ],
