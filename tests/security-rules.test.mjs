@@ -20,6 +20,9 @@ import {
   doc,
   getDoc,
   getDocs,
+  getCountFromServer,
+  orderBy,
+  startAfter,
   limit,
   query,
   runTransaction,
@@ -46,6 +49,58 @@ const PROJECT_ID = process.env.GCLOUD_PROJECT || "demo-no-project";
 const FIRESTORE_PORT = Number(process.env.FIRESTORE_EMULATOR_PORT || 8080);
 const STORAGE_PORT = Number(process.env.STORAGE_EMULATOR_PORT || 9199);
 let testEnv;
+
+test("semanas inexistentes devuelven una consulta vacía sin ampliar acceso a borradores",async()=>{
+  const inicio="2099-01-05";
+  for(const uid of ["planificador-a","bodeguero-a"]) {
+    const db=firestoreComo(uid);
+    await assertFails(getDoc(doc(db,"programacionSemanas",`empresa-a_${inicio}`)));
+    const vacia=await assertSucceeds(getDocs(query(collection(db,"programacionSemanas"),
+      where("empresaId","==","empresa-a"),where("semanaInicio","==",inicio),limit(1))));
+    assert.equal(vacia.size,0);
+  }
+  await testEnv.withSecurityRulesDisabled(async contexto=>{
+    await setDoc(doc(contexto.firestore(),"programacionSemanas",`empresa-a_${inicio}`),{empresaId:"empresa-a",semanaInicio:inicio,estado:"borrador"});
+  });
+  for(const uid of ["admin-a","admin-sucursal-a","jefe-a","sheq-a"]) {
+    const db=firestoreComo(uid),base=query(collection(db,"programacionSemanas"),where("empresaId","==","empresa-a"),where("semanaInicio","==",inicio));
+    await assertFails(getDocs(query(base,limit(1))));
+    const publicada=await assertSucceeds(getDocs(query(base,where("estado","==","publicada"),limit(1))));
+    assert.equal(publicada.size,0);
+  }
+  const planificador=firestoreComo("planificador-a");
+  const borrador=await assertSucceeds(getDocs(query(collection(planificador,"programacionSemanas"),where("empresaId","==","empresa-a"),where("semanaInicio","==",inicio),limit(1))));
+  assert.equal(borrador.size,1);
+  await assertFails(getDocs(query(collection(planificador,"programacionSemanas"),where("empresaId","==","empresa-b"),where("semanaInicio","==",inicio),limit(1))));
+});
+
+test("resúmenes paginados y conteos mantienen aislamiento de empresa y sucursal", async () => {
+  await testEnv.withSecurityRulesDisabled(async contexto => {
+    const db = contexto.firestore();
+    for (const [id, empresaId, sucursalId, cerrada, fechaCreacion] of [
+      ["pagina-a1","empresa-a","sucursal-a",false,3],
+      ["pagina-a2","empresa-a","sucursal-a",false,2],
+      ["pagina-cerrada","empresa-a","sucursal-a",true,1],
+      ["pagina-otra","empresa-a","sucursal-a2",false,4],
+      ["pagina-ajena","empresa-b","sucursal-b",false,5]
+    ]) await setDoc(doc(db,"otsResumen",id),{empresaId,sucursalId,cerrada,fechaCreacion,estado:cerrada?"CERRADA":"EN_PROCESO"});
+  });
+  for (const uid of ["jefe-a","tecnico-a","admin-sucursal-a","planificador-a"]) {
+    const db = firestoreComo(uid);
+    const filtros=[where("empresaId","==","empresa-a"),where("sucursalId","==","sucursal-a")];
+    const base=query(collection(db,"otsResumen"),...filtros,where("cerrada","==",false),orderBy("fechaCreacion","desc"));
+    const primera=await assertSucceeds(getDocs(query(base,limit(1))));
+    assert.equal(primera.docs[0].id,"pagina-a1");
+    const segunda=await assertSucceeds(getDocs(query(base,startAfter(primera.docs[0]),limit(1))));
+    assert.equal(segunda.docs[0].id,"pagina-a2");
+    const conteo=await assertSucceeds(getCountFromServer(query(collection(db,"otsResumen"),...filtros,where("cerrada","==",true))));
+    assert.equal(conteo.data().count,1);
+    await assertFails(getCountFromServer(query(collection(db,"otsResumen"),where("empresaId","==","empresa-a"))));
+  }
+  await assertFails(getDocs(query(collection(firestoreComo("admin-a"),"otsResumen"),where("empresaId","==","empresa-b"),limit(20))));
+  const admin=await assertSucceeds(getCountFromServer(query(collection(firestoreComo("admin-a"),"otsResumen"),where("empresaId","==","empresa-a"))));
+  assert.equal(admin.data().count,4);
+});
 
 const usuarioTallerA = {
   uid: "taller-a",

@@ -58,13 +58,13 @@ test("las ausencias pueden abrirse desde el calendario y actualizarse", () => {
   assert.match(source, /updateDoc\(doc\(db, "programacionAusencias", ausenciaId\)/);
 });
 
-function cargarSemanaPersonal(documentos, error = null) {
+function cargarSemanaPersonal(documentos, error = null, { personal = true, borradores = false } = {}) {
   const source = readFileSync(new URL("../js/programacion.js", import.meta.url), "utf8");
-  const funcion = source.match(/async function cargarSemana\(\) \{[\s\S]*?\n\}/)[0];
+  const funcion = source.match(/async function cargarSemana\([\s\S]*?\) \{[\s\S]*?\n\}/)[0];
   const nodos = new Map(); const consultas = []; const mensajes = [];
   let renders = 0;
   const contexto = vm.createContext({
-    ES_TRABAJADOR_CON_SEMANA_PERSONAL: true, PUEDE_VER_BORRADORES: false,
+    ES_TRABAJADOR_CON_SEMANA_PERSONAL: personal, PUEDE_VER_BORRADORES: borradores,
     usuario: { uid: "nuevo" }, empresaId: "empresa", semanaInicio: 0,
     db: {}, estadoSemanaActual: "borrador", asignacionesEmpresa: [], asignacionesSemana: [],
     fechaISO: valor => valor === 0 ? "2026-10-26" : "2026-11-01", sumarDias: (_, dias) => dias,
@@ -96,6 +96,23 @@ test("usuario sin copia personal ve semana pendiente sin solicitar borradores", 
   assert.match(e.mensajes.at(-1), /Todavía no tienes una programación publicada/);
   assert.equal(e.nodos.get("confirmacionProgramacion").hidden, true);
   assert.equal(e.renders(), 0);
+});
+
+test("una semana general inexistente se consulta por empresa y fecha sin lectura directa denegada",async()=>{
+  for(const borradores of [true,false]) {
+    const e=cargarSemanaPersonal([],null,{personal:false,borradores});await e.ejecutar();
+    const semana=e.consultas.find(c=>c[0].nombre==="programacionSemanas");
+    assert.ok(semana);
+    const filtros=semana.slice(1).filter(f=>f.campo);
+    assert.deepEqual(filtros,[
+      {campo:"empresaId",operador:"==",valor:"empresa"},
+      {campo:"semanaInicio",operador:"==",valor:"2026-10-26"},
+      ...(!borradores?[{campo:"estado",operador:"==",valor:"publicada"}]:[])
+    ]);
+    assert.equal(semana.at(-1).limite,1);
+    assert.equal(e.contexto.estadoSemanaActual,"borrador");
+    assert.equal(e.renders(),borradores?1:0);
+  }
 });
 
 test("la copia publicada sigue mostrando las asignaciones del trabajador", async () => {

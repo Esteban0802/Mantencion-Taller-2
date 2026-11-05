@@ -6,11 +6,11 @@
   <script src="js/sidebar-preload.js?v=20261018-6"></script>
   <title>Taller | Vectaria</title>
   <link rel="icon" type="image/png" href="img/vectaria-favicon-official.png?v=3">
-  <link rel="stylesheet" href="css/styles.css?v=20261018-8">
+  <link rel="stylesheet" href="css/styles.css?v=20261104-1">
   <link rel="stylesheet" href="css/brand-overtrack.css">
   <link rel="stylesheet" href="css/brand-overtrack-light.css">
   <link rel="stylesheet" href="css/notificaciones.css?v=20261007-1">
-    <link rel="stylesheet" href="css/desktop-density.css?v=20261004-7">
+    <link rel="stylesheet" href="css/desktop-density.css?v=20261104-1">
   <link rel="stylesheet" href="css/mobile-normalized.css?v=20261018-4">
   <link rel="stylesheet" href="css/dashboard-planificacion.css?v=20261101-6">
 </head>
@@ -135,7 +135,7 @@
   <input 
     type="text" 
     id="inputBuscar" 
-    placeholder="Buscar por OT, equipo o serie..."
+    placeholder="Buscar OT abiertas por número, equipo o serie..."
     onkeyup="filtrarOTs()"
   >
 </div>
@@ -209,6 +209,7 @@
   <div class="chart-card">
     <h3><svg class="ot-icon section-icon" aria-hidden="true"><use href="img/icons-overtrack.svg#clipboard"></use></svg>Estado de Órdenes</h3>
     <canvas id="graficoEstados"></canvas>
+    <p id="avisoTotalCerradas" class="sin-alertas" hidden>El total de órdenes cerradas no está disponible todavía.</p>
   </div>
 
   <div class="chart-card">
@@ -342,6 +343,6 @@
 
 <script src="js/components/notificaciones.js?v=20261022-3"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.min.js"></script>
-<script type="module" src="js/dashboard.js?v=20261101-7"></script>
+<script type="module" src="js/dashboard.js?v=20261104-3"></script>
 </body>
 </html>

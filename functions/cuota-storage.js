@@ -36,12 +36,13 @@ async function reservarCuota({ db, empresaId, ruta, bytes, uid, hash }) {
   });
   return id;
 }
-async function actualizarReserva({ db, empresaId, id, eliminar = false }) {
+async function actualizarReserva({ db, empresaId, id, eliminar = false, soloPendiente = false }) {
   const refs = referencias(db, empresaId, id);
   await db.runTransaction(async tx => {
     const [empresa, reserva] = await Promise.all([tx.get(refs.empresa), tx.get(refs.reserva)]);
     if (!empresa.exists || !reserva.exists) return;
     const datos = empresa.data(), carga = reserva.data();
+    if (soloPendiente && carga.estado !== "reservada") return;
     if (carga.estado === "eliminada" || (!eliminar && carga.estado === "confirmada")) return;
     const bytes = Number(carga.bytes || 0);
     const pendiente = carga.estado === "reservada";
@@ -54,7 +55,7 @@ async function actualizarReserva({ db, empresaId, id, eliminar = false }) {
     tx.update(refs.reserva, { estado: eliminar ? "eliminada" : "confirmada", actualizadaEn: Date.now() });
   });
 }
-async function subirConCuota({ db, bucket, empresaId, ruta, bytes, uid, hash, contentType, verificar }) {
+async function subirConCuota({ db, bucket, empresaId, ruta, bytes, uid, hash, contentType, verificar, cacheControl }) {
   const archivo = bucket.file(ruta);
   const id = await reservarCuota({ db, empresaId, ruta, bytes: bytes.length, uid, hash });
   const metadata = { creadoPorUid: uid, sha256: hash, cuotaEmpresaId: empresaId, cuotaReservaId: id, firebaseStorageDownloadTokens: crypto.randomUUID() };
@@ -62,7 +63,8 @@ async function subirConCuota({ db, bucket, empresaId, ruta, bytes, uid, hash, co
   try {
     await verificar();
     try {
-      await archivo.save(bytes, { resumable: false, preconditionOpts: { ifGenerationMatch: 0 }, metadata: { contentType, metadata } });
+      await archivo.save(bytes, { resumable: false, preconditionOpts: { ifGenerationMatch: 0 },
+        metadata: { contentType, ...(cacheControl ? { cacheControl } : {}), metadata } });
       creado = true;
     } catch (e) { if (Number(e.code) !== 412) throw e; }
     const [actual] = await archivo.getMetadata();

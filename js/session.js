@@ -33,6 +33,20 @@ let cierreEnCurso = false;
 let ultimaActividadLocal = 0;
 let ultimaSincronizacionActividad = 0;
 let intervaloInactividad = null;
+const lecturasEmpresaEnCurso = new Map();
+
+// Solo comparte peticiones simultáneas: el resultado no queda almacenado.
+export function leerEmpresaInicial(empresaId) {
+  const clave = JSON.stringify([auth.currentUser?.uid || "", empresaId]);
+  if (lecturasEmpresaEnCurso.has(clave)) return lecturasEmpresaEnCurso.get(clave);
+  const lectura = getDoc(doc(db, "empresas", empresaId));
+  lecturasEmpresaEnCurso.set(clave, lectura);
+  const retirar = () => {
+    if (lecturasEmpresaEnCurso.get(clave) === lectura) lecturasEmpresaEnCurso.delete(clave);
+  };
+  lectura.then(retirar, retirar);
+  return lectura;
+}
 
 
 export function obtenerUsuarioActivo() {
@@ -53,6 +67,7 @@ export function obtenerUsuarioActivo() {
 
 
 function limpiarSesionLocal() {
+  lecturasEmpresaEnCurso.clear();
   localStorage.removeItem("usuarioActivo");
   localStorage.removeItem("otActiva");
   localStorage.removeItem(CLAVE_ULTIMA_ACTIVIDAD);
@@ -298,7 +313,7 @@ function empresaEnPeriodoDeSalida(empresa = {}) {
 
 async function aplicarRestriccionCancelacion(usuario) {
   if (!usuario.empresaId || usuario.rol === "super_admin") return false;
-  const empresaSnap = await getDoc(doc(db, "empresas", usuario.empresaId));
+  const empresaSnap = await leerEmpresaInicial(usuario.empresaId);
   if (!empresaSnap.exists() || !empresaEnPeriodoDeSalida(empresaSnap.data())) return false;
 
   if (usuario.rol !== "admin_empresa") {

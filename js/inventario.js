@@ -1,11 +1,12 @@
 import { urlSegura } from "./html-seguro.js";
 import { uploadBytes, deleteObject } from "./storage-seguro.js";
 import { db, storage } from "./firebase-config.js";
-import { protegerPagina, cerrarSesion } from "./session.js?v=20261017-1";
+import { protegerPagina, cerrarSesion, leerEmpresaInicial } from "./session.js?v=20261104-1";
 import { moduloActivo } from "./modulos.js?v=20261018-2";
 import { evaluarCuotaStorage, mensajeCuotaStorage } from "./storage-quota.js";
 import { optimizarFotoParaCarga } from "./modulos/core/imagenes.js";
 import { validarFirmaArchivo } from "./file-validation.js";
+import { cargarExcel } from "./cargar-excel.js";
 import {
   addDoc, collection, deleteDoc, deleteField, doc, getDoc, getDocs,
   getCountFromServer, limit, orderBy, query, serverTimestamp, setDoc,
@@ -116,7 +117,7 @@ async function cargarEmpresa() {
     ? sessionStorage.getItem("empresaIdOperacionAdmin") || ""
     : usuario.empresaId || "";
   if (!empresaId) throw new Error("No se encontró la empresa activa.");
-  const snap = await getDoc(doc(db, "empresas", empresaId));
+  const snap = await leerEmpresaInicial(empresaId);
   if (!snap.exists()) throw new Error("La empresa ya no existe.");
   empresa = { id: snap.id, ...snap.data() };
   if (!moduloActivo(empresa, "inventario")) {
@@ -481,6 +482,7 @@ async function subirEvidencias(fila, archivosSeleccionados) {
 async function importarExcel(archivo) {
   if (!sucursalId) return mensaje({ titulo: "Sucursal requerida", texto: "Selecciona una sucursal antes de importar el inventario.", tipo: "advertencia" });
   if (!/\.xlsx?$/i.test(archivo?.name || "") || archivo.size > 5 * 1024 * 1024) throw new Error("Selecciona un archivo Excel válido de máximo 5 MB.");
+  const XLSX = await cargarExcel();
   const buffer = await archivo.arrayBuffer();
   const workbook = XLSX.read(buffer, { type: "array" });
   if (!workbook.SheetNames.length) throw new Error("El archivo Excel no contiene hojas.");
@@ -751,6 +753,7 @@ function filtrarInventario() {
 async function exportarInventario() {
   await asegurarInventarioCompleto();
   if (!items.length) return mensaje({ titulo: "Inventario vacío", texto: "No existen registros para exportar.", tipo: "advertencia" });
+  const XLSX = await cargarExcel();
   const datos = items.map(item => Object.fromEntries(columnas.map(c => [c, item.datos?.[c] ?? ""])));
   const hoja = XLSX.utils.json_to_sheet(datos, { header: columnas });
   const libro = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(libro, hoja, "Inventario");

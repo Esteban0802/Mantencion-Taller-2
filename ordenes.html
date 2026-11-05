@@ -6,13 +6,14 @@
   <script src="js/sidebar-preload.js?v=20261018-6"></script>
   <title>Órdenes de Trabajo | Vectaria</title>
   <link rel="icon" type="image/png" href="img/vectaria-favicon-official.png?v=3">
-  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/styles.css?v=20261104-1">
   <link rel="stylesheet" href="css/papelera-ot.css?v=20261101-2">
   <link rel="stylesheet" href="css/brand-overtrack.css">
   <link rel="stylesheet" href="css/brand-overtrack-light.css">
-  <link rel="stylesheet" href="css/desktop-density.css?v=20261004-7">
+  <link rel="stylesheet" href="css/desktop-density.css?v=20261104-1">
   <link rel="stylesheet" href="css/notificaciones.css?v=20261007-1">
   <link rel="stylesheet" href="css/mobile-normalized.css?v=20261018-4">
+  <link rel="stylesheet" href="css/ordenes-consulta.css?v=20261104-1">
 </head>
 <body class="dashboard-overtrack ordenes-page">
 <div class="app">
@@ -71,6 +72,7 @@
       <div class="ordenes-filtros" role="search">
         <label class="sr-only" for="buscarOrdenes">Buscar órdenes</label>
         <input id="buscarOrdenes" type="search" placeholder="Buscar por OT, equipo, serie o cliente...">
+        <button id="btnBuscarOrdenes" type="button" class="btn-card-open">Buscar</button>
         <label class="sr-only" for="estadoOrdenes">Estado</label>
         <select id="estadoOrdenes">
           <option value="todas">Todas</option>
@@ -91,6 +93,6 @@
   </main>
 </div>
 <script src="js/components/notificaciones.js?v=20261022-3"></script>
-<script type="module" src="js/ordenes.js?v=20261101-3"></script>
+  <script type="module" src="js/ordenes.js?v=20261104-3"></script>
 </body>
 </html>

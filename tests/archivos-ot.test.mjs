@@ -44,6 +44,38 @@ test("carga y elimina archivos propios conservando la autoría verificada", asyn
   }
 });
 
+test("las fotos nuevas de OT permiten caché privada de una hora sin cambiar cuota, autoría ni reintentos", async () => {
+  for (const [contentType, nombre, bytes] of [
+    ["image/jpeg", "foto.jpg", Buffer.from([255,216,255])],
+    ["image/png", "foto.png", Buffer.from([137,80,78,71,13,10,26,10])]
+  ]) {
+    const e=entorno();
+    e.datos={...e.datos,contentType,nombre,base64:bytes.toString("base64"),cacheControl:"public, max-age=999999"};
+    const resultado=await subirArchivoOT(e);
+    const metadata=[...e.archivos.values()][0];
+    assert.equal(metadata.cacheControl,"private, max-age=3600");
+    assert.equal(metadata.metadata.creadoPorUid,"yo");
+    assert.equal(metadata.size,bytes.length);
+    assert.equal(e.empresa.storageUsadoBytes,bytes.length);
+    assert.equal(e.empresa.storageReservadoBytes,0);
+    assert.deepEqual(await subirArchivoOT(e),resultado);
+    assert.deepEqual(e.cambios,["subir"]);
+  }
+});
+
+test("los PDF no reciben caché de fotos y un reintento no modifica archivos existentes",async()=>{
+  const e=entorno();
+  e.datos={...e.datos,nombre:"manual.pdf",contentType:"application/pdf",base64:Buffer.from("%PDF-1.7").toString("base64"),cacheControl:"public, max-age=999999"};
+  const pdf=await subirArchivoOT(e);
+  assert.equal([...e.archivos.values()][0].cacheControl,undefined);
+  assert.deepEqual(await subirArchivoOT(e),pdf);
+  const foto=entorno();await subirArchivoOT(foto);
+  [...foto.archivos.values()][0].cacheControl="private, max-age=0";
+  await subirArchivoOT(foto);
+  assert.equal([...foto.archivos.values()][0].cacheControl,"private, max-age=0");
+  assert.deepEqual(foto.cambios,["subir"]);
+});
+
 for (const estado of ["cancelacion_solicitada", "periodo_exportacion", "pendiente_eliminacion", "cancelada"]) {
   test(`${estado}: bloquea nuevas cargas y eliminaciones incluso con activa=true`, async () => {
     const e = entorno();

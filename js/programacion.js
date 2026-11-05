@@ -1,5 +1,5 @@
 import { app, auth, db } from "./firebase-config.js";
-import { protegerPagina, cerrarSesion } from "./session.js?v=20261017-1";
+import { protegerPagina, cerrarSesion, leerEmpresaInicial } from "./session.js?v=20261104-1";
 import { moduloActivo } from "./modulos.js?v=20261018-2";
 import {
   etiquetaRolProgramacion,
@@ -173,7 +173,7 @@ async function cargarEmpresa() {
 
   if (!empresaId) throw new Error("No se encontró la empresa asociada.");
 
-  const snap = await getDoc(doc(db, "empresas", empresaId));
+  const snap = await leerEmpresaInicial(empresaId);
   if (!snap.exists()) throw new Error("La empresa no existe.");
 
   empresa = { id: snap.id, ...snap.data() };
@@ -207,7 +207,6 @@ async function cargarUsuariosYSucursales() {
       .sort((a, b) => nombreUsuario(a).localeCompare(nombreUsuario(b), "es"));
   }
 
-  actualizarSelectoresAsignacion();
 }
 
 function opcionUsuario(item, seleccionado = false, noDisponible = false, deshabilitado = false) {
@@ -500,12 +499,13 @@ function actualizarAlertaSheqTrabajador() {
   contenedor.hidden = false;
 }
 
-async function cargarSemana() {
+async function cargarSemana({ datosPrevios = null } = {}) {
   mostrarMensaje("Cargando programación...");
   const inicio = fechaISO(semanaInicio);
   const fin = fechaISO(sumarDias(semanaInicio, 6));
 
   let semanaGuardada = null;
+  let asignacionesConsultadas = null;
   if (ES_TRABAJADOR_CON_SEMANA_PERSONAL) {
     // Una consulta autorizada puede estar vacía para un usuario nuevo.
     // No consultar borradores como alternativa a un rechazo de permisos.
@@ -518,9 +518,26 @@ async function cargarSemana() {
       limit(1)
     ));
     semanaGuardada = publicaciones.docs[0]?.data() || null;
+  } else if (PUEDE_VER_BORRADORES) {
+    const [semanaSnap, asignacionesSnap] = await Promise.all([
+      getDocs(query(collection(db, "programacionSemanas"),
+        where("empresaId", "==", empresaId), where("semanaInicio", "==", inicio), limit(1))),
+      getDocs(query(collection(db, "programaciones"), where("empresaId", "==", empresaId))),
+      cargarConfirmacionesSemana(inicio)
+    ]);
+    semanaGuardada = semanaSnap.docs[0]?.data() || null;
+    asignacionesConsultadas = asignacionesSnap.docs.map(item => ({ id: item.id, ...item.data() }));
   } else {
-    const semanaSnap = await getDoc(doc(db, "programacionSemanas", `${empresaId}_${inicio}`));
-    semanaGuardada = semanaSnap.exists() ? semanaSnap.data() : null;
+    const semanaSnap = await getDocs(query(collection(db, "programacionSemanas"),
+      where("empresaId", "==", empresaId), where("semanaInicio", "==", inicio),
+      where("estado", "==", "publicada"), limit(1)));
+    semanaGuardada = semanaSnap.docs[0]?.data() || null;
+  }
+  if (datosPrevios) {
+    const cargas = await datosPrevios;
+    const fallida = cargas.find(carga => carga.status === "rejected");
+    if (fallida) throw fallida.reason;
+    actualizarSelectoresAsignacion();
   }
   estadoSemanaActual = semanaGuardada?.estado || "borrador";
   turnosEmergenciaSemana = new Set(
@@ -550,8 +567,7 @@ async function cargarSemana() {
   }
 
   if (PUEDE_VER_BORRADORES) {
-    const asignacionesSnap = await getDocs(query(collection(db, "programaciones"), where("empresaId", "==", empresaId)));
-    asignacionesEmpresa = asignacionesSnap.docs.map(item => ({ id: item.id, ...item.data() }));
+    asignacionesEmpresa = asignacionesConsultadas;
   } else {
     asignacionesEmpresa = Array.isArray(semanaGuardada?.asignaciones)
       ? semanaGuardada.asignaciones
@@ -559,7 +575,7 @@ async function cargarSemana() {
   }
   asignacionesEmpresa.sort((a, b) => `${a.fecha}_${a.cliente || ""}`.localeCompare(`${b.fecha}_${b.cliente || ""}`));
   asignacionesSemana = asignacionesEmpresa.filter(item => item.fecha >= inicio && item.fecha <= fin);
-  await cargarConfirmacionesSemana(inicio);
+  if (!PUEDE_VER_BORRADORES) await cargarConfirmacionesSemana(inicio);
   renderCuadro();
 }
 
@@ -1487,10 +1503,13 @@ async function iniciar() {
     if (!auth.currentUser) throw new Error("Firebase todavía no reconoce la sesión. Vuelve a iniciar sesión.");
     if (!await cargarEmpresa()) return;
     actualizarNavegacionProgramacion();
-    await cargarUsuariosYSucursales();
-    await cargarDocumentosSheq();
-    await cargarDatosOperativosProgramacion();
-    await cargarSemana();
+    const cargas = Promise.allSettled([
+      cargarUsuariosYSucursales(),
+      cargarDocumentosSheq(),
+      cargarDatosOperativosProgramacion()
+    ]);
+    const [semana] = await Promise.allSettled([cargarSemana({ datosPrevios: cargas }), cargas]);
+    if (semana.status === "rejected") throw semana.reason;
   } catch (error) {
     console.error("Error iniciando Programación semanal:", error);
     const detalle = error?.code === "permission-denied"

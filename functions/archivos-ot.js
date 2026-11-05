@@ -101,6 +101,7 @@ async function subirArchivoOT({ db, bucket, usuario, datos }) {
   let metadata = await metadataOpcional(archivo);
   if (!metadata) {
     metadata = await subirConCuota({ db, bucket, empresaId, ruta, bytes, uid: usuario.uid, hash,
+      cacheControl: datos.contentType.startsWith("image/") ? "private, max-age=3600" : undefined,
       contentType: datos.contentType, verificar: async () => {
         const { orden: vigente } = await exigirContextoArchivo({ db, usuario, otId: datos.otId });
         exigirActividadLibre(vigente, datos.etapa, datos.itemIndex);

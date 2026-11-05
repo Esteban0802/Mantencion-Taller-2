@@ -2,7 +2,7 @@ import { puedeEliminarArchivoStorage, protegerBotonEliminarEvidencia } from "./c
 // ==========================================
 // MÓDULO DESPACHO — OVERTRACK
 // ==========================================
-import { reautenticarAccionCritica } from "../session.js?v=20261017-1";
+import { reautenticarAccionCritica } from "../session.js?v=20261104-1";
 
 export function inicializarModuloDespacho(servicios) {
   let cierreEnCurso = false;

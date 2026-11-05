@@ -3,6 +3,7 @@ import { getOT } from "../contexto.js";
 import { evaluarCuotaStorage, mensajeCuotaStorage } from "../../storage-quota.js";
 import { medirAsync } from "./rendimiento.js";
 import { validarFirmaArchivo } from "../../file-validation.js";
+import { optimizarFotoParaCarga } from "./imagenes.js";
 import { puedeEliminarArchivoStorage } from "./autoriaEvidencias.js";
 
 import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-functions.js";
@@ -197,7 +198,7 @@ async function subirArchivoStorageInterno(file, etapa, itemIndex) {
         throw new Error("No se recibió ningún archivo");
     }
 
-    const contentType = tipoContenidoArchivo(file);
+    let contentType = tipoContenidoArchivo(file);
     if (!contentType) {
         throw new Error("No fue posible identificar el tipo del archivo seleccionado.");
     }
@@ -208,6 +209,17 @@ async function subirArchivoStorageInterno(file, etapa, itemIndex) {
         throw new Error("El archivo supera el máximo permitido de 20 MB.");
     }
     await validarFirmaArchivo(file, contentType);
+
+    // El flujo anterior prepara sus fotos en cada etapa; el flujo dinámico lo hace aquí.
+    if (String(etapa).startsWith("personalizada_")) {
+        const foto = contentType.startsWith("image/") && file.type !== contentType
+            ? new File([file], file.name, { type: contentType, lastModified: file.lastModified })
+            : file;
+        const resultado = await optimizarFotoParaCarga(foto);
+        file = resultado.archivo;
+        contentType = tipoContenidoArchivo(file);
+        await validarFirmaArchivo(file, contentType);
+    }
 
     const contextoCarga = await validarContextoCarga(otId, file);
     await validarCuotaAntesDeSubir(file, otId, contextoCarga);

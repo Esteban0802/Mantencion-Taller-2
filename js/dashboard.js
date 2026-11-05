@@ -1,6 +1,6 @@
 import { esFlujoLibre, progresoLibre } from "./flujo-libre-modelo.js?v=20261101-1";
 import { escaparHtml } from "./html-seguro.js";
-import { protegerPagina, cerrarSesion } from "./session.js?v=20261017-1";
+import { protegerPagina, cerrarSesion, leerEmpresaInicial } from "./session.js?v=20261104-1";
 
 import {
   obtenerModulosEmpresa,
@@ -32,7 +32,6 @@ const usuario = protegerPagina([
 if (!usuario) throw new Error("Acceso no autorizado");
 
 import { db } from "./firebase-config.js";
-import { asegurarResumenesOT } from "./modulos/core/resumenOT.js";
 
 import {
   collection,
@@ -40,8 +39,7 @@ import {
   where,
   orderBy,
   onSnapshot,
-  doc,
-  getDoc
+  getCountFromServer
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 let listaOTs = [];
@@ -49,6 +47,9 @@ let listaFiltrada = [];
 let empresaActualDashboard = null;
 let modulosDashboard = {};
 let cancelarEscuchaOTs = null;
+let consultaCerradasDashboard = null;
+let cantidadCerradasDashboard = null;
+let versionConteoDashboard = 0;
 let cancelarEscuchaInventarioAlertas = null;
 let inventarioAlertasCargado = false;
 let inventarioPorOSDashboard = new Map();
@@ -136,7 +137,7 @@ function calcularProgreso(ot) {
 // =======================
 // CARGAR TODAS LAS OT
 // =======================
-window.onload = async () => {
+async function iniciarDashboard() {
   renderUsuarioActivo();
 
   const btnPanelEmpresa =
@@ -182,7 +183,7 @@ window.onload = async () => {
     mostrarDashboardSinOrdenes();
     window.OverTrackUI?.finalizarCargaPagina?.();
   }
-};
+}
 
 function normalizarClaveOS(valor = "") {
   return String(valor).trim().toLocaleLowerCase("es");
@@ -254,13 +255,7 @@ async function cargarConfiguracionEmpresaDashboard() {
         return false;
       }
 
-      const empresaRef = doc(
-        db,
-        "empresas",
-        empresaIdOperacion
-      );
-
-      const empresaSnap = await getDoc(empresaRef);
+      const empresaSnap = await leerEmpresaInicial(empresaIdOperacion);
 
       if (!empresaSnap.exists()) {
         sessionStorage.removeItem("empresaIdOperacionAdmin");
@@ -292,13 +287,7 @@ async function cargarConfiguracionEmpresaDashboard() {
       return false;
     }
 
-    const empresaRef = doc(
-      db,
-      "empresas",
-      usuario.empresaId
-    );
-
-    const empresaSnap = await getDoc(empresaRef);
+    const empresaSnap = await leerEmpresaInicial(usuario.empresaId);
 
     if (!empresaSnap.exists()) {
       await notificarDashboard("No se encontró la empresa asociada al usuario.", "Empresa no disponible", "error");
@@ -691,29 +680,25 @@ async function escucharOTsTiempoReal() {
     console.log("Dashboard empresa:", usuarioActivo.empresaId);
   }
 
-  let coleccionListado = "otsResumen";
-  try {
-    await asegurarResumenesOT(restricciones);
-  } catch (error) {
-    console.warn("No fue posible preparar los resúmenes de OT; se usará la colección completa.", error);
-    coleccionListado = "ots";
-  }
-
+  cancelarEscuchaOTs?.();
+  consultaCerradasDashboard = query(collection(db,"otsResumen"), ...restricciones, where("cerrada","==",true));
   const q = query(
-    collection(db, coleccionListado),
+    collection(db, "otsResumen"),
     ...restricciones,
+    where("cerrada", "==", false),
     orderBy("fechaCreacion", "desc")
   );
 
-  onSnapshot(q, (snapshot) => {
+  let primeraCarga = true;
+  cancelarEscuchaOTs = onSnapshot(q, (snapshot) => {
     listaOTs = snapshot.docs.map(docSnap => ({
       id: docSnap.id,
       ...docSnap.data()
     }));
 
-    listaFiltrada = [...listaOTs];
-
-    renderizarDashboardOperacional(listaFiltrada);
+    filtrarOTs();
+    if (primeraCarga || snapshot.docChanges().some(c=>c.type!=="modified")) actualizarConteoCerradasDashboard();
+    primeraCarga = false;
     window.OverTrackUI?.finalizarCargaPagina?.();
 
   }, (error) => {
@@ -722,6 +707,34 @@ async function escucharOTsTiempoReal() {
     window.OverTrackUI?.finalizarCargaPagina?.();
   });
 }
+
+async function actualizarConteoCerradasDashboard() {
+  if (!consultaCerradasDashboard) return;
+  const version = ++versionConteoDashboard;
+  try {
+    const conteo = await getCountFromServer(consultaCerradasDashboard);
+    if (version !== versionConteoDashboard) return;
+    cantidadCerradasDashboard = conteo.data().count;
+  } catch (error) {
+    if (version !== versionConteoDashboard) return;
+    cantidadCerradasDashboard = null;
+    console.warn("No fue posible actualizar el total de OT cerradas:", error);
+  }
+  renderizarDashboardOperacional(listaFiltrada);
+}
+
+window.addEventListener("focus", actualizarConteoCerradasDashboard);
+window.addEventListener("pagehide", () => {
+  versionConteoDashboard++;
+  cancelarEscuchaOTs?.();
+  cancelarEscuchaInventarioAlertas?.();
+});
+window.addEventListener("pageshow", evento => {
+  if (evento.persisted && empresaActualDashboard) {
+    iniciarInventarioAlertasTiempoReal();
+    escucharOTsTiempoReal();
+  }
+});
 
 
 
@@ -1191,26 +1204,16 @@ function animarNumero(id, valorFinal) {
 // KPI
 // =======================
 function calcularKPIs(lista = listaOTs) {
-  let total = lista.length;
-  let proceso = 0;
-  let cerradas = 0;
-
-  lista.forEach(ot => {
-    const estado = obtenerEstadoOT(ot);
-
-    if (estado === "CERRADA") {
-      cerradas++;
-    } else {
-      proceso++;
-    }
-  });
-
-  const atrasadas = lista.filter(o => estaOTAtrasada(o)).length;
-
-  animarNumero("kpiTotal", total);
-  animarNumero("kpiProceso", proceso);
-  animarNumero("kpiAtrasadas", atrasadas);
-  animarNumero("kpiCerradas", cerradas);
+  const total = listaOTs.length + (cantidadCerradasDashboard || 0);
+  animarNumero("kpiProceso", listaOTs.filter(o=>obtenerEstadoOT(o)!=="CERRADA").length);
+  animarNumero("kpiAtrasadas", listaOTs.filter(o=>estaOTAtrasada(o)).length);
+  if (cantidadCerradasDashboard === null) {
+    document.getElementById("kpiTotal").textContent = "—";
+    document.getElementById("kpiCerradas").textContent = "—";
+  } else {
+    animarNumero("kpiTotal", total);
+    animarNumero("kpiCerradas", cantidadCerradasDashboard);
+  }
 }
 
 function renderEstadoTaller(lista = listaOTs) {
@@ -1937,6 +1940,10 @@ function destruirGraficosDashboard() {
 
 
 function renderGraficos(lista = listaOTs) {
+  const canvasEstados = document.getElementById("graficoEstados");
+  const avisoCerradas = document.getElementById("avisoTotalCerradas");
+  if (canvasEstados) canvasEstados.hidden = cantidadCerradasDashboard === null;
+  if (avisoCerradas) avisoCerradas.hidden = cantidadCerradasDashboard !== null;
 
   const estadosGraficos = [
     ...(lista.some(ot=>!esFlujoLibre(ot)) ? obtenerEtapasDashboardActivas() : []),
@@ -1946,6 +1953,7 @@ function renderGraficos(lista = listaOTs) {
   const estadosCount = Object.fromEntries(
     estadosGraficos.map(etapa => [etapa.key, 0])
   );
+  estadosCount.CERRADA = cantidadCerradasDashboard || 0;
 
   lista.forEach(ot => {
 
@@ -2050,17 +2058,7 @@ chartEstados = new Chart(document.getElementById("graficoEstados"), {
   });
 }
 
-window.addEventListener("storage", () => {
-  const data = localStorage.getItem("ots");
-  if (data) {
-    listaOTs = JSON.parse(data);
-    listaFiltrada = [...listaOTs];
-
-    renderTabla(listaFiltrada);
-    calcularKPIs(listaFiltrada);
-    renderGraficos(listaFiltrada);
-  }
-});
+window.addEventListener("storage", actualizarConteoCerradasDashboard);
 
 function renderUsuarioActivo() {
   const usuarioActivo = JSON.parse(localStorage.getItem("usuarioActivo"));
@@ -2227,3 +2225,8 @@ function configurarMenuMovilDashboard() {
 }
 
 document.addEventListener("DOMContentLoaded", configurarMenuMovilDashboard);
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", iniciarDashboard, { once: true });
+} else {
+  iniciarDashboard();
+}

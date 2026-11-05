@@ -1,0 +1,23 @@
+.ordenes-page .ordenes-filtros {
+  grid-template-columns: minmax(200px, 1fr) auto minmax(130px, 190px);
+  align-items: center;
+}
+
+.ordenes-page #btnBuscarOrdenes {
+  min-height: 40px;
+  padding: 10px 20px;
+  border: 0;
+  border-radius: 12px;
+  color: #fff;
+  background: #087ce5;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.ordenes-page #btnBuscarOrdenes:focus-visible { outline: 3px solid #79baff; outline-offset: 3px; }
+
+@media (max-width: 700px) {
+  .ordenes-page .ordenes-filtros { grid-template-columns: minmax(0, 1fr) auto; }
+  .ordenes-page #estadoOrdenes { grid-column: 1 / -1; }
+}

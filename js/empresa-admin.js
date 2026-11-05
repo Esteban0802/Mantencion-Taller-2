@@ -4,10 +4,10 @@ import { renderIndicadorAlmacenamiento } from "./storage-indicador.js";
 import { conectarDesgloseAlmacenamiento } from "./almacenamiento-sucursales.js?v=20261031-1";
 import { renderConfiguracionSucursal } from "./empresa/configuracion-sucursal.js?v=20261102-1";
 import { uploadBytes, deleteObject } from "./storage-seguro.js";
-import { renderVistaUsuariosEmpresa } from "./empresa/usuarios.js?v=20261029-1";
+import { renderVistaUsuariosEmpresa } from "./empresa/usuarios.js?v=20261104-1";
 import { renderVistaSucursalesEmpresa } from "./empresa/sucursales.js?v=20261028-1";
 import { app, db } from "./firebase-config.js";
-import { protegerPagina, cerrarSesion, reautenticarAccionCritica } from "./session.js?v=20261017-1";
+import { protegerPagina, cerrarSesion, reautenticarAccionCritica, leerEmpresaInicial } from "./session.js?v=20261104-1";
 import { aplicarModulosEnInterfaz, moduloActivo, obtenerModulosEmpresa} from "./modulos.js?v=20261018-2";
 import { evaluarCuotaStorage, mensajeCuotaStorage } from "./storage-quota.js";
 import { validarFirmaArchivo } from "./file-validation.js";
@@ -150,7 +150,7 @@ async function cargarEmpresa() {
 
   try {
     const refEmpresa = doc(db, "empresas", empresaIdActual);
-    const snap = await getDoc(refEmpresa);
+    const snap = await leerEmpresaInicial(empresaIdActual);
 
     if (!snap.exists()) {
       await alert("La empresa no existe");
@@ -176,6 +176,12 @@ async function cargarEmpresa() {
       const datos = snapshot.data();
       for (const clave of ["maxStorageGB", "storageUsadoBytes", "storageReservadoBytes", "storageArchivos", "storageCuotaVersion", "storageActualizadoEnMs"]) empresaActual[clave] = datos[clave];
       document.querySelectorAll("[data-visor-almacenamiento]").forEach(elemento => { elemento.outerHTML = renderIndicadorAlmacenamiento(empresaActual); });
+      document.querySelectorAll('[data-storage-resumen="usado"]').forEach(elemento => {
+        elemento.textContent = empresaActual.storageCuotaVersion === 1 ? formatearAlmacenamiento(empresaActual.storageUsadoBytes) : "Pendiente de medir";
+      });
+      document.querySelectorAll('[data-storage-resumen="archivos"]').forEach(elemento => {
+        elemento.textContent = String(Number(empresaActual.storageArchivos || 0));
+      });
     }, error => console.warn("No fue posible actualizar el visor de almacenamiento:", error.code));
 
   } catch (error) {
@@ -1216,8 +1222,8 @@ function renderVistaConfiguracionEmpresa() {
           <div><span>Usuarios</span><strong>${escaparHtml(empresaActual.maxUsuarios || "-")}</strong></div>
           <div><span>Sucursales</span><strong>${escaparHtml(empresaActual.maxSucursales || "-")}</strong></div>
           <div><span>Storage contratado</span><strong>${escaparHtml(empresaActual.maxStorageGB || "-")} GB</strong></div>
-          <div><span>Storage utilizado</span><strong>${empresaActual.storageCuotaVersion === 1 ? formatearAlmacenamiento(storageUsadoBytes) : "Pendiente de medir"}</strong></div>
-          <div><span>Archivos</span><strong>${Number(empresaActual.storageArchivos || 0)}</strong></div>
+          <div><span>Storage utilizado</span><strong data-storage-resumen="usado">${empresaActual.storageCuotaVersion === 1 ? formatearAlmacenamiento(storageUsadoBytes) : "Pendiente de medir"}</strong></div>
+          <div><span>Archivos</span><strong data-storage-resumen="archivos">${Number(empresaActual.storageArchivos || 0)}</strong></div>
         </div>
         ${renderIndicadorAlmacenamiento(empresaActual)}
         ${editable && empresaActual.storageCuotaVersion !== 1 ? `<button type="button" class="btn-secondary" id="btnRecalcularStorage">Medir uso real y habilitar cargas</button>` : ""}

@@ -30,7 +30,9 @@ test("el Planificador conserva Inventario y SHEQ al navegar entre módulos", asy
   ]);
 
   assert.match(preload, /planificador:\s*\[[^\]]*"inventario"[^\]]*"sheq"[^\]]*"programacion"/);
-  assert.match(programacionJs, /actualizarNavegacionProgramacion\(\);\s*\n\s*await cargarUsuariosYSucursales/);
+  const inicioProgramacion = programacionJs.slice(programacionJs.lastIndexOf("async function iniciar()"));
+  assert.ok(inicioProgramacion.indexOf("actualizarNavegacionProgramacion();") >= 0);
+  assert.ok(inicioProgramacion.indexOf("actualizarNavegacionProgramacion();") < inicioProgramacion.indexOf("cargarUsuariosYSucursales()"));
   assert.match(programacionJs, /menuSheqProgramacion[\s\S]*?"planificador"/);
   assert.match(programacionJs, /menuInventarioProgramacion[\s\S]*?"planificador"/);
   assert.match(inventarioJs, /puedeEditar\s*=\s*\[[^\]]*"jefe_taller"[^\]]*"planificador"/);

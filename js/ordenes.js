@@ -1,7 +1,7 @@
-import { protegerPagina, cerrarSesion, reautenticarAccionCritica } from "./session.js?v=20261017-1";
+import { protegerPagina, cerrarSesion, reautenticarAccionCritica, leerEmpresaInicial } from "./session.js?v=20261104-1";
 import { db } from "./firebase-config.js";
 import { obtenerModulosEmpresa, moduloActivo } from "./modulos.js?v=20261018-2";
-import { asegurarResumenesOT } from "./modulos/core/resumenOT.js";
+import { coincideTextoOT, crearBusquedaOT } from "./ordenes-consulta.js";
 import { puedeVerOrdenesServicio, puedeCrearOT, puedeAbrirOT, puedeEntrarPanelEmpresa } from "./permisos.js?v=20261029-1";
 import {
   collection,
@@ -13,7 +13,8 @@ import {
   getDoc,
   getDocs,
   limit,
-  startAfter
+  startAfter,
+  getCountFromServer
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-functions.js";
@@ -29,6 +30,16 @@ let empresaActual = null;
 let listaOrdenes = [];
 let listaVisible = [];
 let pagina = 1;
+let restriccionesOrdenes = [];
+let cancelarEscuchaOrdenes = null;
+let cursoresOrdenes = [null];
+let hayMasOrdenes = false;
+let totalOrdenes = null;
+let textoAplicado = "";
+let busquedaOrdenes = null;
+let versionOrdenes = 0;
+let cargandoOrdenes = false;
+let consultaConteoOrdenes = null;
 
 function textoSeguro(valor = "") {
   return String(valor).replace(/[&<>'"]/g, caracter => ({
@@ -86,7 +97,7 @@ async function cargarEmpresa() {
     return false;
   }
 
-  const empresaSnap = await getDoc(doc(db, "empresas", empresaId));
+  const empresaSnap = await leerEmpresaInicial(empresaId);
   if (!empresaSnap.exists()) {
     alert("La empresa seleccionada ya no existe.");
     return false;
@@ -105,29 +116,14 @@ async function cargarEmpresa() {
 }
 
 function aplicarFiltros() {
-  const texto = document.getElementById("buscarOrdenes").value.trim().toLowerCase();
-  const estado = document.getElementById("estadoOrdenes").value;
-
-  listaVisible = listaOrdenes.filter(ot => {
-    const coincideTexto = [ot.os, ot.equipo, ot.serie, ot.cliente]
-      .some(valor => String(valor || "").toLowerCase().includes(texto));
-    const coincideEstado = estado === "todas"
-      || (estado === "activas" && !estaCerrada(ot))
-      || (estado === "atrasadas" && estaAtrasada(ot))
-      || (estado === "cerradas" && estaCerrada(ot));
-    return coincideTexto && coincideEstado;
-  });
-
-  const paginas = Math.max(1, Math.ceil(listaVisible.length / POR_PAGINA));
-  pagina = Math.min(pagina, paginas);
-  renderizar();
+  textoAplicado = document.getElementById("buscarOrdenes").value.trim().toLowerCase();
+  cargarPaginaOrdenes(1, true);
 }
 
 function renderizar() {
   const contenedor = document.getElementById("listaOrdenesCompleta");
-  const inicio = (pagina - 1) * POR_PAGINA;
-  const registros = listaVisible.slice(inicio, inicio + POR_PAGINA);
-  const paginas = Math.max(1, Math.ceil(listaVisible.length / POR_PAGINA));
+  const registros = listaVisible;
+  const paginas = totalOrdenes === null ? null : Math.max(1, Math.ceil(totalOrdenes / POR_PAGINA));
 
   contenedor.innerHTML = registros.map(ot => {
     const clase = estaCerrada(ot) ? "cerrada" : estaAtrasada(ot) ? "atrasada" : "activa";
@@ -150,12 +146,101 @@ function renderizar() {
       </article>`;
   }).join("");
 
-  document.getElementById("totalOrdenesVista").textContent = `${listaVisible.length} ${listaVisible.length === 1 ? "orden" : "órdenes"}`;
-  document.getElementById("estadoCargaOrdenes").textContent = listaOrdenes.length ? "Historial actualizado" : "Sin registros";
+  document.getElementById("totalOrdenesVista").textContent = totalOrdenes === null ? `${registros.length} resultados en esta página` : `${totalOrdenes} ${totalOrdenes === 1 ? "orden" : "órdenes"}`;
+  document.getElementById("estadoCargaOrdenes").textContent = textoAplicado ? "Resultados de la búsqueda" : listaOrdenes.length ? "Historial actualizado" : "Sin registros";
   document.getElementById("ordenesVacio").hidden = registros.length > 0;
-  document.getElementById("paginaActual").textContent = `Página ${pagina} de ${paginas}`;
-  document.getElementById("paginaAnterior").disabled = pagina <= 1;
-  document.getElementById("paginaSiguiente").disabled = pagina >= paginas;
+  document.getElementById("paginaActual").textContent = `Página ${pagina}${paginas === null ? "" : ` de ${paginas}`}`;
+  document.getElementById("paginaAnterior").disabled = cargandoOrdenes || pagina <= 1;
+  document.getElementById("paginaSiguiente").disabled = cargandoOrdenes || !hayMasOrdenes;
+}
+
+async function cargarPaginaOrdenes(numero, reiniciar = false) {
+  const version = ++versionOrdenes;
+  cancelarEscuchaOrdenes?.();
+  cancelarEscuchaOrdenes = null;
+  cargandoOrdenes = true;
+  document.getElementById("paginaAnterior").disabled = true;
+  document.getElementById("paginaSiguiente").disabled = true;
+  document.getElementById("estadoCargaOrdenes").textContent = textoAplicado ? "Buscando en el historial…" : "Cargando órdenes…";
+  if (reiniciar) { cursoresOrdenes = [null]; busquedaOrdenes = null; totalOrdenes = null; }
+  const estado = document.getElementById("estadoOrdenes").value;
+  const filtros = [...restriccionesOrdenes];
+  if (estado !== "todas") filtros.push(where("cerrada", "==", estado === "cerradas"));
+  const orden = [];
+  if (estado === "atrasadas") {
+    const hoy = new Date();
+    const fecha = `${hoy.getFullYear()}-${String(hoy.getMonth()+1).padStart(2,"0")}-${String(hoy.getDate()).padStart(2,"0")}`;
+    filtros.push(where("gantt.fechaTermino", ">", ""), where("gantt.fechaTermino", "<", fecha));
+    orden.push(orderBy("gantt.fechaTermino", "asc"));
+  }
+  orden.push(orderBy("fechaCreacion", "desc"));
+  const base = query(collection(db, "otsResumen"), ...filtros, ...orden);
+  consultaConteoOrdenes = textoAplicado ? null : query(collection(db,"otsResumen"), ...filtros);
+  const vigente = () => version === versionOrdenes;
+  try {
+    if (textoAplicado) {
+      if (!busquedaOrdenes) {
+        const texto = textoAplicado;
+        // La cancelación depende de la búsqueda, no de la página que la consulta.
+        const identidad = {};
+        busquedaOrdenes = { identidad, leer: crearBusquedaOT({
+          vigente: () => busquedaOrdenes?.identidad === identidad,
+          coincide: ot => coincideTextoOT(ot, texto),
+          leerBloque: async cursor => {
+            const bloque = await getDocs(query(base, ...(cursor ? [startAfter(cursor)] : []), limit(POR_PAGINA)));
+            return { docs: bloque.docs.map(d=>({id:d.id,...d.data()})), cursor: bloque.docs.at(-1), fin: bloque.size < POR_PAGINA };
+          }
+        }) };
+      }
+      const resultado = await busquedaOrdenes.leer(numero);
+      if (!vigente() || !resultado) return;
+      pagina = numero; listaOrdenes = listaVisible = resultado.registros;
+      hayMasOrdenes = resultado.hayMas; totalOrdenes = resultado.total;
+      cargandoOrdenes = false; renderizar();
+    } else {
+      const cursor = cursoresOrdenes[numero-1];
+      let primeraCarga = true;
+      let versionConteo = 0;
+      const actualizarConteo = () => {
+        const conteoActual = ++versionConteo;
+        getCountFromServer(query(collection(db,"otsResumen"), ...filtros)).then(resultado => {
+          if (!vigente() || conteoActual !== versionConteo) return;
+          totalOrdenes = resultado.data().count;
+          if (!primeraCarga) renderizar();
+        }).catch(error => {
+          if (!vigente() || conteoActual !== versionConteo) return;
+          totalOrdenes = null;
+          if (!primeraCarga) renderizar();
+          console.warn("No fue posible actualizar el total de órdenes:",error);
+        });
+      };
+      actualizarConteo();
+      cancelarEscuchaOrdenes = onSnapshot(query(base, ...(cursor ? [startAfter(cursor)] : []), limit(POR_PAGINA+1)), snapshot => {
+        if (!vigente()) return;
+        if (!snapshot.size && numero > 1) { cargarPaginaOrdenes(1,true); return; }
+        const docs = snapshot.docs.slice(0,POR_PAGINA);
+        pagina = numero; listaOrdenes = listaVisible = docs.map(d=>({id:d.id,...d.data()}));
+        hayMasOrdenes = snapshot.size > POR_PAGINA;
+        cursoresOrdenes = cursoresOrdenes.slice(0,numero);
+        cursoresOrdenes[numero] = docs.at(-1);
+        cargandoOrdenes = false; renderizar();
+        window.OverTrackUI?.finalizarCargaPagina?.();
+        if (!primeraCarga && snapshot.docChanges().some(c=>c.type!=="modified")) {
+          actualizarConteo();
+        }
+        primeraCarga = false;
+      }, error => mostrarErrorOrdenes(error, version));
+    }
+  } catch (error) { mostrarErrorOrdenes(error, version); }
+  finally { if (vigente() && textoAplicado) window.OverTrackUI?.finalizarCargaPagina?.(); }
+}
+
+function mostrarErrorOrdenes(error, version) {
+  if (version !== versionOrdenes) return;
+  cargandoOrdenes = false;
+  console.error("No fue posible cargar las órdenes:", error);
+  document.getElementById("estadoCargaOrdenes").textContent = "No se pudo cargar. Presiona Buscar para reintentar.";
+  window.OverTrackUI?.finalizarCargaPagina?.();
 }
 
 async function escucharOrdenes() {
@@ -171,31 +256,8 @@ async function escucharOrdenes() {
     restricciones.push(where("sucursalId", "==", usuario.sucursalId));
   }
 
-  let coleccionListado = "otsResumen";
-  try {
-    await asegurarResumenesOT(restricciones);
-  } catch (error) {
-    console.warn("No fue posible preparar los resúmenes de OT; se usará la colección completa.", error);
-    coleccionListado = "ots";
-  }
-
-  const consulta = query(
-    collection(db, coleccionListado),
-    ...restricciones,
-    orderBy("fechaCreacion", "desc")
-  );
-
-  onSnapshot(consulta, snapshot => {
-    listaOrdenes = snapshot.docs
-      .map(item => ({ id: item.id, ...item.data() }))
-      .sort((a, b) => marcaTiempo(b) - marcaTiempo(a));
-    aplicarFiltros();
-    window.OverTrackUI?.finalizarCargaPagina?.();
-  }, error => {
-    console.error("No fue posible cargar las órdenes:", error);
-    document.getElementById("estadoCargaOrdenes").textContent = "No se pudo cargar";
-    window.OverTrackUI?.finalizarCargaPagina?.();
-  });
+  restriccionesOrdenes = restricciones;
+  await cargarPaginaOrdenes(1,true);
 }
 
 function abrirOT(id) {
@@ -226,6 +288,7 @@ async function eliminarOT(id) {
   if (!(await reautenticarAccionCritica("enviar esta orden de servicio a la papelera"))) return;
   const eliminar = async () => {
     await enviarOTPapelera({ otId: id });
+    await cargarPaginaOrdenes(1, true);
     if (!document.getElementById("papeleraOT").hidden) await cargarPapelera();
   };
   if (window.OverTrackUI?.ejecutarConCarga) {
@@ -340,6 +403,7 @@ async function cargarPapelera(mas = false) {
         boton.disabled = true;
         try {
           await restaurarOTPapelera({ otId: documento.id });
+          await cargarPaginaOrdenes(1, true);
           fila.remove();
           cargarAvisosPapelera().catch(console.warn);
           if (!lista.querySelector(".papelera-item") && botonMas.hidden) mostrarPapeleraVacia(lista);
@@ -400,10 +464,22 @@ function configurarInterfaz() {
   document.getElementById("menuSheqOrdenes").style.display = moduloActivo(empresaActual, "sheq") && rolesModulosOperativos.includes(usuario.rol) ? "" : "none";
   document.getElementById("menuProgramacionOrdenes").style.display = moduloActivo(empresaActual, "programacion") && ["super_admin", "admin_empresa", "admin_sucursal", "jefe_taller", "planificador", "supervisor", "tecnico"].includes(usuario.rol) ? "" : "none";
 
-  document.getElementById("buscarOrdenes").addEventListener("input", () => { pagina = 1; aplicarFiltros(); });
-  document.getElementById("estadoOrdenes").addEventListener("change", () => { pagina = 1; aplicarFiltros(); });
-  document.getElementById("paginaAnterior").addEventListener("click", () => { pagina--; renderizar(); window.scrollTo({ top: 0, behavior: "smooth" }); });
-  document.getElementById("paginaSiguiente").addEventListener("click", () => { pagina++; renderizar(); window.scrollTo({ top: 0, behavior: "smooth" }); });
+  document.getElementById("buscarOrdenes").addEventListener("keydown", evento => {
+    if (evento.key === "Enter") { evento.preventDefault(); aplicarFiltros(); }
+  });
+  document.getElementById("buscarOrdenes").addEventListener("search", () => {
+    if (!document.getElementById("buscarOrdenes").value) aplicarFiltros();
+  });
+  document.getElementById("btnBuscarOrdenes").addEventListener("click", aplicarFiltros);
+  document.getElementById("estadoOrdenes").addEventListener("change", aplicarFiltros);
+  document.getElementById("paginaAnterior").addEventListener("click", () => {
+    if (!cargandoOrdenes && pagina > 1) cargarPaginaOrdenes(pagina-1);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  });
+  document.getElementById("paginaSiguiente").addEventListener("click", () => {
+    if (!cargandoOrdenes && hayMasOrdenes) cargarPaginaOrdenes(pagina+1);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  });
   document.getElementById("listaOrdenesCompleta").addEventListener("click", evento => {
     const eliminar = evento.target.closest("[data-eliminar-ot]");
     if (eliminar) {
@@ -441,6 +517,17 @@ function configurarInterfaz() {
 
 window.nuevaOT = nuevaOT;
 window.volverPanelEmpresa = volverPanelEmpresa;
+window.addEventListener("pagehide", () => { versionOrdenes++; busquedaOrdenes = null; cancelarEscuchaOrdenes?.(); });
+window.addEventListener("pageshow", evento => { if (evento.persisted && empresaActual) escucharOrdenes(); });
+window.addEventListener("focus", async () => {
+  if (!consultaConteoOrdenes || cargandoOrdenes) return;
+  const version = versionOrdenes;
+  try {
+    const resultado = await getCountFromServer(consultaConteoOrdenes);
+    if (version !== versionOrdenes) return;
+    totalOrdenes = resultado.data().count; renderizar();
+  } catch (error) { console.warn("No fue posible actualizar el total de órdenes:",error); }
+});
 
 window.addEventListener("DOMContentLoaded", async () => {
   try {

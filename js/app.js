@@ -4,7 +4,7 @@ import { crearFlujoLibre, obtenerPlantillaLibre, actualizarFlujoLibre } from "./
 import { montarFlujoLibre } from "./flujo-libre-vista.js?v=20261102-1";
 import { etapasDePlantilla, etapasDeOT, actualizarVisibilidadFlujo } from "./flujo-etapas.js?v=20261031-2";
 import { identidadDeSucursal, combinarPlantillasSucursal } from "./configuracion-alcance.js?v=20261031-3";
-import { protegerPagina, cerrarSesion as cerrarSesionGlobal } from "./session.js?v=20261017-1";
+import { protegerPagina, cerrarSesion as cerrarSesionGlobal } from "./session.js?v=20261104-1";
 
 import { db, auth, storage } from "./firebase-config.js";
 import { obtenerModulosEmpresa } from "./modulos.js?v=20261018-2";
@@ -40,7 +40,7 @@ import {
 
 import {
   inicializarModuloDespacho
-} from "./modulos/despacho.js?v=20261027-2";
+} from "./modulos/despacho.js?v=20261104-1";
 
 
 import {
@@ -76,7 +76,7 @@ import {
 import {
     subirArchivoStorage,
     eliminarArchivoStorage
-} from "./modulos/core/storage.js?v=20261027-4";
+} from "./modulos/core/storage.js?v=20261104-1";
 
 
 import {

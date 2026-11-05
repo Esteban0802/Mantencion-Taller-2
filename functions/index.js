@@ -667,21 +667,8 @@ exports.limpiarIdentidadSucursal = onDocumentUpdated({
 exports.conciliarReservasAlmacenamiento = onSchedule({
   schedule: "every 60 minutes", region: REGION, timeoutSeconds: 300, maxInstances: 1
 }, async () => {
-  const empresas = await db.collection("empresas").get();
-  for (const empresa of empresas.docs) {
-    const reservas = await empresa.ref.collection("reservasAlmacenamiento").where("estado", "==", "reservada").get();
-    for (const reserva of reservas.docs) {
-      if (Number(reserva.data().creadaEn) > Date.now() - 10 * 60 * 1000) continue;
-      try {
-        const [metadata] = await bucket.file(reserva.data().ruta).getMetadata();
-        await actualizarReserva({ db, empresaId: empresa.id, id: reserva.id,
-          eliminar: metadata.metadata?.cuotaReservaId !== reserva.id });
-      } catch (e) {
-        if (Number(e.code) === 404) await actualizarReserva({ db, empresaId: empresa.id, id: reserva.id, eliminar: true });
-        else console.error("conciliarReserva", empresa.id, e.code);
-      }
-    }
-  }
+  const resultado = await require("./conciliacion-reservas").conciliarReservas({ db, bucket });
+  console.info("conciliarReservasAlmacenamiento", resultado);
 });
 
 exports.validarComentariosOT = onCall(CALLABLE_OPTIONS, async request => {

@@ -1,7 +1,7 @@
 import { urlSegura } from "./html-seguro.js";
 import { uploadBytes, deleteObject } from "./storage-seguro.js";
 import { db, storage } from "./firebase-config.js";
-import { protegerPagina, cerrarSesion, reautenticarAccionCritica } from "./session.js?v=20261017-1";
+import { protegerPagina, cerrarSesion, reautenticarAccionCritica, leerEmpresaInicial } from "./session.js?v=20261104-1";
 import { moduloActivo } from "./modulos.js?v=20261018-2";
 import { evaluarCuotaStorage, mensajeCuotaStorage } from "./storage-quota.js";
 import { optimizarFotoParaCarga } from "./modulos/core/imagenes.js";
@@ -211,7 +211,7 @@ async function cargarUsuarios() {
 async function cargarBase() {
   empresaId = usuario.rol === "super_admin" ? sessionStorage.getItem("empresaIdOperacionAdmin") || "" : usuario.empresaId || "";
   if (!empresaId) throw new Error("No se encontró la empresa activa.");
-  const empresaSnap = await getDoc(doc(db, "empresas", empresaId));
+  const empresaSnap = await leerEmpresaInicial(empresaId);
   if (!empresaSnap.exists()) throw new Error("La empresa no existe.");
   empresa = { id: empresaSnap.id, ...empresaSnap.data() };
   if (!moduloActivo(empresa, "sheq")) { await mensaje("Módulo no habilitado", "SHEQ no está habilitado para esta empresa.", "advertencia"); location.replace("dashboard.html"); return false; }

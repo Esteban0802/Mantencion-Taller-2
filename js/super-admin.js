@@ -1,5 +1,5 @@
 import { argumentoHtml } from "./html-seguro.js";
-import { protegerPagina, cerrarSesion, reautenticarAccionCritica } from "./session.js?v=20261017-1";
+import { protegerPagina, cerrarSesion, reautenticarAccionCritica } from "./session.js?v=20261104-1";
 import { abrirWizard } from "./components/wizard.js?v=20261028-1";
 import {
   MODULOS_COMERCIALES,

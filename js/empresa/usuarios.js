@@ -17,7 +17,7 @@ import {
   getFunctions,
   httpsCallable
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-functions.js";
-import { reautenticarAccionCritica } from "../session.js?v=20261017-1";
+import { reautenticarAccionCritica } from "../session.js?v=20261104-1";
 
 const functions = getFunctions(app, "us-central1");
 const crearUsuarioEmpresaSeguro = httpsCallable(functions, "crearUsuarioEmpresa");
