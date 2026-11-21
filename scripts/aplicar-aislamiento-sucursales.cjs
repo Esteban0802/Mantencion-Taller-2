@@ -30,7 +30,7 @@ async function main(){
   await requireAuth(options);
   const api=new Client({urlPrefix:'https://firestore.googleapis.com',apiVersion:'v1'});
   // Un solo lote atómico. Si cualquier dato cambió desde la revisión, se rechaza todo.
-  const respuesta=(await api.post('/projects/overtrack-42387/databases/(default)/documents:commit',{body:{writes}})).body;
+  const respuesta=(await api.post('/projects/overtrack-42387/databases/(default)/documents:commit',{writes})).body;
   fs.writeFileSync('tmp/resultado-aislamiento-sucursales.json',JSON.stringify({fecha:new Date().toISOString(),resultado:respuesta},null,2));
   console.log(JSON.stringify({aplicado:true,escrituras:respuesta.writeResults.length}));
 }

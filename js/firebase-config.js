@@ -7,7 +7,10 @@ import {
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 import {
-  getAuth
+  initializeAuth,
+  indexedDBLocalPersistence,
+  browserLocalPersistence,
+  browserSessionPersistence
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
 import {
@@ -28,7 +31,9 @@ const app = initializeApp(firebaseConfig);
 
 // Servicios
 const db = getFirestore(app);
-const auth = getAuth(app);
+const auth = initializeAuth(app, {
+  persistence: [indexedDBLocalPersistence, browserLocalPersistence, browserSessionPersistence]
+});
 const storage = getStorage(app);
 
 export {

@@ -48,3 +48,17 @@ El 29 de octubre de 2026 se desplegaron las Functions con sus dependencias corre
 Se añadió SheetJS `xlsx` 0.20.3 a Functions desde la misma distribución ya usada en la interfaz. `npm audit --omit=dev` no informa avisos para ese lector, pero la revisión actual sí detecta seis paquetes con avisos moderados en cadenas preexistentes: `archiver`/`readdir-glob`/`minimatch` y `google-gax`/`rimraf`/`glob`. No informa niveles altos ni críticos. Esto reemplaza la conclusión histórica de cero avisos de producción para la revisión actual; el registro es `tmp/audit-flujo-libre-functions.json`.
 
 La instalación añadió un paquete y conservó las versiones anteriores de esas cadenas. No se ejecutó `audit fix --force` ni se retrocedió Archiver a la versión mayor anterior sugerida por npm. Queda pendiente resolver esos avisos mediante una actualización compatible y verificada dentro de la auditoría de dependencias.
+
+## Revisión del 9 de noviembre de 2026
+
+La auditoría del registro npm arrojó 0 paquetes señalados en las dependencias de producción de la web, 14 moderados en el árbol completo de la raíz y 6 moderados en el árbol de producción de Functions. En ambos árboles hubo 0 altos y 0 críticos. Los seis paquetes de Functions corresponden a dos avisos subyacentes, en `glob` y `minimatch`.
+
+El SDK de Firebase 11.6.1 cargado desde CDN queda fuera del resultado de producción de npm. El repositorio oficial del SDK no mostraba avisos publicados al consultarlo. La actualización del SDK sigue siendo un trabajo separado que requiere probar autenticación, funciones y archivos en navegador.
+
+Se conservan las versiones instaladas. npm propone retrocesos mayores para Firebase CLI y Archiver. Queda pendiente evaluar actualizaciones compatibles de las cadenas afectadas y probar las exportaciones ZIP antes de desplegar cambios en Functions. Resultados locales en `tmp/audit-web-prod-actual.json`, `tmp/audit-web-actual.json` y `tmp/audit-functions-actual.json`.
+
+### Compatibilidad de las correcciones
+
+- `archiver@8.0.0` declara `readdir-glob` en la rama 3. La versión 4 incorpora `minimatch` corregido, pero queda fuera de ese rango. La exportación de Vectaria agrega entradas con `zip.append()` y no usa las funciones de búsqueda de Archiver.
+- La cadena de Firestore pasa por `@google-cloud/firestore-api@0.2.0`, `google-gax@5.0.8` y `rimraf@5.0.10` hasta `glob@10.5.0`. La versión corregida de `glob` es 14.0.2. Incluso `@google-cloud/firestore@9.4.0` sigue declarando `@google-cloud/firestore-api` en la rama 0.2, que conserva `google-gax` en la rama 5.
+- No se identificó una actualización dentro de los rangos declarados que cierre ambos avisos. Se conserva el árbol instalado y se mantienen los avisos moderados abiertos. Cuando exista una actualización compatible, repetir la auditoría y comprobar exportaciones ZIP y operaciones de Firestore.

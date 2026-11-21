@@ -43,3 +43,15 @@ Una vez por trimestre se debe restaurar el respaldo más reciente en una base de
 - El dueño de la plataforma administra respaldos, restauraciones y presupuestos de Google Cloud.
 - Los administradores de empresa pueden generar el respaldo exportable de su empresa, pero no administrar los respaldos internos de la plataforma.
 - Ningún respaldo interno debe exponerse desde la interfaz de usuarios operativos.
+
+## Ensayo del 21 de noviembre de 2026
+
+Se restauró el respaldo `206d2697-8664-48c8-b517-c84d5d0835ba`, tomado el 20 de noviembre a las 15:47 UTC, en la base temporal `ensayo-recuperacion-20261121` de `overtrack-42387`. Firebase informó `SUCCESSFUL` y avance 100 %. La base operativa conservó su destino original. La base restaurada heredó protección contra eliminación y tiene PITR deshabilitado.
+
+Se enumeraron 24 colecciones de primer nivel. Se verificó por hash SHA-256 la igualdad del contenido completo de ocho colecciones frente a la base operativa al momento de la comparación. Coincidieron empresa (1), usuarios (11), sucursales (1), OT (3), resúmenes de OT (3), inventario (32), publicaciones personales de programación (4) y documentos SHEQ (17). La comparación incluye los campos de los documentos, como las etapas almacenadas dentro de las OT. No se compararon todas las subcolecciones ni se realizó un cambio de conexión de la aplicación a la base temporal. Los perfiles recuperados de Firestore son distintos de las cuentas de Firebase Authentication.
+
+Para Storage se creó un archivo artificial bajo `ensayos-recuperacion/20261121/`. Se eliminó con condición de generación, se comprobó su estado de eliminación recuperable y se restauró. La generación restaurada conserva el mismo tamaño y MD5 del contenido original. La retención efectiva consultada es de 7 días. Este ensayo acredita recuperación puntual dentro de esa ventana, no una copia independiente del bucket.
+
+Evidencia local en `tmp/resultado-restauracion.json`, `tmp/comparacion-restauracion.json` y `tmp/resultado-archivo-recuperacion.json`. La base temporal y el archivo artificial restaurado quedan pendientes de limpieza autorizada. El costo efectivo se revisará en facturación cuando se registre.
+
+Limpieza posterior autorizada y verificada el mismo día. La base temporal fue eliminada y el archivo artificial dejó de estar activo. Las versiones eliminadas del archivo quedan sujetas a la retención de Storage de 7 días y pueden generar almacenamiento durante esa ventana. La consulta final confirmó que `(default)` continúa presente con protección contra eliminación y PITR habilitados. La CLI informó éxito en la actualización y eliminación de la base temporal, seguido de un fallo de cierre de Node en Windows. La consulta independiente posterior confirmó el resultado remoto. Evidencia en `tmp/limpieza-ensayo-recuperacion.json`.

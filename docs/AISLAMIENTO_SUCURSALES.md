@@ -1,6 +1,6 @@
 # Programación y SHEQ por sucursal
 
-Corrección preparada el 21 de noviembre de 2026. Pendiente de activación autorizada en Firebase y publicación de la web.
+Corrección del 21 de noviembre de 2026. Adaptación de 56 registros aplicada con autorización y contenido completo verificado. Reglas de Firestore y Storage y tres funciones activadas. Los 17 índices del proyecto están listos. Publicación web enviada a GitHub Pages en el commit 5f7819c; no se pudo comprobar su ejecución remota. Las mejoras posteriores del procedimiento de adaptación y esta constancia quedan locales porque no se autorizó su segundo envío a GitHub.
 
 - Planificador: planificación, publicación, historial, ausencias, vehículos y acreditaciones de su empresa y sucursal asignadas.
 - SHEQ: contratos, vehículos, documentos y archivos de su empresa y sucursal asignadas.
