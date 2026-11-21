@@ -135,11 +135,12 @@ test("un fallo confirmado de carga libera la reserva y un resultado desconocido 
 test("todos los grupos de archivos de empresa usan la cuota y respetan los roles", async () => {
   const casos = [
     ["admin_empresa", "informe/logo.png", "image/png", Buffer.from([137,80,78,71,13,10,26,10])],
-    ["sheq", "sheq/documento.pdf", "application/pdf", Buffer.from("%PDF-1.4")],
+    ["sheq", "sheq/persona/u/documento.pdf", "application/pdf", Buffer.from("%PDF-1.4")],
     ["jefe_taller", "inventario/s/documento.pdf", "application/pdf", Buffer.from("%PDF-1.4")]
   ];
   for (const [rol, ruta, contentType, bytes] of casos) {
     const e = entorno(); e.empresa.storageUsadoBytes = 9;
+    e.db.documentos.set("usuarios/u", {empresaId:"e",sucursalId:"s"});
     const usuario = { uid: "u", activo: true, empresaId: "e", sucursalId: "s", rol };
     const datos = { ruta: `empresas/e/${ruta}`, contentType, base64: bytes.toString("base64") };
     const bucket = { file: () => { throw new Error("No debe llegar a Storage"); } };

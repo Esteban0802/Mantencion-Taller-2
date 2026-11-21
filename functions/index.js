@@ -1701,16 +1701,22 @@ exports.publicarProgramacion = onCall(CALLABLE_OPTIONS, async request => {
   if (!(solicitante.empresaId === empresaId && solicitante.rol === "planificador")) {
     throw new HttpsError("permission-denied", "No puedes publicar esta programación.");
   }
+  const sucursalId = solicitante.sucursalId;
+  if (!sucursalId) throw new HttpsError("permission-denied", "Debes tener una sucursal asignada.");
+  const sucursalSnap = await db.collection("sucursales").doc(sucursalId).get();
+  if (!sucursalSnap.exists || sucursalSnap.data().empresaId !== empresaId || sucursalSnap.data().activa === false) {
+    throw new HttpsError("permission-denied", "La sucursal no está disponible.");
+  }
   const empresaSnap = await exigirEmpresaOperativa(empresaId, solicitante);
   const inicio = new Date(`${semanaInicio}T12:00:00Z`);
   const termino = new Date(inicio);
   termino.setUTCDate(termino.getUTCDate() + 6);
   const semanaTermino = termino.toISOString().slice(0, 10);
   const [asignacionesSnap, semanaSnap, usuariosSnap, confirmacionesSnap] = await Promise.all([
-    db.collection("programaciones").where("empresaId", "==", empresaId).get(),
-    db.collection("programacionSemanas").doc(`${empresaId}_${semanaInicio}`).get(),
-    db.collection("usuarios").where("empresaId", "==", empresaId).get(),
-    db.collection("programacionConfirmaciones").where("empresaId", "==", empresaId).get()
+    db.collection("programaciones").where("empresaId", "==", empresaId).where("sucursalId", "==", sucursalId).get(),
+    db.collection("programacionSemanas").doc(`${empresaId}_${sucursalId}_${semanaInicio}`).get(),
+    db.collection("usuarios").where("empresaId", "==", empresaId).where("sucursalId", "==", sucursalId).get(),
+    db.collection("programacionConfirmaciones").where("empresaId", "==", empresaId).where("sucursalId", "==", sucursalId).get()
   ]);
   const actuales = asignacionesSnap.docs
     .map(programacionPublicable)
@@ -1744,6 +1750,14 @@ exports.publicarProgramacion = onCall(CALLABLE_OPTIONS, async request => {
     });
   }
   const usuarios = new Map(usuariosSnap.docs.map(item => [item.id, { id: item.id, ...item.data() }]));
+  for (const asignacion of actuales) {
+    if (idsProgramacion(asignacion).some(id => !usuarios.has(id))) {
+      throw new HttpsError("failed-precondition", "Hay participantes que no pertenecen a esta sucursal.");
+    }
+  }
+  for (const id of turnosEmergenciaActuales) {
+    if (!usuarios.has(id)) throw new HttpsError("failed-precondition", "El turno contiene usuarios de otra sucursal.");
+  }
   const cambiosPorUsuario = new Map();
   cambios.forEach(cambio => {
     const idsAntes = new Set(cambio.anterior ? idsProgramacion(cambio.anterior) : []);
@@ -1804,7 +1818,7 @@ exports.publicarProgramacion = onCall(CALLABLE_OPTIONS, async request => {
         html: `<div style="font-family:Arial,sans-serif;color:#17324a"><div style="padding:18px 20px;border-radius:12px 12px 0 0;background:${estaDeEmergencia ? "#51380d" : "#0b1d33"};color:#fff"><h2 style="margin:0">${escaparHtml(empresaSnap.data().nombre || "Vectaria")}</h2>${estaDeEmergencia ? '<p style="margin:8px 0 0;color:#ffd987;font-weight:bold">TURNO DE EMERGENCIA</p>' : ""}</div><p>Hola ${escaparHtml(perfil?.nombreCompleto || perfil?.nombre || "")},</p><p>${primeraPublicacion ? "Esta es tu programación completa para la semana." : "Se realizaron cambios que afectan tu programación."}</p>${avisoEmergencia}${contenido}<p>Revisa el sistema para consultar la programación vigente.</p></div>`,
         text: `${estaDeEmergencia ? "TURNO DE EMERGENCIA. " : cambioTurnoEmergencia ? "Tu turno de emergencia fue actualizado. " : ""}${primeraPublicacion ? "Programación semanal" : "Cambios de programación"} desde ${semanaInicio}. Ingresa al sistema para ver el detalle.`
       },
-      empresaId, semanaInicio, usuarioId,
+      empresaId, sucursalId, semanaInicio, usuarioId,
       tipo: primeraPublicacion ? "programacion_completa" : "cambio_programacion",
       estadoAplicacion: "pendiente_proveedor_correo",
       creadoPor: solicitante.uid,
@@ -1814,8 +1828,8 @@ exports.publicarProgramacion = onCall(CALLABLE_OPTIONS, async request => {
   }
   for (const [usuarioId, perfil] of usuarios) {
     if (!['tecnico', 'supervisor'].includes(perfil?.rol) || perfil?.activo === false) continue;
-    lote.set(db.collection("programacionPublicadaUsuarios").doc(`${empresaId}_${semanaInicio}_${usuarioId}`), {
-      empresaId,
+    lote.set(db.collection("programacionPublicadaUsuarios").doc(`${empresaId}_${sucursalId}_${semanaInicio}_${usuarioId}`), {
+      empresaId, sucursalId,
       semanaInicio,
       estado: "publicada",
       usuarioId,
@@ -1825,8 +1839,8 @@ exports.publicarProgramacion = onCall(CALLABLE_OPTIONS, async request => {
       fechaPublicacion: FieldValue.serverTimestamp()
     }, { merge: false });
   }
-  lote.set(db.collection("programacionSemanas").doc(`${empresaId}_${semanaInicio}`), {
-    empresaId, semanaInicio, estado: "publicada",
+  lote.set(db.collection("programacionSemanas").doc(`${empresaId}_${sucursalId}_${semanaInicio}`), {
+    empresaId, sucursalId, semanaInicio, estado: "publicada",
     publicadoPor: solicitante.uid,
     fechaPublicacion: FieldValue.serverTimestamp(),
     cantidadAsignaciones: actuales.length,

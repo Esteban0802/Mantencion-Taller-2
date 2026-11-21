@@ -50,26 +50,64 @@ const FIRESTORE_PORT = Number(process.env.FIRESTORE_EMULATOR_PORT || 8080);
 const STORAGE_PORT = Number(process.env.STORAGE_EMULATOR_PORT || 9199);
 let testEnv;
 
+test("Programación y SHEQ rechazan acceso y escrituras de otras sucursales, incluso dentro de la misma empresa", async () => {
+  const colecciones=["programaciones","programacionSemanas","programacionHistorial","programacionAusencias","programacionConfirmaciones","sheqContratos","sheqVehiculos","sheqDocumentos"];
+  await testEnv.withSecurityRulesDisabled(async c=>{
+    for(const nombre of colecciones) await setDoc(doc(c.firestore(),nombre,"otra-sucursal"),{
+      empresaId:"empresa-a",sucursalId:"sucursal-a2",estado:"publicada",creadoPor:"sheq-a",
+      usuarioId:"tecnico-a",entidadTipo:"persona",entidadId:"taller-a2",vehiculoId:"otro"
+    });
+  });
+  for(const uid of ["planificador-a","sheq-a","admin-sucursal-a","jefe-a","bodeguero-a"]){
+    const db=firestoreComo(uid);
+    for(const nombre of colecciones){
+      const ref=doc(db,nombre,"otra-sucursal");
+      await assertFails(getDoc(ref));
+      await assertFails(updateDoc(ref,{sucursalId:"sucursal-a",estado:"observado"}));
+      await assertFails(deleteDoc(ref));
+      await assertFails(getDocs(query(collection(db,nombre),where("empresaId","==","empresa-a"))));
+    }
+  }
+  const sheq=firestoreComo("sheq-a");
+  await assertFails(setDoc(doc(sheq,"sheqDocumentos","referencia-ajena"),{
+    empresaId:"empresa-a",sucursalId:"sucursal-a",entidadTipo:"persona",entidadId:"taller-a2",creadoPor:"sheq-a",estado:"pendiente"
+  }));
+  await assertSucceeds(getDoc(doc(firestoreComo("admin-a"),"sheqDocumentos","otra-sucursal")));
+  await assertSucceeds(getDoc(doc(firestoreComo("admin-a"),"programacionSemanas","otra-sucursal")));
+});
+
+test("los archivos SHEQ de otra sucursal no se pueden leer, reemplazar ni eliminar",async()=>{
+  const ruta="empresas/empresa-a/sheq/persona/taller-a2/ajeno.pdf";
+  await testEnv.withSecurityRulesDisabled(async c=>{
+    await uploadBytes(ref(c.storage(),ruta),Buffer.from("%PDF-1.4"),{contentType:"application/pdf"});
+  });
+  await assertFails(getBytes(ref(storageComo("sheq-a"),ruta)));
+  await assertSucceeds(getBytes(ref(storageComo("admin-a"),ruta)));
+  for(const accion of ["subirEmpresa","eliminarEmpresa"]){
+    await assert.rejects(archivoEnServidorPrueba("sheq-a",accion,{ruta,contentType:"application/pdf",base64:Buffer.from("%PDF-1.4").toString("base64")}),{code:"permission-denied"});
+  }
+});
+
 test("semanas inexistentes devuelven una consulta vacía sin ampliar acceso a borradores",async()=>{
   const inicio="2099-01-05";
   for(const uid of ["planificador-a","bodeguero-a"]) {
     const db=firestoreComo(uid);
     await assertFails(getDoc(doc(db,"programacionSemanas",`empresa-a_${inicio}`)));
     const vacia=await assertSucceeds(getDocs(query(collection(db,"programacionSemanas"),
-      where("empresaId","==","empresa-a"),where("semanaInicio","==",inicio),limit(1))));
+      where("empresaId","==","empresa-a"),where("sucursalId","==","sucursal-a"),where("semanaInicio","==",inicio),limit(1))));
     assert.equal(vacia.size,0);
   }
   await testEnv.withSecurityRulesDisabled(async contexto=>{
-    await setDoc(doc(contexto.firestore(),"programacionSemanas",`empresa-a_${inicio}`),{empresaId:"empresa-a",semanaInicio:inicio,estado:"borrador"});
+    await setDoc(doc(contexto.firestore(),"programacionSemanas",`empresa-a_${inicio}`),{empresaId:"empresa-a",sucursalId:"sucursal-a",semanaInicio:inicio,estado:"borrador"});
   });
   for(const uid of ["admin-a","admin-sucursal-a","jefe-a","sheq-a"]) {
-    const db=firestoreComo(uid),base=query(collection(db,"programacionSemanas"),where("empresaId","==","empresa-a"),where("semanaInicio","==",inicio));
+    const db=firestoreComo(uid),base=query(collection(db,"programacionSemanas"),where("empresaId","==","empresa-a"),where("sucursalId","==","sucursal-a"),where("semanaInicio","==",inicio));
     await assertFails(getDocs(query(base,limit(1))));
     const publicada=await assertSucceeds(getDocs(query(base,where("estado","==","publicada"),limit(1))));
     assert.equal(publicada.size,0);
   }
   const planificador=firestoreComo("planificador-a");
-  const borrador=await assertSucceeds(getDocs(query(collection(planificador,"programacionSemanas"),where("empresaId","==","empresa-a"),where("semanaInicio","==",inicio),limit(1))));
+  const borrador=await assertSucceeds(getDocs(query(collection(planificador,"programacionSemanas"),where("empresaId","==","empresa-a"),where("sucursalId","==","sucursal-a"),where("semanaInicio","==",inicio),limit(1))));
   assert.equal(borrador.size,1);
   await assertFails(getDocs(query(collection(planificador,"programacionSemanas"),where("empresaId","==","empresa-b"),where("semanaInicio","==",inicio),limit(1))));
 });
@@ -465,8 +503,10 @@ async function sembrarDatos() {
       cerrada: false,
     });
 
+    await setDoc(doc(db, "sheqVehiculos", "vehiculo-a"), {empresaId:"empresa-a",sucursalId:"sucursal-a",creadoPor:"sheq-a"});
     await setDoc(doc(db, "sheqDocumentos", "documento-sheq-a"), {
       empresaId: "empresa-a",
+      sucursalId: "sucursal-a",
       entidadTipo: "persona",
       entidadId: "taller-a",
       tipoDocumento: "Examen ocupacional",
@@ -477,6 +517,7 @@ async function sembrarDatos() {
 
     await setDoc(doc(db, "programaciones", "programacion-vehiculo-a"), {
       empresaId: "empresa-a",
+      sucursalId: "sucursal-a",
       semanaInicio: "2026-10-12",
       fecha: "2026-10-14",
       grupo: "tecnico",
@@ -489,6 +530,7 @@ async function sembrarDatos() {
 
     await setDoc(doc(db, "programacionSemanas", "empresa-a_2026-10-12"), {
       empresaId: "empresa-a",
+      sucursalId: "sucursal-a",
       semanaInicio: "2026-10-12",
       estado: "publicada",
       snapshotPublicado: [],
@@ -496,12 +538,14 @@ async function sembrarDatos() {
 
     await setDoc(doc(db, "programacionSemanas", "empresa-a_2026-10-19"), {
       empresaId: "empresa-a",
+      sucursalId: "sucursal-a",
       semanaInicio: "2026-10-19",
       estado: "borrador",
     });
 
     await setDoc(doc(db, "programacionPublicadaUsuarios", "empresa-a_2026-10-12_tecnico-a"), {
       empresaId: "empresa-a",
+      sucursalId: "sucursal-a",
       semanaInicio: "2026-10-12",
       estado: "publicada",
       usuarioId: "tecnico-a",
@@ -1794,11 +1838,12 @@ test("Admin Sucursal no puede modificar inventario de otra sucursal", async () =
   }));
 });
 
-test("SHEQ puede consultar y crear documentos de acreditación de su empresa", async () => {
+test("SHEQ puede consultar y crear documentos de acreditación de su sucursal", async () => {
   const db = firestoreComo("sheq-a");
   await assertSucceeds(getDoc(doc(db, "sheqDocumentos", "documento-sheq-a")));
   await assertSucceeds(setDoc(doc(db, "sheqDocumentos", "documento-sheq-nuevo"), {
     empresaId: "empresa-a",
+      sucursalId: "sucursal-a",
     entidadTipo: "vehiculo",
     entidadId: "vehiculo-a",
     tipoDocumento: "SOAP",
@@ -1859,7 +1904,7 @@ test("la consulta personal permite semanas vacías sin abrir publicaciones ajena
     const db = firestoreComo(uid);
     for (const semanaInicio of ["2026-10-12", "2026-10-26"]) {
       const resultado = await assertSucceeds(getDocs(query(collection(db, "programacionPublicadaUsuarios"),
-        where("empresaId", "==", "empresa-a"), where("usuarioId", "==", uid),
+        where("empresaId", "==", "empresa-a"), where("sucursalId", "==", "sucursal-a"), where("usuarioId", "==", uid),
         where("estado", "==", "publicada"), where("semanaInicio", "==", semanaInicio), limit(1))));
       assert.equal(resultado.size, uid === "tecnico-a" && semanaInicio === "2026-10-12" ? 1 : 0);
     }
@@ -1873,6 +1918,7 @@ test("Planificador puede registrar turnos de emergencia de una semana", async ()
   const db = firestoreComo("planificador-a");
   await assertSucceeds(setDoc(doc(db, "programacionSemanas", "empresa-a_2026-10-12"), {
     empresaId: "empresa-a",
+      sucursalId: "sucursal-a",
     semanaInicio: "2026-10-12",
     estado: "borrador",
     turnosEmergenciaIds: ["tecnico-a", "supervisor-a"],
@@ -1885,6 +1931,7 @@ test("Técnico no puede modificar los turnos de emergencia", async () => {
   const db = firestoreComo("tecnico-a");
   await assertFails(setDoc(doc(db, "programacionSemanas", "empresa-a_2026-10-12"), {
     empresaId: "empresa-a",
+      sucursalId: "sucursal-a",
     semanaInicio: "2026-10-12",
     estado: "borrador",
     turnosEmergenciaIds: ["tecnico-a"],

@@ -190,7 +190,12 @@ function renderMatrizCumplimiento() {
 }
 
 async function obtenerColeccion(nombre) {
-  const snap = await getDocs(query(collection(db, nombre), where("empresaId", "==", empresaId)));
+  const filtros = [where("empresaId", "==", empresaId)];
+  if (usuario.rol !== "admin_empresa") {
+    if (!usuario.sucursalId) throw new Error("Tu usuario no tiene una sucursal asignada.");
+    filtros.push(where("sucursalId", "==", usuario.sucursalId));
+  }
+  const snap = await getDocs(query(collection(db, nombre), ...filtros));
   return snap.docs.map(d => ({ id: d.id, ...d.data() }));
 }
 
@@ -203,7 +208,10 @@ async function cargarSucursales() {
 
 async function cargarUsuarios() {
   const filtros = [where("empresaId", "==", empresaId)];
-  if (!["super_admin", "admin_empresa"].includes(usuario.rol) && usuario.sucursalId) filtros.push(where("sucursalId", "==", usuario.sucursalId));
+  if (usuario.rol !== "admin_empresa") {
+    if (!usuario.sucursalId) throw new Error("Tu usuario no tiene una sucursal asignada.");
+    filtros.push(where("sucursalId", "==", usuario.sucursalId));
+  }
   const snap = await getDocs(query(collection(db, "usuarios"), ...filtros));
   return snap.docs.map(d => ({ id: d.id, ...d.data() }));
 }
@@ -643,8 +651,8 @@ function abrirDocumento(item=null,preset={}) {
   abrirModal("modalDocumento");
 }
 
-async function guardarContrato(e){e.preventDefault();const id=$("contratoId").value,ubicacion=$("contratoUbicacion").value.trim(),fechaInicio=$("contratoInicio").value,fechaTermino=$("contratoTermino").value;if(fechaTermino<fechaInicio)throw new Error("La fecha de término no puede ser anterior a la fecha de inicio.");const datos={empresaId,cliente:$("contratoCliente").value.trim(),ubicacion,fechaInicio,fechaTermino,requisitosPersonal:requisitosSeleccionados("personal"),requisitosVehiculos:requisitosSeleccionados("vehiculos"),actualizadoPor:usuario.uid,fechaActualizacion:serverTimestamp()};if(id)await updateDoc(doc(db,"sheqContratos",id),{...datos,nombre:deleteField(),faena:deleteField(),sucursalId:deleteField()});else await addDoc(collection(db,"sheqContratos"),{...datos,personalIds:[],vehiculoIds:[],creadoPor:usuario.uid,fechaCreacion:serverTimestamp()});cerrarSelectoresRequisitos();cerrarModal("modalContrato");await recargar("Contrato guardado");}
-async function guardarVehiculo(e){e.preventDefault();const id=$("vehiculoId").value,datos={empresaId,patente:$("vehiculoPatente").value.trim().toUpperCase(),tipo:$("vehiculoTipo").value,marca:$("vehiculoMarca").value.trim(),modelo:$("vehiculoModelo").value.trim(),anio:Number($("vehiculoAnio").value)||null,propietario:$("vehiculoPropietario").value.trim(),sucursalId:$("vehiculoSucursal").value,equipamiento:$("vehiculoEquipamiento").value.trim(),actualizadoPor:usuario.uid,fechaActualizacion:serverTimestamp()};if(id)await updateDoc(doc(db,"sheqVehiculos",id),{...datos,contratoId:deleteField()});else await addDoc(collection(db,"sheqVehiculos"),{...datos,creadoPor:usuario.uid,fechaCreacion:serverTimestamp()});cerrarModal("modalVehiculo");await recargar("Vehículo guardado");}
+async function guardarContrato(e){e.preventDefault();const id=$("contratoId").value,ubicacion=$("contratoUbicacion").value.trim(),fechaInicio=$("contratoInicio").value,fechaTermino=$("contratoTermino").value;if(fechaTermino<fechaInicio)throw new Error("La fecha de término no puede ser anterior a la fecha de inicio.");const datos={empresaId,sucursalId:usuario.sucursalId,cliente:$("contratoCliente").value.trim(),ubicacion,fechaInicio,fechaTermino,requisitosPersonal:requisitosSeleccionados("personal"),requisitosVehiculos:requisitosSeleccionados("vehiculos"),actualizadoPor:usuario.uid,fechaActualizacion:serverTimestamp()};if(id)await updateDoc(doc(db,"sheqContratos",id),{...datos,nombre:deleteField(),faena:deleteField()});else await addDoc(collection(db,"sheqContratos"),{...datos,personalIds:[],vehiculoIds:[],creadoPor:usuario.uid,fechaCreacion:serverTimestamp()});cerrarSelectoresRequisitos();cerrarModal("modalContrato");await recargar("Contrato guardado");}
+async function guardarVehiculo(e){e.preventDefault();const id=$("vehiculoId").value,datos={empresaId,patente:$("vehiculoPatente").value.trim().toUpperCase(),tipo:$("vehiculoTipo").value,marca:$("vehiculoMarca").value.trim(),modelo:$("vehiculoModelo").value.trim(),anio:Number($("vehiculoAnio").value)||null,propietario:$("vehiculoPropietario").value.trim(),sucursalId:usuario.sucursalId,equipamiento:$("vehiculoEquipamiento").value.trim(),actualizadoPor:usuario.uid,fechaActualizacion:serverTimestamp()};if(id)await updateDoc(doc(db,"sheqVehiculos",id),{...datos,contratoId:deleteField()});else await addDoc(collection(db,"sheqVehiculos"),{...datos,creadoPor:usuario.uid,fechaCreacion:serverTimestamp()});cerrarModal("modalVehiculo");await recargar("Vehículo guardado");}
 async function guardarDocumento(e){
   e.preventDefault();
   const entidadId=$("documentoEntidadId").value,entidadTipo=$("documentoEntidadTipo").value;
@@ -687,7 +695,7 @@ async function guardarDocumento(e){
         await uploadBytes(storageRef,archivoCarga,{contentType:tipoCarga});
         archivoUrl=await getDownloadURL(storageRef);
       }
-      preparados.push({id,anterior,datos:{empresaId,entidadTipo,entidadId,tipoDocumento,contratoId:anterior?.contratoId||$("formDocumento").dataset.contratoId||"",fechaEmision:fechaInicio,fechaVencimiento:fechaFinal,estado,validacionExplicita:true,observaciones:$("documentoObservaciones").value.trim(),archivoUrl,archivoRuta,historial:anterior?[...(anterior.historial||[]),versionDocumento(anterior,motivo)]:[],actualizadoPor:usuario.uid,fechaActualizacion:serverTimestamp()}});
+      preparados.push({id,anterior,datos:{empresaId,sucursalId:usuario.sucursalId,entidadTipo,entidadId,tipoDocumento,contratoId:anterior?.contratoId||$("formDocumento").dataset.contratoId||"",fechaEmision:fechaInicio,fechaVencimiento:fechaFinal,estado,validacionExplicita:true,observaciones:$("documentoObservaciones").value.trim(),archivoUrl,archivoRuta,historial:anterior?[...(anterior.historial||[]),versionDocumento(anterior,motivo)]:[],actualizadoPor:usuario.uid,fechaActualizacion:serverTimestamp()}});
     }
     const batch=writeBatch(db);
     for(const preparado of preparados){
@@ -728,7 +736,7 @@ async function eliminarVehiculoCompleto(id) {
   if (!vehiculo) return;
   const documentosVehiculo = documentos.filter(item => item.entidadTipo === "vehiculo" && item.entidadId === id);
   const contratosRelacionados = contratos.filter(item => Array.isArray(item.vehiculoIds) && item.vehiculoIds.includes(id));
-  const programacionesSnap = await getDocs(query(collection(db, "programaciones"), where("empresaId", "==", empresaId)));
+  const programacionesSnap = await getDocs(query(collection(db, "programaciones"), where("empresaId", "==", empresaId), where("sucursalId", "==", usuario.sucursalId), where("vehiculoId", "==", id)));
   const programacionesRelacionadas = programacionesSnap.docs.filter(item => item.data().vehiculoId === id);
   const detalle = `${documentosVehiculo.length} documento(s), ${contratosRelacionados.length} contrato(s) y ${programacionesRelacionadas.length} actividad(es) relacionada(s)`;
   const ok = await window.OverTrackUI.confirmarAccion({

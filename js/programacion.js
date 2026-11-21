@@ -25,6 +25,15 @@ import {
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-functions.js";
 
+function filtrosAmbitoProgramacion() {
+  const filtros = [where("empresaId", "==", empresaId)];
+  if (usuario.rol !== "admin_empresa") {
+    if (!usuario.sucursalId) throw new Error("Tu usuario no tiene una sucursal asignada.");
+    filtros.push(where("sucursalId", "==", usuario.sucursalId));
+  }
+  return filtros;
+}
+
 const functions = getFunctions(app, "us-central1");
 const publicarProgramacionSegura = httpsCallable(functions, "publicarProgramacion");
 
@@ -195,10 +204,7 @@ async function cargarUsuariosYSucursales() {
       ? [{ id: perfilSnap.id, ...perfilSnap.data() }]
       : [{ id: usuario.uid, ...usuario }];
   } else {
-    const restriccionesUsuarios = [where("empresaId", "==", empresaId)];
-    if (["admin_sucursal", "jefe_taller", "planificador", "bodeguero", "sheq"].includes(usuario.rol) && usuario.sucursalId) {
-      restriccionesUsuarios.push(where("sucursalId", "==", usuario.sucursalId));
-    }
+    const restriccionesUsuarios = [...filtrosAmbitoProgramacion()];
     const usuariosSnap = await getDocs(
       query(collection(db, "usuarios"), ...restriccionesUsuarios)
     );
@@ -417,8 +423,8 @@ async function cargarDocumentosSheq() {
   if (!PUEDE_EDITAR || !moduloActivo(empresa, "sheq")) return;
   try {
     const [documentosSnap, vehiculosSnap] = await Promise.all([
-      getDocs(query(collection(db, "sheqDocumentos"), where("empresaId", "==", empresaId))),
-      getDocs(query(collection(db, "sheqVehiculos"), where("empresaId", "==", empresaId)))
+      getDocs(query(collection(db, "sheqDocumentos"), ...filtrosAmbitoProgramacion())),
+      getDocs(query(collection(db, "sheqVehiculos"), ...filtrosAmbitoProgramacion()))
     ]);
     documentosSheq = documentosSnap.docs.map(item => ({ id: item.id, ...item.data() }));
     vehiculosSheq = vehiculosSnap.docs
@@ -437,13 +443,12 @@ async function cargarDatosOperativosProgramacion() {
   const consultas = [];
   if (PUEDE_EDITAR) {
     consultas.push(
-      getDocs(query(collection(db, "programacionAusencias"), where("empresaId", "==", empresaId)))
+      getDocs(query(collection(db, "programacionAusencias"), ...filtrosAmbitoProgramacion()))
         .then(snap => { ausenciasEmpresa = snap.docs.map(item => ({ id: item.id, ...item.data() })); })
     );
-    const filtrosInventario = [where("empresaId", "==", empresaId)];
-    if (usuario.rol !== "super_admin" && usuario.sucursalId) filtrosInventario.push(where("sucursalId", "==", usuario.sucursalId));
+    const filtrosInventario = [...filtrosAmbitoProgramacion()];
     consultas.push(
-      getDocs(query(collection(db, "programacionHistorial"), where("empresaId", "==", empresaId)))
+      getDocs(query(collection(db, "programacionHistorial"), ...filtrosAmbitoProgramacion()))
         .then(snap => { historialProgramacion = snap.docs.map(item => ({ id: item.id, ...item.data() })); }),
       getDocs(query(collection(db, "inventarioItems"), ...filtrosInventario))
         .then(snap => { inventarioProgramacion = snap.docs.map(item => ({ id: item.id, ...item.data() })); })
@@ -511,7 +516,7 @@ async function cargarSemana({ datosPrevios = null } = {}) {
     // No consultar borradores como alternativa a un rechazo de permisos.
     const publicaciones = await getDocs(query(
       collection(db, "programacionPublicadaUsuarios"),
-      where("empresaId", "==", empresaId),
+      ...filtrosAmbitoProgramacion(),
       where("usuarioId", "==", usuario.uid),
       where("estado", "==", "publicada"),
       where("semanaInicio", "==", inicio),
@@ -521,17 +526,21 @@ async function cargarSemana({ datosPrevios = null } = {}) {
   } else if (PUEDE_VER_BORRADORES) {
     const [semanaSnap, asignacionesSnap] = await Promise.all([
       getDocs(query(collection(db, "programacionSemanas"),
-        where("empresaId", "==", empresaId), where("semanaInicio", "==", inicio), limit(1))),
-      getDocs(query(collection(db, "programaciones"), where("empresaId", "==", empresaId))),
+        ...filtrosAmbitoProgramacion(), where("semanaInicio", "==", inicio), limit(1))),
+      getDocs(query(collection(db, "programaciones"), ...filtrosAmbitoProgramacion())),
       cargarConfirmacionesSemana(inicio)
     ]);
     semanaGuardada = semanaSnap.docs[0]?.data() || null;
     asignacionesConsultadas = asignacionesSnap.docs.map(item => ({ id: item.id, ...item.data() }));
   } else {
     const semanaSnap = await getDocs(query(collection(db, "programacionSemanas"),
-      where("empresaId", "==", empresaId), where("semanaInicio", "==", inicio),
-      where("estado", "==", "publicada"), limit(1)));
-    semanaGuardada = semanaSnap.docs[0]?.data() || null;
+      ...filtrosAmbitoProgramacion(), where("semanaInicio", "==", inicio),
+      where("estado", "==", "publicada")));
+    semanaGuardada = semanaSnap.docs.length ? {
+      estado: "publicada",
+      snapshotPublicado: semanaSnap.docs.flatMap(item => item.data().snapshotPublicado || item.data().asignaciones || []),
+      turnosEmergenciaIds: semanaSnap.docs.flatMap(item => item.data().turnosEmergenciaIds || [])
+    } : null;
   }
   if (datosPrevios) {
     const cargas = await datosPrevios;
@@ -586,7 +595,7 @@ async function cargarConfirmacionesSemana(inicio) {
     if (ES_TRABAJADOR_CON_SEMANA_PERSONAL) {
       const snap = await getDocs(query(
         collection(db, "programacionConfirmaciones"),
-        where("empresaId", "==", empresaId),
+        ...filtrosAmbitoProgramacion(),
         where("usuarioId", "==", usuario.uid),
         where("semanaInicio", "==", inicio)
       ));
@@ -596,7 +605,7 @@ async function cargarConfirmacionesSemana(inicio) {
         confirmacionesSemana = [confirmacionSemanaActual];
       }
     } else if (PUEDE_EDITAR) {
-      const snap = await getDocs(query(collection(db, "programacionConfirmaciones"), where("empresaId", "==", empresaId)));
+      const snap = await getDocs(query(collection(db, "programacionConfirmaciones"), ...filtrosAmbitoProgramacion()));
       confirmacionesSemana = snap.docs.map(item => ({ id: item.id, ...item.data() })).filter(item => item.semanaInicio === inicio);
     }
   } catch (error) {
@@ -605,8 +614,9 @@ async function cargarConfirmacionesSemana(inicio) {
 }
 
 function marcarSemanaBorrador(batch, inicio) {
-  batch.set(doc(db, "programacionSemanas", `${empresaId}_${inicio}`), {
+  batch.set(doc(db, "programacionSemanas", `${empresaId}_${usuario.sucursalId}_${inicio}`), {
     empresaId,
+    sucursalId: usuario.sucursalId,
     semanaInicio: inicio,
     estado: "borrador",
     actualizadoPor: usuario.uid,
@@ -817,7 +827,7 @@ async function confirmarRevisionProgramacion() {
     return;
   }
   const inicio = fechaISO(semanaInicio);
-  const referencia = doc(db, "programacionConfirmaciones", `${empresaId}_${inicio}_${usuario.uid}`);
+  const referencia = doc(db, "programacionConfirmaciones", confirmacionSemanaActual?.id || `${empresaId}_${usuario.sucursalId}_${inicio}_${usuario.uid}`);
   const boton = $("btnConfirmarProgramacion");
   if (boton) {
     boton.disabled = true;
@@ -865,8 +875,9 @@ async function cambiarTurnoEmergencia(usuarioId) {
 
   const inicio = fechaISO(semanaInicio);
   try {
-    await setDoc(doc(db, "programacionSemanas", `${empresaId}_${inicio}`), {
+    await setDoc(doc(db, "programacionSemanas", `${empresaId}_${usuario.sucursalId}_${inicio}`), {
       empresaId,
+      sucursalId: usuario.sucursalId,
       semanaInicio: inicio,
       estado: estadoSemanaActual,
       turnosEmergenciaIds: [...nuevosTurnos],

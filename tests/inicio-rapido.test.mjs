@@ -23,7 +23,7 @@ function entornoProgramacion({ habilitada=true, borradores=false }={}) {
     window:{OverTrackUI:{finalizarCargaPagina:()=>{finales++;}}},
     $:()=>({style:{},innerHTML:"",textContent:""}),escapar:String,
     mostrarMensaje:m=>mensajes.push(m),
-    db:{},empresaId:"e",usuario:{uid:"u"},semanaInicio:new Date("2026-11-02"),fechaISO:()=>"2026-11-02",sumarDias:()=>new Date("2026-11-08"),
+    db:{},empresaId:"e",usuario:{uid:"u",rol:"planificador",sucursalId:"s"},semanaInicio:new Date("2026-11-02"),fechaISO:()=>"2026-11-02",sumarDias:()=>new Date("2026-11-08"),
     ES_TRABAJADOR_CON_SEMANA_PERSONAL:false,PUEDE_VER_BORRADORES:borradores,
     doc:(_db,c)=>({c}),collection:(_db,c)=>({c}),where(){},limit(){},query:(c)=>c,
     getDoc:()=>{llamadas.push("semana");return semana.promesa;},
@@ -38,7 +38,8 @@ function entornoProgramacion({ habilitada=true, borradores=false }={}) {
   });
   const cargar=programa.match(/async function cargarSemana\([\s\S]*?\) \{[\s\S]*?\n\}/)[0];
   const iniciar=programa.slice(programa.lastIndexOf("async function iniciar()"),programa.lastIndexOf("\niniciar();"));
-  vm.runInContext(`${cargar}\n${iniciar}`,contexto);
+  const ambito=programa.match(/function filtrosAmbitoProgramacion\(\) \{[\s\S]*?\n\}/)[0];
+  vm.runInContext(`${ambito}\n${cargar}\n${iniciar}`,contexto);
   return {contexto,llamadas,mensajes,usuarios,sheq,operativos,semana,asignaciones,confirmaciones,renders:()=>renders,finales:()=>finales};
 }
 

@@ -27,7 +27,12 @@ async function contexto({ db, usuario, ruta }) {
     permitido = false; // Las plantillas se administran exclusivamente por sucursal.
     tipos = ["application/vnd.ms-excel", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"]; maximo = 5 * 1024 ** 2;
   } else if (grupo === "sheq") {
-    permitido = usuario.rol === "sheq" && empresa.modulos?.sheq !== false;
+    const partes = ruta.split("/");
+    const tipo = partes[3], entidadId = partes[4];
+    const coleccion = tipo === "persona" ? "usuarios" : tipo === "vehiculo" ? "sheqVehiculos" : null;
+    const entidad = coleccion && entidadId && partes.length === 6 ? await db.collection(coleccion).doc(entidadId).get() : null;
+    permitido = usuario.rol === "sheq" && Boolean(usuario.sucursalId) && empresa.modulos?.sheq !== false &&
+      entidad?.exists && entidad.data().empresaId === empresaId && entidad.data().sucursalId === usuario.sucursalId;
     tipos = [...imagenes, "application/pdf", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"];
   } else if (grupo === "inventario") {
     permitido = ["jefe_taller", "planificador"].includes(usuario.rol) && usuario.sucursalId === sucursal && empresa.modulos?.inventario !== false;

@@ -182,8 +182,18 @@ service firebase.storage {
       allow delete: if false;
     }
 
-    match /empresas/{empresaId}/sheq/{allPaths=**} {
-      allow read: if canReadSheq(empresaId);
+    match /empresas/{empresaId}/sheq/{tipo}/{entidadId}/{archivo} {
+      allow read: if canReadSheq(empresaId) && (
+        profile().rol == 'admin_empresa' || (
+          tipo == 'persona' &&
+          firestore.get(/databases/(default)/documents/usuarios/$(entidadId)).data.empresaId == empresaId &&
+          firestore.get(/databases/(default)/documents/usuarios/$(entidadId)).data.sucursalId == profile().sucursalId
+        ) || (
+          tipo == 'vehiculo' &&
+          firestore.get(/databases/(default)/documents/sheqVehiculos/$(entidadId)).data.empresaId == empresaId &&
+          firestore.get(/databases/(default)/documents/sheqVehiculos/$(entidadId)).data.sucursalId == profile().sucursalId
+        )
+      );
       allow create, update: if false;
       allow delete: if false;
     }
