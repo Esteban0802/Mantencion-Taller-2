@@ -6,6 +6,22 @@ import { resumenAlmacenamiento, renderIndicadorAlmacenamiento } from "../js/stor
 const { reservarCuota, actualizarReserva, subirConCuota } = createRequire(import.meta.url)("../functions/cuota-storage.js");
 const { subirArchivoEmpresa } = createRequire(import.meta.url)("../functions/archivos-empresa.js");
 const { conciliarReservas } = createRequire(import.meta.url)("../functions/conciliacion-reservas.js");
+const { limpiarExportaciones } = createRequire(import.meta.url)("../functions/limpieza-exportaciones.js");
+
+test("la limpieza de exportaciones pagina y solo elimina temporales vencidos",async()=>{
+  const consultas=[],borrados=[];
+  const archivo=(name,metadata)=>({name,getMetadata:async()=>[{metadata}],delete:async()=>borrados.push(name)});
+  const bucket={getFiles:async opciones=>{
+    consultas.push(opciones);
+    return opciones.pageToken ? [[archivo("exportaciones/futura",{temporalExport:"true",expiresAt:"2030-01-01"}),archivo("exportaciones/invalida",{temporalExport:"true",expiresAt:"sin fecha"})],null] :
+      [[archivo("exportaciones/vencida",{temporalExport:"true",expiresAt:"2026-01-01"}),archivo("exportaciones/permanente",{expiresAt:"2026-01-01"}),archivo("ots/evidencia",{temporalExport:"true",expiresAt:"2026-01-01"})],{pageToken:"segunda"}];
+  }};
+  const r=await limpiarExportaciones({bucket,ahora:Date.parse("2026-11-22")});
+  assert.deepEqual(borrados,["exportaciones/vencida"]);
+  assert.deepEqual(r,{revisadas:4,eliminadas:1});
+  assert.equal(consultas[1].pageToken,"segunda");
+  assert.ok(consultas.every(q=>q.maxResults===100 && q.autoPaginate===false));
+});
 
 function habilitarConsultaReservas(db) {
   const consultas=[];

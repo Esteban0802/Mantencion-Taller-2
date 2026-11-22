@@ -1,4 +1,5 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
+const { setGlobalOptions } = require("firebase-functions/v2/options");
 const { onObjectFinalized, onObjectDeleted } = require("firebase-functions/storage");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { onDocumentUpdated, onDocumentWritten, onDocumentDeleted } = require("firebase-functions/v2/firestore");
@@ -19,6 +20,8 @@ const db = getFirestore();
 const auth = getAuth();
 const bucket = getStorage().bucket();
 const REGION = "us-central1";
+// Respaldo para toda función actual o futura; las opciones específicas prevalecen.
+setGlobalOptions({ region: REGION, minInstances: 0, maxInstances: 5, memory: "256MiB" });
 const CALLABLE_OPTIONS = {
   region: REGION,
   maxInstances: 10,
@@ -665,7 +668,7 @@ exports.limpiarIdentidadSucursal = onDocumentUpdated({
 });
 
 exports.conciliarReservasAlmacenamiento = onSchedule({
-  schedule: "every 60 minutes", region: REGION, timeoutSeconds: 300, maxInstances: 1
+  schedule: "every 60 minutes", region: REGION, timeoutSeconds: 300, maxInstances: 1, concurrency: 1
 }, async () => {
   const resultado = await require("./conciliacion-reservas").conciliarReservas({ db, bucket });
   console.info("conciliarReservasAlmacenamiento", resultado);
@@ -1865,18 +1868,10 @@ exports.limpiarExportacionesExpiradas = onSchedule({
   schedule: "every day 03:15",
   timeZone: "America/Santiago",
   timeoutSeconds: 540,
-  memory: "256MiB"
+  memory: "256MiB",
+  maxInstances: 1,
+  concurrency: 1
 }, async () => {
-  const [archivos] = await bucket.getFiles({ prefix: "exportaciones/" });
-  const ahora = Date.now();
-  let eliminados = 0;
-  for (const archivo of archivos) {
-    const [metadata] = await archivo.getMetadata();
-    const expira = Date.parse(metadata.metadata?.expiresAt || "");
-    if (metadata.metadata?.temporalExport === "true" && Number.isFinite(expira) && expira <= ahora) {
-      await archivo.delete({ ignoreNotFound: true });
-      eliminados += 1;
-    }
-  }
-  console.log(`Exportaciones temporales eliminadas: ${eliminados}`);
+  const resultado = await require("./limpieza-exportaciones").limpiarExportaciones({ bucket });
+  console.info("limpiarExportacionesExpiradas", resultado);
 });
