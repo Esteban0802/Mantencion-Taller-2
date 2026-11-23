@@ -21,7 +21,7 @@ async function obtenerDesglose({ db, bucket, usuario, empresaId }) {
       vistas.add(archivo.name);
       const partes = archivo.name.split("/");
       const ot = partes[0] === "ots" ? ordenes.get(partes[1]) : null;
-      const sucursalId = ot ? ot.sucursalId : ["sucursales", "inventario"].includes(partes[2]) ? partes[3] : null;
+      const sucursalId = ot ? ot.sucursalId : ["sucursales", "inventario", "inventarioServicio"].includes(partes[2]) ? partes[3] : null;
       const fila = sucursalId ? filas.get(sucursalId) || sinSucursal : ot ? sinSucursal : generales;
       const bytes = Math.max(0, Number(archivo.metadata?.size || 0));
       fila.bytes += bytes; fila.archivos++;

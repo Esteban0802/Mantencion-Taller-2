@@ -50,6 +50,41 @@ const FIRESTORE_PORT = Number(process.env.FIRESTORE_EMULATOR_PORT || 8080);
 const STORAGE_PORT = Number(process.env.STORAGE_EMULATOR_PORT || 9199);
 let testEnv;
 
+test("Servicio permite consultar solo el inventario y movimientos de la sucursal y bloquea toda escritura directa",async()=>{
+  await testEnv.withSecurityRulesDisabled(async c=>{
+    for(const coleccion of ["inventarioServicio","inventarioServicioMovimientos"]){
+      await setDoc(doc(c.firestore(),coleccion,"servicio-a"),{empresaId:"empresa-a",sucursalId:"sucursal-a",ordenId:"servicio-a",fechaActualizacion:1,fechaRegistro:1});
+      await setDoc(doc(c.firestore(),coleccion,"servicio-ajeno"),{empresaId:"empresa-a",sucursalId:"sucursal-a2",ordenId:"servicio-ajeno",fechaActualizacion:1,fechaRegistro:1});
+    }
+  });
+  for(const coleccion of ["inventarioServicio","inventarioServicioMovimientos"]){
+    for(const uid of ["jefe-a","planificador-a","bodeguero-a","admin-sucursal-a"]){
+      const db=firestoreComo(uid),ref=doc(db,coleccion,"servicio-a");
+      await assertSucceeds(getDoc(ref));
+      await assertSucceeds(getDocs(query(collection(db,coleccion),where("empresaId","==","empresa-a"),where("sucursalId","==","sucursal-a"))));
+      await assertFails(getDoc(doc(db,coleccion,"servicio-ajeno")));
+      await assertFails(updateDoc(ref,{recibido:100}));await assertFails(deleteDoc(ref));
+      await assertFails(setDoc(doc(db,coleccion,"nuevo"),{empresaId:"empresa-a",sucursalId:"sucursal-a"}));
+    }
+    for(const uid of ["tecnico-a","supervisor-a","sheq-a","super-admin","taller-b"])await assertFails(getDoc(doc(firestoreComo(uid),coleccion,"servicio-a")));
+    await assertSucceeds(getDoc(doc(firestoreComo("admin-a"),coleccion,"servicio-ajeno")));
+  }
+});
+
+test("los respaldos de Servicio se leen solo en la empresa y sucursal autorizadas y no se escriben directamente",async()=>{
+  const ruta="empresas/empresa-a/inventarioServicio/sucursal-a/servicio-a/movimiento/foto.jpg";
+  await testEnv.withSecurityRulesDisabled(async c=>{
+    await setDoc(doc(c.firestore(),"inventarioServicio","servicio-a"),{empresaId:"empresa-a",sucursalId:"sucursal-a"});
+    await uploadBytes(ref(c.storage(),ruta),new Uint8Array([255,216,255]),{contentType:"image/jpeg"});
+  });
+  for(const uid of ["jefe-a","planificador-a","bodeguero-a","admin-sucursal-a","admin-a"])await assertSucceeds(getBytes(ref(storageComo(uid),ruta)));
+  for(const uid of ["taller-a2","taller-b","tecnico-a","sheq-a","super-admin"])await assertFails(getBytes(ref(storageComo(uid),ruta)));
+  for(const uid of ["bodeguero-a","jefe-a","admin-a"]){
+    await assertFails(deleteObject(ref(storageComo(uid),ruta)));
+    await assertFails(uploadBytes(ref(storageComo(uid),ruta),new Uint8Array([255,216,255]),{contentType:"image/jpeg"}));
+  }
+});
+
 test("Programación y SHEQ rechazan acceso y escrituras de otras sucursales, incluso dentro de la misma empresa", async () => {
   const colecciones=["programaciones","programacionSemanas","programacionHistorial","programacionAusencias","programacionConfirmaciones","sheqContratos","sheqVehiculos","sheqDocumentos"];
   await testEnv.withSecurityRulesDisabled(async c=>{

@@ -756,6 +756,21 @@ service cloud.firestore {
       );
     }
 
+    // Servicio usa movimientos inmutables y saldos calculados exclusivamente en el servidor.
+    match /inventarioServicio/{ordenId} {
+      allow read: if canReadBranchData(resource.data) &&
+        hasRole(['admin_empresa', 'admin_sucursal', 'jefe_taller', 'planificador', 'bodeguero']) &&
+        moduloEtapaActivo(empresaDeOT(resource.data), 'inventario');
+      allow write: if false;
+    }
+
+    match /inventarioServicioMovimientos/{movimientoId} {
+      allow read: if canReadBranchData(resource.data) &&
+        hasRole(['admin_empresa', 'admin_sucursal', 'jefe_taller', 'planificador', 'bodeguero']) &&
+        moduloEtapaActivo(empresaDeOT(resource.data), 'inventario');
+      allow write: if false;
+    }
+
     match /inventarioItems/{itemId} {
       allow read: if canReadBranchData(resource.data) &&
         moduloEtapaActivo(empresaDeOT(resource.data), 'inventario');

@@ -198,6 +198,13 @@ service firebase.storage {
       allow delete: if false;
     }
 
+    match /empresas/{empresaId}/inventarioServicio/{sucursalId}/{ordenId}/{movimientoId}/{archivo} {
+      allow read: if canReadInventory(empresaId, sucursalId) &&
+        firestore.get(/databases/(default)/documents/inventarioServicio/$(ordenId)).data.empresaId == empresaId &&
+        firestore.get(/databases/(default)/documents/inventarioServicio/$(ordenId)).data.sucursalId == sucursalId;
+      allow write: if false;
+    }
+
     match /empresas/{empresaId}/inventario/{sucursalId}/{allPaths=**} {
       allow read: if canReadInventory(empresaId, sucursalId);
       allow create, update: if false;

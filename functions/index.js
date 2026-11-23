@@ -630,6 +630,19 @@ exports.eliminarArchivoOT = operacionArchivoOT(archivosOT.eliminarArchivoOT);
 exports.subirArchivoEmpresa = operacionArchivoOT(archivosEmpresa.subirArchivoEmpresa);
 exports.eliminarArchivoEmpresa = operacionArchivoOT(archivosEmpresa.eliminarArchivoEmpresa);
 
+exports.gestionarInventarioServicio = onCall(CALLABLE_OPTIONS, async request => {
+  const usuario = await obtenerSolicitante(request);
+  try {
+    return await require("./inventario-servicio").gestionarServicio({ db, bucket, usuario, datos: request.data || {} });
+  } catch (error) {
+    if (["permission-denied","failed-precondition","invalid-argument","not-found","already-exists"].includes(error.code)) {
+      throw new HttpsError(error.code, error.message);
+    }
+    console.error("gestionarInventarioServicio", error.code || error.name);
+    throw new HttpsError("internal", "No fue posible guardar el movimiento. Reintenta sin cambiar sus datos.");
+  }
+});
+
 exports.limpiarIdentidadEmpresa = onDocumentUpdated({
   document: "empresas/{empresaId}", region: REGION, retry: true, maxInstances: 1, timeoutSeconds: 120
 }, async evento => {
@@ -1504,6 +1517,8 @@ exports.eliminarEmpresaCompleta = onCall({
     "otsPapelera",
     "plantillasMantenimiento",
     "inventarioItems",
+    "inventarioServicio",
+    "inventarioServicioMovimientos",
     "inventarioConfiguraciones",
     "programaciones",
     "programacionSemanas",
@@ -1579,7 +1594,7 @@ exports.generarExportacionEmpresa = onCall({
   const empresa = { id: empresaSnap.id, ...valorExportable(empresaSnap.data()) };
   const colecciones = [
     "usuarios", "sucursales", "clientes", "equipos", "ots", "otsResumen", "otsPapelera",
-    "plantillasMantenimiento", "plantillasSucursal", "inventarioItems", "inventarioConfiguraciones",
+    "plantillasMantenimiento", "plantillasSucursal", "inventarioItems", "inventarioConfiguraciones", "inventarioServicio", "inventarioServicioMovimientos",
     "programaciones", "programacionSemanas", "programacionPublicadaUsuarios",
     "programacionHistorial", "programacionAusencias", "programacionConfirmaciones",
     "sheqContratos", "sheqVehiculos",

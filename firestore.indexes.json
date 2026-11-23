@@ -1,6 +1,46 @@
 {
   "indexes": [
     {
+      "collectionGroup": "inventarioServicio",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "empresaId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "sucursalId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "fechaActualizacion",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "inventarioServicioMovimientos",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "empresaId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "sucursalId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "ordenId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "fechaRegistro",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
       "collectionGroup": "programacionSemanas",
       "queryScope": "COLLECTION",
       "fields": [

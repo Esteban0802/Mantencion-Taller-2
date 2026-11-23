@@ -34,6 +34,16 @@ async function contexto({ db, usuario, ruta }) {
     permitido = usuario.rol === "sheq" && Boolean(usuario.sucursalId) && empresa.modulos?.sheq !== false &&
       entidad?.exists && entidad.data().empresaId === empresaId && entidad.data().sucursalId === usuario.sucursalId;
     tipos = [...imagenes, "application/pdf", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"];
+  } else if (grupo === "inventarioServicio") {
+    const partes = ruta.split("/");
+    const ordenId = partes[4], movimientoId = partes[5];
+    const orden = partes.length === 7 ? await db.collection("inventarioServicio").doc(ordenId).get() : null;
+    const movimiento = orden?.exists ? await db.collection("inventarioServicioMovimientos").doc(`${ordenId}_${movimientoId}`).get() : null;
+    const sucursalSnap = orden?.exists ? await db.collection("sucursales").doc(sucursal).get() : null;
+    permitido = usuario.rol === "bodeguero" && Boolean(usuario.sucursalId) && usuario.sucursalId === sucursal && empresa.modulos?.inventario !== false &&
+      orden?.exists && orden.data().empresaId === empresaId && orden.data().sucursalId === sucursal && !movimiento?.exists &&
+      sucursalSnap?.exists && sucursalSnap.data().empresaId === empresaId && sucursalSnap.data().activa !== false;
+    tipos = [...imagenes, "application/pdf"];
   } else if (grupo === "inventario") {
     permitido = ["jefe_taller", "planificador"].includes(usuario.rol) && usuario.sucursalId === sucursal && empresa.modulos?.inventario !== false;
     tipos = [...imagenes, "application/pdf"];

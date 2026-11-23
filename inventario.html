@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="css/brand-overtrack-light.css">
   <link rel="stylesheet" href="css/notificaciones.css?v=20261007-1">
   <link rel="stylesheet" href="css/inventario.css?v=20261014-21">
+  <link rel="stylesheet" href="css/inventario-servicio.css?v=20261122-1">
   <link rel="stylesheet" href="css/desktop-density.css?v=20261104-1">
   <link rel="stylesheet" href="css/mobile-normalized.css?v=20261018-4">
 </head>
@@ -46,9 +47,16 @@
       <div class="user-box"><span id="usuarioNombre">Usuario</span><small id="usuarioRol">Rol</small><button type="button" class="btn-logout" id="btnSalirInventarioTop">Salir</button></div>
     </div>
 
+    <div class="inventario-areas-bar">
+      <div class="inventario-areas" role="tablist" aria-label="Área de inventario">
+        <button type="button" id="tabInventarioTaller" role="tab" aria-selected="true" aria-controls="areaInventarioTaller">Taller</button>
+        <button type="button" id="tabInventarioServicio" role="tab" aria-selected="false" aria-controls="areaInventarioServicio" tabindex="-1">Servicio</button>
+      </div>
+      <label id="grupoSucursalInventario"><span>Sucursal</span><select id="selectorSucursalInventario"><option value="">Seleccionar sucursal</option></select></label>
+    </div>
+    <div id="areaInventarioTaller" role="tabpanel" aria-labelledby="tabInventarioTaller">
     <section class="inventario-toolbar card">
       <div class="inventario-filtros">
-        <label id="grupoSucursalInventario"><span>Sucursal</span><select id="selectorSucursalInventario"><option value="">Seleccionar sucursal</option></select></label>
         <label><span>Buscar</span><input id="buscarInventario" type="search" placeholder="Buscar en todo el inventario..."></label>
       </div>
       <div class="inventario-acciones" id="accionesEdicionInventario">
@@ -77,6 +85,8 @@
         <button type="button" class="btn-secondary-inventario" id="btnCargarMasInventario" hidden>Cargar 50 más</button>
       </div>
     </section>
+    </div>
+    <section id="areaInventarioServicio" role="tabpanel" aria-labelledby="tabInventarioServicio" hidden></section>
   </main>
 </div>
 
@@ -124,6 +134,6 @@
 
 <script src="js/components/notificaciones.js?v=20261022-3"></script>
 <script src="js/mobile-table-cards.js?v=20261017-1"></script>
-<script type="module" src="js/inventario.js?v=20261104-3" data-excel-src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<script type="module" src="js/inventario.js?v=20261122-2" data-excel-src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 </body>
 </html>

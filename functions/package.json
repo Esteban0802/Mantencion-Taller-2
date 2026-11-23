@@ -6,7 +6,7 @@
     "node": "22"
   },
   "scripts": {
-    "check": "node --check index.js && node --check flujo-libre.js && node --check operacion-libre.js && node --check planificacion-libre.js && node --check plantilla-libre.js && node --check desglose-storage.js && node --check papelera-ot.js && node --check comentarios-ot.js && node --check respuesta-observacion.js && node --check evidencias-ot.js && node --check archivos-ot.js && node --check cuota-storage.js && node --check archivos-empresa.js",
+    "check": "node --check index.js && node --check flujo-libre.js && node --check operacion-libre.js && node --check planificacion-libre.js && node --check plantilla-libre.js && node --check desglose-storage.js && node --check papelera-ot.js && node --check comentarios-ot.js && node --check respuesta-observacion.js && node --check evidencias-ot.js && node --check archivos-ot.js && node --check cuota-storage.js && node --check archivos-empresa.js && node --check inventario-servicio.js && node --check limpieza-exportaciones.js",
     "serve": "firebase emulators:start --only functions",
     "deploy": "firebase deploy --only functions"
   },

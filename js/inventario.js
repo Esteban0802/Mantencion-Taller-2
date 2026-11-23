@@ -26,6 +26,27 @@ let itemsFiltrados = [];
 let usuariosRetiro = [];
 let puedeEditar = false;
 let puedeGestionarEstados = false;
+let servicioInventario = null;
+let cargandoServicioInventario = null;
+
+async function mostrarAreaInventario(area) {
+  const esServicio = area === "servicio";
+  for (const [nombre, seleccionada] of [["Taller", !esServicio], ["Servicio", esServicio]]) {
+    const tab = $("tabInventario" + nombre);
+    tab.setAttribute("aria-selected", String(seleccionada));
+    tab.tabIndex = seleccionada ? 0 : -1;
+    $("areaInventario" + nombre).hidden = !seleccionada;
+  }
+  if (esServicio) {
+    try {
+      if (!cargandoServicioInventario) cargandoServicioInventario = import("./inventario-servicio.js?v=20261122-2").then(m => {
+        servicioInventario = m.iniciarInventarioServicio({ root: $("areaInventarioServicio"), obtenerContexto: () => ({usuario,empresaId,sucursalId,usuariosRetiro}) });
+      }).catch(error => { cargandoServicioInventario = null; throw error; });
+      await cargandoServicioInventario;
+      await servicioInventario.cargar();
+    } catch (error) { await mensaje({ titulo: "No se pudo cargar Servicio", texto: error.message || "Intenta nuevamente.", tipo: "error" }); }
+  }
+}
 let importacionEnCurso = false;
 const operacionesInventarioEnCurso = new Set();
 const REGISTROS_POR_CARGA = 50;
@@ -153,7 +174,10 @@ async function cargarSucursales() {
     selector.value = sucursalId;
   }
 
-  if (sucursalId) { await cargarUsuariosRetiro(); await cargarInventario(); }
+  if (sucursalId) {
+    await cargarUsuariosRetiro(); await cargarInventario();
+    if (servicioInventario && !$("areaInventarioServicio").hidden) await servicioInventario.cargar();
+  }
 }
 
 async function cargarUsuariosRetiro() {
@@ -761,7 +785,21 @@ async function exportarInventario() {
 }
 
 function configurarEventos() {
-  $("selectorSucursalInventario").addEventListener("change", async e => { sucursalId = e.target.value; await cargarUsuariosRetiro(); await cargarInventario(); });
+  for (const area of ["Taller", "Servicio"]) {
+    const tab = $("tabInventario" + area);
+    tab.addEventListener("click", () => mostrarAreaInventario(area.toLowerCase()));
+    tab.addEventListener("keydown", e => {
+      if (["ArrowLeft","ArrowRight","Home","End"].includes(e.key)) {
+        e.preventDefault(); const destino = e.key === "Home" ? "Taller" : e.key === "End" ? "Servicio" : area === "Taller" ? "Servicio" : "Taller";
+        $("tabInventario" + destino).focus(); mostrarAreaInventario(destino.toLowerCase());
+      }
+    });
+  }
+  $("selectorSucursalInventario").addEventListener("change", async e => {
+    sucursalId = e.target.value;
+    try { await cargarUsuariosRetiro(); await cargarInventario(); if (servicioInventario) await servicioInventario.cargar(); }
+    catch (error) { await mensaje({titulo:"No se pudo cambiar de sucursal",texto:error.message,tipo:"error"}); }
+  });
   $("buscarInventario").addEventListener("input", () => {
     clearTimeout(timerBusquedaInventario);
     timerBusquedaInventario = setTimeout(async () => {
